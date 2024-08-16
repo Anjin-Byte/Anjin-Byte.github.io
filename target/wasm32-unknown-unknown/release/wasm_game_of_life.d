@@ -1,1 +1,0 @@
-/Users/thales/Documents/Anjin-Byte.github.io/wasm-game-of-life/target/wasm32-unknown-unknown/release/wasm_game_of_life.wasm: /Users/thales/Documents/Anjin-Byte.github.io/wasm-game-of-life/src/lib.rs /Users/thales/Documents/Anjin-Byte.github.io/wasm-game-of-life/src/utils.rs

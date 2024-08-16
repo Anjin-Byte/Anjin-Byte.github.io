@@ -1,5 +1,0 @@
-{
-    "dependencies": {
-        "create-wasm-app": "/usr/local/lib/node_modules/create-wasm-app"
-    }
-}
