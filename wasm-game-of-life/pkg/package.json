@@ -8,13 +8,11 @@
   "files": [
     "wasm_game_of_life_bg.wasm",
     "wasm_game_of_life.js",
-    "wasm_game_of_life_bg.js",
     "wasm_game_of_life.d.ts"
   ],
   "main": "wasm_game_of_life.js",
   "types": "wasm_game_of_life.d.ts",
   "sideEffects": [
-    "./wasm_game_of_life.js",
     "./snippets/*"
   ]
 }
