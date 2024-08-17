@@ -1,5 +1,5 @@
 //import * as wasm from "../wasm-game-of-life";
-import { Universe } from "hello_there";
+import { Universe } from "../pkg/wasm_game_of_life";
 
 const pre = document.getElementById("game-of-life-canvas");
 const universe = Universe.new();
