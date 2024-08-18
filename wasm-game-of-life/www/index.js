@@ -15,5 +15,5 @@ init().then(() => {
 
     requestAnimationFrame(renderLoop);
 
-    wasm.greet("Mae \u{1F48C} - u are a dork!");
+    wasm.greet("Mae \u{1F48C} - I got website running! U are a goof");
 });
