@@ -1,4 +1,4 @@
-import * as wasm from "../pkg/wasm_game_of_life.js";
+//import * as wasm from "../pkg/wasm_game_of_life.js";
 import init, { Universe } from "../pkg/wasm_game_of_life.js";
 
 init().then(() => {
@@ -15,5 +15,5 @@ init().then(() => {
 
     requestAnimationFrame(renderLoop);
 
-    wasm.greet("Mae \u{1F48C} - I got website running! U are a goof");
+    //wasm.greet("Mae \u{1F48C} - I got website running! U are a goof");
 });
