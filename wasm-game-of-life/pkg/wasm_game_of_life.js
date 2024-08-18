@@ -129,6 +129,27 @@ export class Universe {
         return Universe.__wrap(ret);
     }
     /**
+    * @returns {number}
+    */
+    width() {
+        const ret = wasm.universe_width(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+    * @returns {number}
+    */
+    height() {
+        const ret = wasm.universe_height(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+    * @returns {number}
+    */
+    cells() {
+        const ret = wasm.universe_cells(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
     * @returns {string}
     */
     render() {
@@ -207,6 +228,8 @@ function __wbg_finalize_init(instance, module) {
     __wbg_init.__wbindgen_wasm_module = module;
     cachedDataViewMemory0 = null;
     cachedUint8ArrayMemory0 = null;
+
+
 
     return wasm;
 }

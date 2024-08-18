@@ -19,6 +19,18 @@ export class Universe {
 */
   static new(): Universe;
 /**
+* @returns {number}
+*/
+  width(): number;
+/**
+* @returns {number}
+*/
+  height(): number;
+/**
+* @returns {number}
+*/
+  cells(): number;
+/**
 * @returns {string}
 */
   render(): string;
@@ -33,6 +45,9 @@ export interface InitOutput {
   readonly memory: WebAssembly.Memory;
   readonly __wbg_universe_free: (a: number, b: number) => void;
   readonly universe_new: () => number;
+  readonly universe_width: (a: number) => number;
+  readonly universe_height: (a: number) => number;
+  readonly universe_cells: (a: number) => number;
   readonly universe_render: (a: number, b: number) => void;
   readonly universe_tick: (a: number) => void;
   readonly greet: (a: number, b: number) => void;
