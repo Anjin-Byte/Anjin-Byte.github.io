@@ -10,7 +10,7 @@ async function start() {
     const wasm = await __wbg_init("../pkg/wasm_game_of_life_bg.wasm");
 }
 
-start();
+start().catch(console.error);
 
 const universe = Universe.new();
 

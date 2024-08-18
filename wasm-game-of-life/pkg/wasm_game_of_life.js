@@ -209,7 +209,7 @@ function __wbg_finalize_init(instance, module) {
     cachedUint8ArrayMemory0 = null;
 
 
-
+    console.log("__wbg_finalize_init finished")
     return wasm;
 }
 
