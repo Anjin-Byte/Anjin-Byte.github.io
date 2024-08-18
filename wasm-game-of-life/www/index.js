@@ -2,6 +2,7 @@ import * as wasm from "../pkg/wasm_game_of_life.js";
 import init, { Universe } from "../pkg/wasm_game_of_life.js";
 
 init().then(() => {
+    console.log("wbg_init called")
     const pre = document.getElementById("game-of-life-canvas");
 
     const universe = Universe.new();
