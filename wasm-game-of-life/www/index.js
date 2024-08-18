@@ -15,11 +15,5 @@ init().then(() => {
 
     requestAnimationFrame(renderLoop);
 
-    wasm.greet("Mae");
+    wasm.greet("Mae \u{1F48C} - u are a dork!");
 });
-
-
-/*
-Get rid of redirect
-Change message to Mae
-*/
