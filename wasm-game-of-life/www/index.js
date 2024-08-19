@@ -1,6 +1,6 @@
 //import * as wasm from "../pkg/wasm_game_of_life.js";
 import init, { Universe, Cell } from "../pkg/wasm_game_of_life.js";
-import { getUint8ArrayMemory0 as getMemory } from "../pkg/wasm_game_of_life_bg.js";
+import { getUint8ArrayMemory0 as getMemory } from "../pkg/wasm_game_of_life.js";
 
 const CELL_SIZE = 10; // px
 const GRID_COLOR = "#CCCCCC";
