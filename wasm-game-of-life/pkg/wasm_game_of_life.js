@@ -281,5 +281,5 @@ async function __wbg_init(module_or_path) {
     return __wbg_finalize_init(instance, module);
 }
 
-export { initSync };
+export { initSync, getUint8ArrayMemory0 };
 export default __wbg_init;
