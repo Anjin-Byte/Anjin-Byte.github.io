@@ -46,7 +46,8 @@ init().then(() => {
     
     const drawCells = () => {
         const cellsPtr = universe.cells();
-        const cells = new Uint8Array(getMemory(), cellsPtr, width * height);
+        const cells = getMemory().subarray(cellsPtr, (cellsPtr + (width * height)))
+        //const cells = new Uint8Array(getMemory()., cellsPtr, width * height);
     
         ctx.beginPath();
     
