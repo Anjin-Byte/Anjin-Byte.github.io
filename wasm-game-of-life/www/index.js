@@ -1,6 +1,6 @@
 //import * as wasm from "../pkg/wasm_game_of_life.js";
 import init, { Universe, Cell } from "../pkg/wasm_game_of_life.js";
-import { memory } from "../pkg/wasm_game_of_life_bg.wasm";
+import { getUint8ArrayMemory0 as getMemory } from "../pkg/wasm_game_of_life_bg.js";
 
 const CELL_SIZE = 10; // px
 const GRID_COLOR = "#CCCCCC";
@@ -46,7 +46,7 @@ init().then(() => {
     
     const drawCells = () => {
         const cellsPtr = universe.cells();
-        const cells = new Uint8Array(memory.buffer, cellsPtr, width * height);
+        const cells = new Uint8Array(getMemory(), cellsPtr, width * height);
     
         ctx.beginPath();
     
