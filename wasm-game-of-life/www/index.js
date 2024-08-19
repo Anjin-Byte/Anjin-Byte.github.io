@@ -73,9 +73,13 @@ init().then(() => {
         universe.tick();
 
         drawGrid();
-        drawCells();
-
+        drawCells(); 
         requestAnimationFrame(renderLoop);
     };
+
+    drawGrid();
+    drawCells();
+    requestAnimationFrame(renderLoop);
+    
     //wasm.greet("Mae \u{1F48C} - I got website running! U are a goof");
 });
