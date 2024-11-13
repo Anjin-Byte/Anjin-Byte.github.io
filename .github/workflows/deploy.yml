@@ -21,13 +21,11 @@ jobs:
           toolchain: stable
           override: true
 
-      - uses: jetli/wasm-pack-action@v0.4.0
-        with:
-          # Optional version of wasm-pack to install(eg. 'v0.9.1', 'latest')
-          version: 'latest'
+      - name: Install WASM-Pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
       - name: Build with wasm-pack
-        run: wasm-pack build
+        run: wasm-pack build --target bundler
 
       - name: Install NPM Dependencies
         run: |
