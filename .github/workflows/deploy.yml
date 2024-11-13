@@ -12,8 +12,7 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: '22.6.0'
-      - run: cd www
-      - run: npm install
+      - run: cd www && npm install
       - run: npm run dev 
       - name: Deploy
         run: |
