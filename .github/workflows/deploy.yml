@@ -24,6 +24,14 @@ jobs:
       - name: Install WASM-Pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
+      - name: Display Versions
+        run: |
+          node --version
+          npm --version
+          rustc --version
+          wasm-pack --version
+          cargo --version
+
       - name: Build with wasm-pack
         run: wasm-pack build --target bundler
 
