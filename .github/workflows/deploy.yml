@@ -20,16 +20,28 @@ jobs:
         with:
           toolchain: stable
           override: true
+
       - name: Install wasm-pack
-        uses: actions-rs/wasm-pack@v1
+        uses: jetli/wasm-pack-action@v0.2.1
+
       - name: Build with wasm-pack
         run: wasm-pack build
-      - run: cd www && npm install
-      - run: cd www && npm run dev 
+
+
+      - name: Install NPM Dependencies
+        run: |
+          cd www
+          npm install
+
+      - name: Build NPM Project
+        run: |
+          cd www
+          npm run dev
+
       - name: Deploy
         run: |
           git config user.name 'Anjin-Byte'
           git config user.email '77296608+Anjin-Byte@users.noreply.github.com'
           git add -f dist
           git commit -m 'Deploy to GitHub Pages'
-          git subtree push --prefix dist origin main
+          git push origin `git subtree split --prefix dist dev`:main --force
