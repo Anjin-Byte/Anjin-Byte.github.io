@@ -24,7 +24,6 @@ jobs:
         uses: actions-rs/wasm-pack@v1
       - name: Build with wasm-pack
         run: wasm-pack build
-      - name: npm setup and build
       - run: cd www && npm install
       - run: cd www && npm run dev 
       - name: Deploy
