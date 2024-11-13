@@ -33,7 +33,7 @@ jobs:
           cargo --version
 
       - name: Build with wasm-pack
-        run: wasm-pack build --target bundler
+        run: wasm-pack build --target web
 
       - name: Install NPM Dependencies
         run: |
