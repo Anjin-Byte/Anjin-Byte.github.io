@@ -7,7 +7,8 @@
     "start_dev": "cross-env NODE_ENV=development webpack serve",
     "start_prod": "cross-env NODE_ENV=production webpack serve",
     "dev": "cross-env NODE_ENV=development webpack",
-    "prod": "cross-env NODE_ENV=production webpack"
+    "prod": "cross-env NODE_ENV=production webpack",
+    "deploy": "gh-pages -d dist -b main -t true"
   },
   "keywords": [],
   "author": "",
