@@ -13,7 +13,7 @@ jobs:
         with:
           node-version: '22.6.0'
       - run: cd www && npm install
-      - run: npm run dev 
+      - run: cd www && npm run dev 
       - name: Deploy
         run: |
           git config user.name 'Anjin-Byte'
