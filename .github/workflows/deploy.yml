@@ -1,0 +1,23 @@
+name: Deploy to GitHub Pages
+on:
+  push:
+    branches: [src]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Important to fetch the entire history
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '22.6.0'
+      - run: npm install
+      - run: npm run dev 
+      - name: Deploy
+        run: |
+          git config user.name 'Anjin-Byte'
+          git config user.email '77296608+Anjin-Byte@users.noreply.github.com'
+          git add -f dist
+          git commit -m 'Deploy to GitHub Pages'
+          git subtree push --prefix dist origin main
