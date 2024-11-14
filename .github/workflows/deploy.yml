@@ -5,6 +5,8 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Ensure the GITHUB_TOKEN has write permissions
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
