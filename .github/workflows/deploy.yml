@@ -6,12 +6,12 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Ensure the GITHUB_TOKEN has write permissions
+      contents: write  
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Important to fetch the entire history
+          fetch-depth: 0  # fetchs the entire history
 
       - uses: actions/setup-node@v3
         with:
@@ -45,12 +45,12 @@ jobs:
       - name: Build NPM Project
         run: |
           cd www
-          npm run dev
+          npm run prod
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./www/dist
-          publish_branch: main  # Use 'gh-pages' if you prefer
+          publish_branch: main
 
