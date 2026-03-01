@@ -26,9 +26,21 @@ function patchWgpuFirefoxLimits(): Plugin {
   };
 }
 
+// Plugins needed in both the main pipeline and the worker sub-pipeline.
+const sharedPlugins = () => [wasm(), topLevelAwait(), patchWgpuFirefoxLimits()];
+
 export default defineConfig({
   base: '/',
-  plugins: [vue(), wasm(), topLevelAwait(), patchWgpuFirefoxLimits()],
+  plugins: [vue(), ...sharedPlugins()],
+  worker: {
+    // Workers are spawned as ES modules (type: 'module' in AppBackground.vue).
+    format: 'es',
+    // vite-plugin-wasm and friends must be registered here so they apply
+    // inside the worker sub-build that vite:worker-import-meta-url creates.
+    // Without this the worker bundle follows the WASM import chain and hits
+    // Vite's built-in "ESM integration proposal not supported" error.
+    plugins: sharedPlugins,
+  },
   resolve: {
     alias: {
       '@': new URL('./src', import.meta.url).pathname,

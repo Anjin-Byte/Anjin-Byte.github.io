@@ -95,9 +95,7 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
       if (gpuProbeOk) {
         log.debug('GPU: loading wasm module...');
         try {
-          const { GpuGameOfLife } = await import(
-            /* @vite-ignore */ '@gpu-pkg/game_of_life_gpu.js'
-          );
+          const { GpuGameOfLife } = await import('@gpu-pkg/game_of_life_gpu.js');
           log.debug('GPU: module loaded, initialising surface...');
           const gpu = await GpuGameOfLife.new_offscreen(canvas, cellPx);
           renderer = {
