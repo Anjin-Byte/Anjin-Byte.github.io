@@ -53,7 +53,7 @@ async fn from_surface(
 
     let grid       = Grid::new(width, height, cell_px);
     let simulation = Simulation::new(&device, &queue, &grid);
-    let renderer   = GpuRenderer::new(&device, &adapter, surface, &grid,
+    let renderer   = GpuRenderer::new(&device, &queue, &adapter, surface, &grid,
                                       &simulation.buf_a, &simulation.buf_b);
 
     Ok(GpuGameOfLife { device, queue, grid, simulation, renderer })

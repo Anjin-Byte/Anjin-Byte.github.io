@@ -1,6 +1,23 @@
-// Game of Life render shader.
-// Vertex stage: fullscreen triangle from vertex index (no vertex buffer).
-// Fragment stage: maps pixel → cell → packed bit → color, branch-free.
+// Engineering-paper Game of Life renderer — sponge-stamp ink model.
+//
+// Ink model: each alive cell renders as a sponge-stamped ink patch.
+//   Porous interior + pressure falloff + drying ring + ragged perimeter.
+//   All edges use fwidth-based AA (no constant feather needed at this scale).
+//
+// Color pipeline (linear light throughout):
+//   Colors are defined in OKLab — perceptually uniform, correct gamut path.
+//   Converted to linear sRGB for all lighting/filtering math.
+//   Paper→ink transition mixed in OKLab for perceptual linearity.
+//   Output gamma-encodes to sRGB (non-sRGB surface format, manual encode).
+//
+// Fragment pipeline:
+//   1. Paper fiber noise  (textureSample — must be first; uniform control flow)
+//   2. Fiber lighting     (ambient-dominant; tiny directional; matte specular)
+//   3. Paper albedo       (OKLab → linear; ±1.25% fiber variation)
+//   4. Grid lines         (cyan-blue dye: multiplicative transmittance filter)
+//   5. Sponge stamp       (computed unconditionally, then masked by cell_alive)
+//   6. Ink absorption     (Beer-Lambert; paper→ink mix in OKLab)
+//   7. sRGB encode
 
 struct Uniforms {
     screen_cols:   u32,
@@ -13,43 +30,332 @@ struct Uniforms {
     _pad:          u32,
 }
 
-@group(0) @binding(0) var<uniform>       uniforms: Uniforms;
-@group(0) @binding(1) var<storage, read> cells:    array<u32>;
-
-// Emit a single fullscreen triangle covering NDC [-1,1] × [-1,1].
-@vertex
-fn vs_main(@builtin(vertex_index) vi: u32) -> @builtin(position) vec4<f32> {
-    var positions = array<vec2<f32>, 3>(
-        vec2<f32>(-1.0, -1.0),
-        vec2<f32>( 3.0, -1.0),
-        vec2<f32>(-1.0,  3.0),
-    );
-    return vec4<f32>(positions[vi], 0.0, 1.0);
+struct PaperParams {
+    noise_scale:   f32,  // UV tiling frequency for fiber noise (paper texture)
+    ink_od:        f32,  // Beer-Lambert optical depth at full stamp coverage
+    grid_pitch_px: f32,  // minor grid pitch in canvas pixels (= cell_px)
+    major_every:   f32,  // major grid line every N minor lines
+    minor_half_px: f32,  // half-width of minor grid lines (canvas pixels)
+    major_half_px: f32,  // half-width of major grid lines (canvas pixels)
+    spec_power:    f32,  // Blinn-Phong exponent for fiber specular
+    spec_weight:   f32,  // specular contribution scale
 }
 
-const DEAD_COLOR  = vec4<f32>(0.039, 0.039, 0.059, 1.0);  // #0a0a0f
-const ALIVE_COLOR = vec4<f32>(0.486, 0.302, 1.000, 1.0);  // #7c4dff
+@group(0) @binding(0) var<uniform>       uniforms: Uniforms;
+@group(0) @binding(1) var<storage, read> cells:    array<u32>;
+@group(0) @binding(2) var<uniform>       paper:    PaperParams;
+@group(0) @binding(3) var                noise_tex: texture_2d<f32>;
+@group(0) @binding(4) var                noise_smp: sampler;
+
+// ── Vertex ────────────────────────────────────────────────────────────────────
+
+@vertex
+fn vs_main(@builtin(vertex_index) vi: u32) -> @builtin(position) vec4f {
+    var pos = array<vec2f, 3>(
+        vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0),
+    );
+    return vec4f(pos[vi], 0.0, 1.0);
+}
+
+// ── Color space ───────────────────────────────────────────────────────────────
+// All colors are defined in OKLab (perceptually uniform).
+// All lighting and filtering math runs in linear sRGB.
+// OKLab is used for any mix that must traverse perceptual space.
+
+// OKLab → linear sRGB. https://bottosson.github.io/posts/oklab/
+fn oklab_to_linear(lab: vec3f) -> vec3f {
+    let l_ = lab.x + 0.3963377774 * lab.y + 0.2158037573 * lab.z;
+    let m_ = lab.x - 0.1055613458 * lab.y - 0.0638541728 * lab.z;
+    let s_ = lab.x - 0.0894841775 * lab.y - 1.2914855480 * lab.z;
+    let l  = l_ * l_ * l_;
+    let m  = m_ * m_ * m_;
+    let s  = s_ * s_ * s_;
+    return vec3f(
+        4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+       -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+       -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
+    );
+}
+
+// Linear sRGB → OKLab (inverse of above).
+fn linear_to_oklab(c: vec3f) -> vec3f {
+    let l  = 0.4122214708 * c.r + 0.5363325363 * c.g + 0.0514459929 * c.b;
+    let m  = 0.2119034982 * c.r + 0.6806995451 * c.g + 0.1073969566 * c.b;
+    let s  = 0.0883024619 * c.r + 0.2817188376 * c.g + 0.6299787005 * c.b;
+    let l_ = pow(max(l, 0.0), 1.0 / 3.0);
+    let m_ = pow(max(m, 0.0), 1.0 / 3.0);
+    let s_ = pow(max(s, 0.0), 1.0 / 3.0);
+    return vec3f(
+        0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
+        1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
+        0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_,
+    );
+}
+
+// Mix two linear-sRGB colors along a perceptually uniform path through OKLab.
+fn oklab_mix(a: vec3f, b: vec3f, t: f32) -> vec3f {
+    return oklab_to_linear(mix(linear_to_oklab(a), linear_to_oklab(b), t));
+}
+
+// Linear sRGB → sRGB (IEC 61966-2-1). Applied at output for non-sRGB surfaces.
+fn linear_to_srgb(c: vec3f) -> vec3f {
+    let lo = c * 12.92;
+    let hi = 1.055 * pow(max(c, vec3f(0.0031308)), vec3f(1.0 / 2.4)) - 0.055;
+    return select(hi, lo, c < vec3f(0.0031308));
+}
+
+// ── Hash / noise ──────────────────────────────────────────────────────────────
+
+fn hash11(p: f32) -> f32 {
+    let x = fract(p * 0.1031);
+    let y = x * (x + 33.33);
+    return fract(y * (y + y));
+}
+
+fn hash21(p: vec2f) -> f32 {
+    let x = fract(p.x * 0.1031);
+    let y = fract(p.y * 0.1030);
+    let z = fract((x + y) * 0.0973);
+    let t = x * (y + 33.33) + z * (x + 17.17);
+    return fract(t);
+}
+
+fn hash22(p: vec2f) -> vec2f {
+    let n = hash21(p);
+    return vec2f(n, hash11(n + 19.19));
+}
+
+// Quintic smoothstep for value noise (C2 continuous).
+fn fade2(t: vec2f) -> vec2f {
+    return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+}
+
+// Value noise: bilinear interpolation of random lattice values.
+fn value_noise(p: vec2f) -> f32 {
+    let i = floor(p);
+    let f = fract(p);
+    let u = fade2(f);
+    let a = mix(hash21(i),                   hash21(i + vec2f(1.0, 0.0)), u.x);
+    let b = mix(hash21(i + vec2f(0.0, 1.0)), hash21(i + vec2f(1.0, 1.0)), u.x);
+    return mix(a, b, u.y);
+}
+
+// Fractional Brownian Motion: 4 octaves (quality/perf balance for real-time).
+fn fbm(p: vec2f) -> f32 {
+    var s = 0.0; var amp = 0.5; var pp = p;
+    for (var k: i32 = 0; k < 4; k++) {
+        s += amp * value_noise(pp);
+        pp *= 2.0;
+        amp *= 0.5;
+    }
+    return s;
+}
+
+// Worley (cellular) noise: distance to nearest Poisson-disk feature point.
+fn worley(p: vec2f) -> f32 {
+    let i  = floor(p);
+    let f  = fract(p);
+    var md = 9.0;
+    for (var oy: i32 = -1; oy <= 1; oy++) {
+        for (var ox: i32 = -1; ox <= 1; ox++) {
+            let cell = i + vec2f(f32(ox), f32(oy));
+            let rnd  = hash22(cell);
+            let feat = vec2f(f32(ox), f32(oy)) + rnd - f;
+            let d    = dot(feat, feat);
+            if d < md { md = d; }
+        }
+    }
+    return sqrt(md);  // normalised to ≈[0, 1]
+}
+
+// ── AA helpers ────────────────────────────────────────────────────────────────
+// fwidth-based: adapts automatically to cell size and display density.
+// Safe because all callers are in unconditional (uniform) control flow.
+
+fn aastep(threshold: f32, value: f32) -> f32 {
+    let w = fwidth(value);
+    return smoothstep(threshold - w, threshold + w, value);
+}
+
+// Signed distance to an axis-aligned box (centered at origin, half-extents).
+// Negative inside, positive outside, zero at the boundary.
+fn sd_box(p: vec2f, half: vec2f) -> f32 {
+    let q = abs(p) - half;
+    return length(max(q, vec2f(0.0))) + min(max(q.x, q.y), 0.0);
+}
+
+// Grid line coverage: fwidth-AA, no hardcoded feather.
+// coord: pixel position along one axis. pitch: line period. half_w: half-width.
+fn grid_line_aa(coord: f32, pitch: f32, half_w: f32) -> f32 {
+    let d = abs(fract(coord / pitch + 0.5) - 0.5) * pitch;
+    let w = fwidth(d);
+    return 1.0 - smoothstep(half_w - w, half_w + w, d);
+}
+
+// ── Cell helpers ──────────────────────────────────────────────────────────────
+
+fn cell_alive(cx: u32, cy: u32) -> u32 {
+    if cx >= uniforms.screen_cols || cy >= uniforms.screen_rows { return 0u; }
+    let word_idx = cy * uniforms.words_per_row + cx / 32u;
+    let safe_idx = word_idx & (uniforms.words_per_row * uniforms.padded_rows - 1u);
+    return (cells[safe_idx] >> (cx & 31u)) & 1u;
+}
+
+// ── Sponge stamp ──────────────────────────────────────────────────────────────
+//
+// Models a rubber/foam stamp loaded with ink and pressed onto paper.
+//
+// pCell  — pixel in cell-local space [-0.5, 0.5].
+// cellId — integer cell coordinate as vec2f (for per-cell randomness).
+//
+// Each cell gets a random stroke direction so marks look hand-applied rather
+// than uniformly aligned.  Noise coordinates are stretched 3:1 along the
+// stroke axis, producing elongated fiber features that follow the direction.
+// The SDF box is similarly elongated, and pressure tapers from the leading
+// end to the trailing end as in a real pen/brush stroke.
+//
+// Returns coverage in [0, ~1.5].  Caller multiplies by f32(cell_alive).
+// Computed unconditionally so all fwidth calls are in uniform control flow.
+
+fn sponge_stamp(pCell: vec2f, cellId: vec2f) -> f32 {
+    // ── Per-cell stroke direction — right-handed motor bias ──────────────────
+    // A human filling small cells doesn't choose angles uniformly.
+    // Right-handed writers favor left-to-right sweeps and downward-diagonal
+    // pulls; leftward / upward strokes are biomechanically awkward.
+    //
+    // We approximate a right-handed distribution with a triangular distribution
+    // (sum of two uniform samples → cheap bell shape, no trig/tables needed):
+    //   preferred:  +25°  — slightly below horizontal (most natural motion)
+    //   spread:     ±40°  — triangular range [−15°, +65°] in screen space
+    // Result: most marks look horizontal-ish or diagonal-down-right; steep
+    // leftward strokes are essentially absent, matching real handwriting.
+    let u1    = hash21(cellId);
+    let u2    = hash21(cellId + vec2f(17.0, 53.0));
+    let angle = 0.436 + (u1 + u2 - 1.0) * 0.698;  // preferred=25°, spread=±40°
+    let dir   = vec2f(cos(angle), sin(angle));   // unit vector along stroke
+    let perp  = vec2f(-dir.y, dir.x);            // unit vector across stroke
+
+    // Project cell-local position onto stroke/perpendicular axes.
+    let p_s = dot(pCell, dir);    // [-~0.5, ~0.5] along stroke
+    let p_p = dot(pCell, perp);   // [-~0.5, ~0.5] perpendicular
+
+    // ── Anisotropic noise coordinates ─────────────────────────────────────────
+    // Slow along stroke (×2), fast perpendicular (×6) → elongated features.
+    // Large per-cell offsets push each cell into a unique noise region.
+    let shiftA = hash22(cellId) * 97.0;
+    let shiftB = hash22(cellId + vec2f(31.0, 71.0)) * 97.0;
+    let noiseA = vec2f(p_s * 2.0, p_p * 6.0) + shiftA;
+    let noiseB = vec2f(p_s * 2.0, p_p * 6.0) + shiftB;
+
+    // ── Box SDF: grid-aligned square (shape stays natural, only texture rotates)
+    let d = sd_box(pCell, vec2f(0.42));
+
+    // ── Pores (cellular gaps in the foam) ─────────────────────────────────────
+    let pore_a = aastep(0.60, 1.0 - worley(noiseA * 2.0));
+    let pore_b = aastep(0.60, 1.0 - worley(noiseB * 2.0));
+    let pores  = 0.5 * pore_a + 0.5 * pore_b;
+
+    // ── Density field (uneven ink loading on the foam) ────────────────────────
+    let dens_a  = smoothstep(0.25, 0.85, fbm(noiseA));
+    let dens_b  = smoothstep(0.25, 0.85, fbm(noiseB));
+    let density = mix(dens_a, dens_b, 0.5);
+
+    // ── Foam field drives both interior fill and edge displacement ────────────
+    let foam      = density * pores;
+    let edge_disp = (foam - 0.4) * 0.20;
+    let d_foam    = d - edge_disp;
+    let edge      = 1.0 - aastep(0.0, d_foam);
+
+    // ── Directional pressure: leading end (p_s < 0) hits harder ──────────────
+    // Offsetting the radial distance by +p_s*0.08 makes the trailing half
+    // (p_s > 0) look lighter, as ink drags off toward the end of the stroke.
+    let pressure = 1.0 - smoothstep(0.10, 0.50, length(pCell) + p_s * 0.08);
+
+    // ── Drying ring: faint rim tracing the foam-displaced boundary ────────────
+    let ring = smoothstep(-0.06, -0.01, d_foam) * (1.0 - aastep(0.0, d_foam));
+
+    // ── Combine ───────────────────────────────────────────────────────────────
+    var C  = edge * (0.65 * density + 0.35 * pores) * mix(0.6, 1.15, pressure);
+    C     += 0.12 * ring;
+    return clamp(C, 0.0, 1.5);
+}
+
+// ── Fragment ──────────────────────────────────────────────────────────────────
 
 @fragment
-fn fs_main(@builtin(position) frag_pos: vec4<f32>) -> @location(0) vec4<f32> {
-    // Exact integer pixel coordinate from the rasterizer (center at 0.5, 1.5, ...).
-    // u32(0.5) = 0, u32(1.5) = 1, etc. — no floating-point drift at cell edges.
-    let px = u32(frag_pos.x);
-    let py = u32(frag_pos.y);
+fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
+    let px = frag_pos.x;
+    let py = frag_pos.y;
 
-    // Cell coordinate.
-    let cx = px / uniforms.cell_px;
-    let cy = py / uniforms.cell_px;
+    // ── 1. Paper fiber noise ──────────────────────────────────────────────────
+    // textureSample must come before any fwidth/derivative call (uniformity).
+    let uv   = vec2f(px, py) / f32(uniforms.canvas_width) * paper.noise_scale;
+    let ns   = textureSample(noise_tex, noise_smp, uv);
+    let dNdx = ns.g * 2.0 - 1.0;   // analytic dNoise/dx packed into G
+    let dNdy = ns.b * 2.0 - 1.0;   // analytic dNoise/dy packed into B
 
-    // Pixels beyond the visible cell grid render as dead.
-    let oob = u32(cx >= uniforms.screen_cols || cy >= uniforms.screen_rows);
+    // ── 2. Fiber normal + lighting ────────────────────────────────────────────
+    // Paper is nearly flat. XY scaled to ≈4° deviation from vertical.
+    let fiber_N = normalize(vec3f(-dNdx * 0.08, -dNdy * 0.08, 1.0));
+    let L       = normalize(vec3f(0.3, -0.5, 1.8));
+    let V       = vec3f(0.0, 0.0, 1.0);
+    let H       = normalize(L + V);
+    let NdotL   = max(dot(fiber_N, L), 0.0);
+    let NdotH   = max(dot(fiber_N, H), 0.0);
+    let diffuse = 0.85 + 0.15 * NdotL;        // 85% ambient + 15% directional
+    let spec    = pow(NdotH, paper.spec_power) * paper.spec_weight;
 
-    let word_idx = cy * uniforms.words_per_row + cx / 32u;
-    let bit_idx  = cx & 31u;
+    // ── 3. Paper albedo (OKLab → linear) ─────────────────────────────────────
+    // Clearprint-style engineering pad: pale jade-green.
+    // OKLab (0.953, -0.024, 0.028) ≈ sRGB (0.902, 0.941, 0.872)
+    let paper_base   = oklab_to_linear(vec3f(0.953, -0.024, 0.028));
+    let fiber_albedo = mix(0.975, 1.0, ns.r);  // ±1.25% cellulose density variation
+    let paper_lit    = paper_base * (diffuse * fiber_albedo) + vec3f(spec);
 
-    // Clamp word_idx to avoid OOB read when oob=1 (result discarded by select).
-    let safe_idx = word_idx & (uniforms.words_per_row * uniforms.padded_rows - 1u);
-    let alive = ((cells[safe_idx] >> bit_idx) & 1u) & (1u - oob);
+    // ── 4. Grid lines — cyan-blue dye as transmittance filter (linear) ────────
+    // Ink absorbs red/orange, transmits cyan/blue.  Multiplicative: fiber
+    // texture stays visible through the printed lines.
+    let pitch_minor = paper.grid_pitch_px;
+    let pitch_major = pitch_minor * paper.major_every;
 
-    return select(DEAD_COLOR, ALIVE_COLOR, alive == 1u);
+    let minor_cov = max(
+        grid_line_aa(px, pitch_minor, paper.minor_half_px),
+        grid_line_aa(py, pitch_minor, paper.minor_half_px),
+    );
+    let major_cov = max(
+        grid_line_aa(px, pitch_major, paper.major_half_px),
+        grid_line_aa(py, pitch_major, paper.major_half_px),
+    );
+
+    // Transmittance (linear sRGB): (R, G, B) = fraction transmitted per channel.
+    // Minor: (0.52, 0.82, 0.92) — faint teal tint.
+    // Major: (0.34, 0.68, 0.86) — more visible every 5th line.
+    let after_minor = mix(paper_lit, paper_lit * vec3f(0.52, 0.82, 0.92), minor_cov);
+    let paper_grid  = mix(after_minor, after_minor * vec3f(0.34, 0.68, 0.86), major_cov);
+
+    // ── 5. Sponge stamp ───────────────────────────────────────────────────────
+    // Computed unconditionally so all fwidth calls inside are in uniform flow.
+    let cx     = u32(px) / uniforms.cell_px;
+    let cy     = u32(py) / uniforms.cell_px;
+    let pCell  = vec2f(
+        fract(px / f32(uniforms.cell_px)) - 0.5,
+        fract(py / f32(uniforms.cell_px)) - 0.5,
+    );
+    let cellId = vec2f(f32(cx), f32(cy));
+
+    let raw_cov  = sponge_stamp(pCell, cellId);
+    let coverage = raw_cov * f32(cell_alive(cx, cy));
+
+    // ── 6. Ink absorption: Beer-Lambert + OKLab perceptual mix ────────────────
+    // Near-black graphite/ballpoint, very slightly cool.
+    // OKLab (0.15, 0.003, -0.012) ≈ linear sRGB (0.003, 0.003, 0.005)
+    let ink_linear = oklab_to_linear(vec3f(0.15, 0.003, -0.012));
+    let transmit   = exp(-paper.ink_od * coverage);
+    // Mix in OKLab: perceptual uniformity across the paper→ink transition.
+    // At t=0 (transmit=1, no ink): paper color.
+    // At t=1 (transmit→0, full ink): ink color.
+    let result_lin = oklab_mix(paper_grid, ink_linear, 1.0 - transmit);
+
+    // ── 7. Gamma encode for non-sRGB surface ──────────────────────────────────
+    return vec4f(linear_to_srgb(clamp(result_lin, vec3f(0.0), vec3f(1.0))), 1.0);
 }

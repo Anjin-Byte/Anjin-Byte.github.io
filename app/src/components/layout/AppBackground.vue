@@ -5,7 +5,8 @@ import type { WorkerOutMsg } from '../../workers/rendererProtocol';
 
 const log = createLogger('AppBackground');
 
-const DEFAULT_CELL_PX = 6;
+// 5 mm per cell — standard graph paper square at 96 CSS PPI, scaled to physical pixels.
+const DEFAULT_CELL_PX = Math.round(19 * devicePixelRatio);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 let worker: Worker | null = null;
 let animFrameId = 0;
@@ -94,6 +95,6 @@ onUnmounted(() => {
   height: 100vh;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.2;
+  opacity: 1;
 }
 </style>
