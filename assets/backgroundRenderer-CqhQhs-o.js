@@ -64,7 +64,7 @@
                     if (n) {
                         a.debug("GPU: loading wasm module...");
                         try {
-                            const { GpuGameOfLife: o } = await import("./game_of_life_gpu-D0oVL3Oo.js").then(async (m)=>{
+                            const { GpuGameOfLife: o } = await import("./game_of_life_gpu-D2-rye01.js").then(async (m)=>{
                                 await m.__tla;
                                 return m;
                             });
