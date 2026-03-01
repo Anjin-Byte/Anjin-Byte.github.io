@@ -3,4 +3,9 @@
 Cargo.lock
 bin/
 pkg/
+crates/*/pkg/
+!crates/*/pkg/*.d.ts
 wasm-pack.log
+app/node_modules/
+app/dist/
+.DS_Store

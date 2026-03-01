@@ -1,0 +1,28 @@
+{
+  "name": "portfolio",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "typecheck": "vue-tsc --noEmit",
+    "format": "prettier --write \"src/**/*.{ts,vue}\"",
+    "preview": "vite preview",
+    "deploy": "gh-pages -d dist -b main -t true"
+  },
+  "dependencies": {
+    "@mdi/font": "^7.4.47",
+    "vue": "^3.5.13",
+    "vuetify": "^3.7.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "gh-pages": "^6.2.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.1",
+    "vite-plugin-top-level-await": "^1.4.4",
+    "vite-plugin-wasm": "^3.4.0",
+    "vue-tsc": "^2.2.4"
+  }
+}

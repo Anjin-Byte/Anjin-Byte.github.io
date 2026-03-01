@@ -1,0 +1,5 @@
+[build]
+# All crates in this workspace target WASM. Setting the default target here
+# ensures rust-analyzer resolves cfg(target_arch = "wasm32") dependencies
+# (wgpu, web-sys) correctly in the IDE.
+target = "wasm32-unknown-unknown"

@@ -1,0 +1,1 @@
+export { WasmBridge } from './WasmBridge';
