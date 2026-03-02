@@ -15,7 +15,7 @@ pub struct Uniforms {
     pub cell_px:       u32,
     pub canvas_width:  u32,
     pub canvas_height: u32,
-    pub _pad:          u32,
+    pub scroll_y:      f32,   // vertical scroll in canvas pixels (render shader only)
 }
 
 impl Uniforms {
@@ -28,7 +28,7 @@ impl Uniforms {
             cell_px:       grid.cell_px,
             canvas_width:  grid.canvas_width,
             canvas_height: grid.canvas_height,
-            _pad:          0,
+            scroll_y:      0.0,
         }
     }
 }

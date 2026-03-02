@@ -36,4 +36,10 @@ body {
 .v-application {
   background: transparent !important;
 }
+
+/* Vuetify applies background-color via .bg-background with !important.
+   Two-class selector beats the single-class Vuetify rule in the cascade. */
+.v-app-bar.bg-background {
+  background-color: transparent !important;
+}
 </style>

@@ -5,8 +5,11 @@ import type { WorkerOutMsg } from '../../workers/rendererProtocol';
 
 const log = createLogger('AppBackground');
 
-// 5 mm per cell — standard graph paper square at 96 CSS PPI, scaled to physical pixels.
-const DEFAULT_CELL_PX = Math.round(19 * devicePixelRatio);
+// Target: 5 mm per cell at 96 CSS PPI (= 19 CSS px).
+// gridPitch is computed as a float so canvas_width = n_total * MAJOR_EVERY * gridPitch exactly,
+// ensuring both left and right margin borders land on major grid lines.
+const MAJOR_EVERY = 5;
+const TARGET_CELL_CSS_PX = 19;
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 let worker: Worker | null = null;
 let animFrameId = 0;
@@ -52,11 +55,40 @@ onMounted(() => {
     log.error('Worker uncaught exception:', e.message, `at ${e.filename}:${e.lineno}`);
   };
 
-  worker.postMessage({ type: 'init', canvas: offscreen, cellPx: DEFAULT_CELL_PX }, [offscreen]);
-  log.debug('Worker spawned, init message sent');
+  // Compute float grid pitch: canvas_width = nTotal * MAJOR_EVERY * gridPitch exactly,
+  // so both left and right margin borders land on major grid lines.
+  const targetPx = TARGET_CELL_CSS_PX * devicePixelRatio;
+  const nTotal   = Math.max(1, Math.round(canvasW / (targetPx * MAJOR_EVERY)));
+  const gridPitch = canvasW / (nTotal * MAJOR_EVERY);
+
+  // Expose canvas margin as CSS var so header/content can align to the grid border.
+  // margin = 0.8 * pitch_major (canvas px) → convert to CSS px by dividing by dpr.
+  const marginCss = 0.8 * gridPitch * MAJOR_EVERY / devicePixelRatio;
+  document.documentElement.style.setProperty('--grid-margin', `${marginCss.toFixed(1)}px`);
+
+  worker.postMessage({ type: 'init', canvas: offscreen, cellPx: gridPitch }, [offscreen]);
+  log.debug('Worker spawned, init message sent, gridPitch', gridPitch.toFixed(2));
+
+  // Poll scroll position each animation frame rather than relying on scroll events.
+  // This works regardless of whether the scroll container is window, .v-main, or anything else.
+  // Vuetify's v-app-bar activates a layout that makes .v-main (not window) the scroll
+  // container, but we handle both cases by checking both sources.
+  const mainEl = document.querySelector<HTMLElement>('.v-main');
+  // Start at -1 so the first rAF tick always sends the current scroll position,
+  // even if the page loaded at a non-zero scroll (browser scroll restoration, etc.).
+  let lastScrollPx = -1;
 
   const loop = () => {
     worker?.postMessage({ type: 'frame' });
+
+    // Prefer .v-main.scrollTop (Vuetify layout mode); fall back to window.scrollY.
+    // Both are checked so this works regardless of which element Vuetify scrolls.
+    const rawPx = (mainEl?.scrollTop || window.scrollY);
+    if (rawPx !== lastScrollPx) {
+      lastScrollPx = rawPx;
+      worker?.postMessage({ type: 'scroll', scrollY: rawPx * devicePixelRatio });
+    }
+
     animFrameId = requestAnimationFrame(loop);
   };
   animFrameId = requestAnimationFrame(loop);
@@ -67,6 +99,9 @@ onMounted(() => {
     if (w === canvasW && h === canvasH) return;
     canvasW = w;
     canvasH = h;
+    const nT = Math.max(1, Math.round(w / (TARGET_CELL_CSS_PX * devicePixelRatio * MAJOR_EVERY)));
+    const gp = w / (nT * MAJOR_EVERY);
+    document.documentElement.style.setProperty('--grid-margin', `${(0.8 * gp * MAJOR_EVERY / devicePixelRatio).toFixed(1)}px`);
     log.debug('Resize →', w, 'x', h);
     worker?.postMessage({ type: 'resize', width: w, height: h });
   });

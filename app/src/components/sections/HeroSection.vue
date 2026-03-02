@@ -3,7 +3,7 @@
 
 <template>
   <section id="hero" class="hero-section">
-    <v-container>
+    <v-container class="hero-container">
       <h1 class="text-h3 font-weight-bold text-white mb-2">Taylor Hale</h1>
       <p class="text-h6 text-medium-emphasis mb-6">
         Systems Engineer &middot; Rust &middot; WebAssembly &middot; TypeScript
@@ -32,5 +32,10 @@
   height: 100vh;
   display: flex;
   align-items: center;
+}
+.hero-container {
+  background: rgba(10, 10, 15, 1);
+  padding: 2rem;
+  border-radius: 16px;
 }
 </style>

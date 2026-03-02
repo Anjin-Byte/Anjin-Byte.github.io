@@ -12,11 +12,22 @@ const ws  = self as unknown as DedicatedWorkerGlobalScope;
 
 interface Renderer {
   tick(): void;
+  renderOnly?(): void;
   resize(w: number, h: number): void;
+  setScroll?(scrollY: number): void;
   free(): void;
 }
 
 let renderer: Renderer | null = null;
+// Latest scroll offset (canvas px). Cached so it can be re-applied when the
+// renderer becomes available (init is async) or after a resize (resize rewrites
+// the uniform buffer, resetting scroll_y to 0).
+let pendingScrollY = 0;
+// Simulation tick rate throttle. The display renders every frame for smooth
+// scrolling; the GoL simulation only advances every TICK_EVERY frames.
+// At 60 Hz: TICK_EVERY=4 → ~15 sim fps. Adjust to taste.
+const TICK_EVERY = 32;
+let frameCount  = 0;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -99,10 +110,15 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
           log.debug('GPU: module loaded, initialising surface...');
           const gpu = await GpuGameOfLife.new_offscreen(canvas, cellPx);
           renderer = {
-            tick:   () => gpu.tick_and_render(),
-            resize: (w, h) => { canvas.width = w; canvas.height = h; gpu.resize(w, h); },
-            free:   () => gpu.free(),
+            tick:       () => gpu.tick_and_render(),
+            renderOnly: () => gpu.render_only(),
+            resize:     (w, h) => { canvas.width = w; canvas.height = h; gpu.resize(w, h); },
+            setScroll:  (scrollY) => gpu.set_scroll(scrollY),
+            free:       () => gpu.free(),
           };
+          // Scroll messages sent during async GPU init were dropped (renderer was null).
+          // Re-apply the latest position now that the renderer is accepting commands.
+          renderer.setScroll?.(pendingScrollY);
           log.info('GPU renderer ready');
           post({ type: 'ready', backend: 'gpu' });
           break;
@@ -120,6 +136,7 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
       log.debug('CPU: starting software renderer...');
       try {
         renderer = await makeCpuRenderer(canvas);
+        renderer.setScroll?.(pendingScrollY);
         log.info('CPU renderer ready');
         post({ type: 'ready', backend: 'cpu' });
       } catch (cpuErr) {
@@ -131,12 +148,24 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
     }
 
     case 'frame':
-      renderer?.tick();
+      frameCount++;
+      if (renderer?.renderOnly && frameCount % TICK_EVERY !== 0) {
+        renderer.renderOnly();
+      } else {
+        renderer?.tick();
+      }
       break;
 
     case 'resize':
       log.debug('Resize →', e.data.width, 'x', e.data.height);
       renderer?.resize(e.data.width, e.data.height);
+      // resize() rewrites the uniform buffer (scroll_y resets to 0); re-apply.
+      renderer?.setScroll?.(pendingScrollY);
+      break;
+
+    case 'scroll':
+      pendingScrollY = e.data.scrollY;
+      renderer?.setScroll?.(pendingScrollY);
       break;
 
     case 'stop':

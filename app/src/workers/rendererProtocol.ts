@@ -6,6 +6,7 @@ export type WorkerInMsg =
   | { type: 'init'; canvas: OffscreenCanvas; cellPx: number }
   | { type: 'frame' }
   | { type: 'resize'; width: number; height: number }
+  | { type: 'scroll'; scrollY: number }
   | { type: 'stop' };
 
 export type WorkerOutMsg =

@@ -22,21 +22,19 @@ pub struct PaperParams {
 }
 
 impl PaperParams {
-    /// Build paper parameters scaled to a given cell size in canvas pixels.
+    /// Build paper parameters from the exact float grid pitch (canvas pixels per cell).
     ///
-    /// Line widths are proportional to cell_px so they stay visually consistent
-    /// across display densities (DPR=1 vs DPR=2).
-    pub fn for_cell_px(cell_px: u32) -> Self {
-        let p = cell_px as f32;
+    /// Takes a float rather than a rounded integer so the shader grid pitch matches
+    /// the analytically aligned pitch computed from canvas width, ensuring both
+    /// margin borders land on major grid lines.
+    pub fn for_pitch(pitch: f32) -> Self {
         PaperParams {
             noise_scale:   4.0,
-            ink_od:        3.5,
-            grid_pitch_px: p,
+            ink_od:        2.5,
+            grid_pitch_px: pitch,
             major_every:   5.0,
-            minor_half_px: p * 0.02,   // ~2% of cell → 0.38 canvas px at DPR=1
-            major_half_px: p * 0.06,   // ~6% of cell → 1.14 canvas px at DPR=1
-            // Paper is very matte (uncoated cellulose).  Specular ≈ 1–2% at
-            // glancing angles; essentially invisible at normal incidence.
+            minor_half_px: pitch * 0.02,
+            major_half_px: pitch * 0.06,
             spec_power:    80.0,
             spec_weight:   0.012,
         }
@@ -51,6 +49,7 @@ pub struct GpuRenderer {
     pipeline:       wgpu::RenderPipeline,
     uniform_buf:    wgpu::Buffer,
     paper_buf:      wgpu::Buffer,
+    grid_pitch:     f32,             // stored so resize can recompute PaperParams
     _noise_texture: wgpu::Texture,
     noise_view:     wgpu::TextureView,
     noise_sampler:  wgpu::Sampler,
@@ -61,13 +60,14 @@ pub struct GpuRenderer {
 
 impl GpuRenderer {
     pub fn new(
-        device:  &wgpu::Device,
-        queue:   &wgpu::Queue,
-        adapter: &wgpu::Adapter,
-        surface: wgpu::Surface<'static>,
-        grid:    &Grid,
-        buf_a:   &wgpu::Buffer,
-        buf_b:   &wgpu::Buffer,
+        device:     &wgpu::Device,
+        queue:      &wgpu::Queue,
+        adapter:    &wgpu::Adapter,
+        surface:    wgpu::Surface<'static>,
+        grid:       &Grid,
+        grid_pitch: f32,
+        buf_a:      &wgpu::Buffer,
+        buf_b:      &wgpu::Buffer,
     ) -> Self {
         let caps   = surface.get_capabilities(adapter);
         let format = caps.formats.iter()
@@ -95,7 +95,7 @@ impl GpuRenderer {
 
         let paper_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label:    Some("paper_params"),
-            contents: bytes_of(&PaperParams::for_cell_px(grid.cell_px)),
+            contents: bytes_of(&PaperParams::for_pitch(grid_pitch)),
             usage:    wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -158,7 +158,7 @@ impl GpuRenderer {
 
         GpuRenderer {
             surface, surface_config, pipeline,
-            uniform_buf, paper_buf,
+            uniform_buf, paper_buf, grid_pitch,
             _noise_texture: noise_texture, noise_view, noise_sampler,
             bind_group_a, bind_group_b, bgl,
         }
@@ -197,6 +197,13 @@ impl GpuRenderer {
         Ok(output)
     }
 
+    /// Updates the scroll offset in the render uniform buffer.
+    /// scroll_y is the vertical scroll in canvas pixels.
+    pub fn set_scroll(&self, queue: &wgpu::Queue, scroll_y: f32) {
+        // scroll_y is the last field in Uniforms (offset 7 * 4 = 28 bytes).
+        queue.write_buffer(&self.uniform_buf, 28, bytemuck::bytes_of(&scroll_y));
+    }
+
     /// Re-applies the current surface configuration (e.g. after Lost/Outdated error).
     pub fn reconfigure(&mut self, device: &wgpu::Device) {
         self.surface.configure(device, &self.surface_config);
@@ -205,16 +212,19 @@ impl GpuRenderer {
     /// Reconfigures the surface and rebuilds render bind groups for a new grid size.
     pub fn resize(
         &mut self,
-        device: &wgpu::Device,
-        queue:  &wgpu::Queue,
-        grid:   &Grid,
-        buf_a:  &wgpu::Buffer,
-        buf_b:  &wgpu::Buffer,
+        device:     &wgpu::Device,
+        queue:      &wgpu::Queue,
+        grid:       &Grid,
+        grid_pitch: f32,
+        buf_a:      &wgpu::Buffer,
+        buf_b:      &wgpu::Buffer,
     ) {
+        self.grid_pitch = grid_pitch;
         self.surface_config.width  = grid.canvas_width;
         self.surface_config.height = grid.canvas_height;
         self.surface.configure(device, &self.surface_config);
         queue.write_buffer(&self.uniform_buf, 0, bytes_of(&Uniforms::from_grid(grid)));
+        queue.write_buffer(&self.paper_buf,   0, bytes_of(&PaperParams::for_pitch(grid_pitch)));
         self.bind_group_a = make_bind_group(
             device, &self.bgl, &self.uniform_buf, buf_a,
             &self.paper_buf, &self.noise_view, &self.noise_sampler, "rbg_a",

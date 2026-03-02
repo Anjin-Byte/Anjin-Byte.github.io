@@ -27,7 +27,7 @@ struct Uniforms {
     cell_px:       u32,
     canvas_width:  u32,
     canvas_height: u32,
-    _pad:          u32,
+    scroll_y:      f32,   // vertical scroll offset in canvas pixels
 }
 
 struct PaperParams {
@@ -195,10 +195,13 @@ fn grid_line_aa(coord: f32, pitch: f32, half_w: f32) -> f32 {
 // ── Cell helpers ──────────────────────────────────────────────────────────────
 
 fn cell_alive(cx: u32, cy: u32) -> u32 {
-    if cx >= uniforms.screen_cols || cy >= uniforms.screen_rows { return 0u; }
-    let word_idx = cy * uniforms.words_per_row + cx / 32u;
+    // Wrap with modulo so the simulation grid tiles infinitely as the page scrolls.
+    // screen_cols / screen_rows are always > 0 at this point.
+    let cx_w = cx % uniforms.screen_cols;
+    let cy_w = cy % uniforms.screen_rows;
+    let word_idx = cy_w * uniforms.words_per_row + cx_w / 32u;
     let safe_idx = word_idx & (uniforms.words_per_row * uniforms.padded_rows - 1u);
-    return (cells[safe_idx] >> (cx & 31u)) & 1u;
+    return (cells[safe_idx] >> (cx_w & 31u)) & 1u;
 }
 
 // ── Sponge stamp ──────────────────────────────────────────────────────────────
@@ -248,7 +251,7 @@ fn sponge_stamp(pCell: vec2f, cellId: vec2f) -> f32 {
     let noiseB = vec2f(p_s * 2.0, p_p * 6.0) + shiftB;
 
     // ── Box SDF: grid-aligned square (shape stays natural, only texture rotates)
-    let d = sd_box(pCell, vec2f(0.46));
+    let d = sd_box(pCell, vec2f(0.48));
 
     // ── Pores (cellular gaps in the foam) ─────────────────────────────────────
     let pore_a = aastep(0.60, 1.0 - worley(noiseA * 2.0));
@@ -284,12 +287,14 @@ fn sponge_stamp(pCell: vec2f, cellId: vec2f) -> f32 {
 
 @fragment
 fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
-    let px = frag_pos.x;
-    let py = frag_pos.y;
+    let px       = frag_pos.x;
+    let py       = frag_pos.y;
+    let world_y  = py + uniforms.scroll_y;   // world coordinate (scrolled)
 
     // ── 1. Paper fiber noise ──────────────────────────────────────────────────
     // textureSample must come before any fwidth/derivative call (uniformity).
-    let uv   = vec2f(px, py) / f32(uniforms.canvas_width) * paper.noise_scale;
+    // Use world_y so fiber texture is fixed in world space, not viewport space.
+    let uv   = vec2f(px, world_y) / f32(uniforms.canvas_width) * paper.noise_scale;
     let ns   = textureSample(noise_tex, noise_smp, uv);
     let dNdx = ns.g * 2.0 - 1.0;   // analytic dNoise/dx packed into G
     let dNdy = ns.b * 2.0 - 1.0;   // analytic dNoise/dy packed into B
@@ -318,6 +323,19 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     let pitch_minor = paper.grid_pitch_px;
     let pitch_major = pitch_minor * paper.major_every;
 
+    // Canvas dimensions, margin, and content mask — computed once; used by both
+    // the grid suppression and the border drawing below.
+    let cw = f32(uniforms.canvas_width);
+    let ch = f32(uniforms.canvas_height);
+    // grid_pitch_px is computed from canvas_width so cw = n_total * pitch_major exactly.
+    // 2 major squares per margin → both left and right borders land on major lines.
+    let margin = .8 * pitch_major;
+    // 0 inside margin band, 1 inside content area.
+    // Grid lines and cell ink are only drawn inside the content area.
+    let in_cx = step(margin, px) * (1.0 - step(cw - margin, px));
+    let in_cy = step(margin, world_y);
+    let content_mask = in_cx * in_cy;
+
     // Fiber-dependent ink bleed: open fiber absorbs more dye, spreading the edge.
     // ns.r is already in [0,1]; 0.3px max bleed keeps lines recognisably straight.
     let fiber_bleed = ns.r * 0.3;
@@ -325,20 +343,20 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     // Low-frequency printing variation: ink roller/ribbon inconsistency during
     // manufacture.  Each axis fades independently — the print head's condition
     // varies per pass.  Period ≈ 200px (spans ~25 cells); range [0.80, 1.00].
-    let print_fade_x = mix(0.70, 1.0, value_noise(vec2f(px * 0.005,  7.3)));
-    let print_fade_y = mix(0.70, 1.0, value_noise(vec2f(3.9, py * 0.005)));
+    let print_fade_x = mix(0.70, 1.0, value_noise(vec2f(px       * 0.005,  7.3)));
+    let print_fade_y = mix(0.70, 1.0, value_noise(vec2f(3.9, world_y * 0.005)));
 
-    let minor_x   = grid_line_aa(px, pitch_minor, paper.minor_half_px + fiber_bleed) * print_fade_x;
-    let minor_y   = grid_line_aa(py, pitch_minor, paper.minor_half_px + fiber_bleed) * print_fade_y;
-    let minor_cov = max(minor_x, minor_y);
+    let minor_x   = grid_line_aa(px,      pitch_minor, paper.minor_half_px + fiber_bleed) * print_fade_x;
+    let minor_y   = grid_line_aa(world_y, pitch_minor, paper.minor_half_px + fiber_bleed) * print_fade_y;
+    let minor_cov = max(minor_x, minor_y) * content_mask;
 
     // Major lines get a separate, more aggressive fade — they're bolder so need
     // a lower floor to show the same perceptual variation as the minor lines.
-    let major_fade_x = mix(0.45, 1.0, value_noise(vec2f(px * 0.004 + 11.7, 23.1)));
-    let major_fade_y = mix(0.45, 1.0, value_noise(vec2f(19.4, py * 0.004 + 11.7)));
-    let major_x   = grid_line_aa(px, pitch_major, paper.major_half_px + fiber_bleed) * major_fade_x;
-    let major_y   = grid_line_aa(py, pitch_major, paper.major_half_px + fiber_bleed) * major_fade_y;
-    let major_cov = max(major_x, major_y);
+    let major_fade_x = mix(0.45, 1.0, value_noise(vec2f(px       * 0.004 + 11.7, 23.1)));
+    let major_fade_y = mix(0.45, 1.0, value_noise(vec2f(19.4, world_y * 0.004 + 11.7)));
+    let major_x   = grid_line_aa(px,      pitch_major, paper.major_half_px + fiber_bleed) * major_fade_x;
+    let major_y   = grid_line_aa(world_y, pitch_major, paper.major_half_px + fiber_bleed) * major_fade_y;
+    let major_cov = max(major_x, major_y) * content_mask;
 
     // Transmittance (linear sRGB): (R, G, B) = fraction transmitted per channel.
     // Minor: (0.52, 0.82, 0.92) — faint teal tint.
@@ -346,32 +364,76 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     let after_minor = mix(paper_lit, paper_lit * vec3f(0.52, 0.82, 0.92), minor_cov);
     let paper_grid  = mix(after_minor, after_minor * vec3f(0.34, 0.68, 0.86), major_cov);
 
-    // ── 5. Sponge stamp ───────────────────────────────────────────────────────
+    // ── 5. Border margin ──────────────────────────────────────────────────────
+    // Bold rectangle inset exactly 2 major squares from each edge.
+    // `margin`, `cw`, and `ch` were computed above alongside the content mask.
+    let bdr_half = paper.major_half_px * 2.5 + fiber_bleed;
+
+    // Left/right borders span the full viewport height.
+    // Top border uses world_y so it scrolls with the page content.
+    // Bottom border omitted until page_height is added as a uniform.
+    let bdr_l = 1.0 - aastep(bdr_half, abs(px - margin));
+    let bdr_r = 1.0 - aastep(bdr_half, abs(px - (cw - margin)));
+    let bdr_t = 1.0 - aastep(bdr_half, abs(world_y - margin));
+
+    let border_cov = max(max(bdr_l, bdr_r), bdr_t);
+    // Heavier teal absorption than major grid lines — border reads as bolder.
+    let paper_bordered = mix(paper_grid, paper_grid * vec3f(0.18, 0.48, 0.70), border_cov * 0.88);
+
+    // ── 6. Sponge stamp ───────────────────────────────────────────────────────
     // Computed unconditionally so all fwidth calls inside are in uniform flow.
-    let cx     = u32(px) / uniforms.cell_px;
-    let cy     = u32(py) / uniforms.cell_px;
-    let pCell  = vec2f(
-        fract(px / f32(uniforms.cell_px)) - 0.5,
-        fract(py / f32(uniforms.cell_px)) - 0.5,
-    );
+    // Use paper.grid_pitch_px (float) so stamps stay phase-aligned with grid lines.
+    let gp     = paper.grid_pitch_px;
+    let cx     = u32(floor(px      / gp));
+    let cy     = u32(floor(world_y / gp));
+    let pCell  = vec2f(fract(px / gp) - 0.5, fract(world_y / gp) - 0.5);
     let cellId = vec2f(f32(cx), f32(cy));
 
     let raw_cov  = sponge_stamp(pCell, cellId);
-    let coverage = raw_cov * f32(cell_alive(cx, cy));
+    let coverage = raw_cov * f32(cell_alive(cx, cy)) * content_mask;
 
-    // ── 6. Ink absorption: Beer-Lambert + OKLab perceptual mix ────────────────
-    // Near-black graphite/ballpoint, very slightly cool.
-    // OKLab (0.15, 0.003, -0.012) ≈ linear sRGB (0.003, 0.003, 0.005)
-    // Fiber-modulated: ink picks up the same micro-lighting as the paper
-    // so it reads as soaked in rather than rendered on top.
+    // ── 7. Ink shading: anisotropic graphite specular + Beer-Lambert mix ────────
+    //
+    // Graphite crystallite plates orient along the pencil stroke direction,
+    // creating a narrow specular band *across* the stroke (Ward anisotropic BRDF).
+    // The highlight color is neutral grey-silver — graphite is semi-metallic.
+    //
+    // Stroke direction: re-derive from the same hash as sponge_stamp so the
+    // specular aligns with the mark's texture.  The trig is cheap and avoids
+    // plumbing a new return value through sponge_stamp.
+    let u1_g = hash21(cellId);
+    let u2_g = hash21(cellId + vec2f(17.0, 53.0));
+    let a_g  = 0.436 + (u1_g + u2_g - 1.0) * 0.349;
+    let T_g  = vec3f( cos(a_g), sin(a_g), 0.0);   // tangent:   along stroke
+    let B_g  = vec3f(-sin(a_g), cos(a_g), 0.0);   // bitangent: across stroke
+
+    // Ward-simplified: exponent is -((H·T/αt)² + (H·B/αb)²).
+    // αt large → soft/blurry along stroke  (smeared deposit).
+    // αb small → sharp across stroke       (metallic sheen band).
+    let alpha_t = 0.55;
+    let alpha_b = 0.04;
+    let HdotT = dot(H, T_g);
+    let HdotB = dot(H, B_g);
+    let graphite_hi  = exp(-(HdotT * HdotT / (alpha_t * alpha_t)
+                            + HdotB * HdotB / (alpha_b * alpha_b)))
+                     * max(NdotH, 0.0) * 0.40;
+    // Slightly cool grey — graphite's metallic-tinted specular.
+    let graphite_col = vec3f(0.50, 0.52, 0.56);
+
     let ink_albedo = oklab_to_linear(vec3f(0.15, 0.003, -0.012));
-    let ink_lit    = ink_albedo * (diffuse * mix(0.88, 1.0, ns.r)) + vec3f(spec * 0.5);
+    let ink_lit    = ink_albedo * (diffuse * mix(0.88, 1.0, ns.r))   // dark diffuse body
+                   + graphite_col * graphite_hi                       // anisotropic sheen
+                   + vec3f(spec * 0.08);                              // residual fiber spec
     let transmit   = exp(-paper.ink_od * coverage);
     // Mix in OKLab: perceptual uniformity across the paper→ink transition.
     // At t=0 (transmit=1, no ink): paper color.
     // At t=1 (transmit→0, full ink): ink color.
-    let result_lin = oklab_mix(paper_grid, ink_lit, 1.0 - transmit);
+    let result_lin = oklab_mix(paper_bordered, ink_lit, 1.0 - transmit);
 
-    // ── 7. Gamma encode for non-sRGB surface ──────────────────────────────────
+    // ── 8. Greyscale (BT.709 luminance in linear light) ──────────────────────
+    //let luma   = dot(result_lin, vec3f(0.2126, 0.7152, 0.0722));
+    //let result = vec3f(luma);
+
+    // ── 9. Gamma encode for non-sRGB surface ──────────────────────────────────
     return vec4f(linear_to_srgb(clamp(result_lin, vec3f(0.0), vec3f(1.0))), 1.0);
 }

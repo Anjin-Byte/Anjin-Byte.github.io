@@ -4,6 +4,17 @@ use crate::grid::Grid;
 use crate::renderer::GpuRenderer;
 use crate::simulation::Simulation;
 
+// Major-grid divisor: 5 minor cells per major square (must match render.wgsl major_every).
+const MAJOR_EVERY: u32 = 5;
+
+/// Compute a float grid pitch so that `canvas_width` is an exact multiple of
+/// `pitch_major = MAJOR_EVERY * result`.  Both left and right margin borders then
+/// land exactly on major grid lines.
+fn aligned_pitch(canvas_width: u32, target: f32) -> f32 {
+    let n = ((canvas_width as f32 / (target * MAJOR_EVERY as f32)).round() as u32).max(1);
+    canvas_width as f32 / (n * MAJOR_EVERY) as f32
+}
+
 /// WebGPU-accelerated Game of Life, exported to JavaScript.
 ///
 /// Init order required by wgpu ≥ 22:
@@ -13,21 +24,22 @@ use crate::simulation::Simulation;
 ///   4. Device + Queue
 #[wasm_bindgen]
 pub struct GpuGameOfLife {
-    device:     wgpu::Device,
-    queue:      wgpu::Queue,
-    grid:       Grid,
-    simulation: Simulation,
-    renderer:   GpuRenderer,
+    device:       wgpu::Device,
+    queue:        wgpu::Queue,
+    grid:         Grid,
+    simulation:   Simulation,
+    renderer:     GpuRenderer,
+    target_pitch: f32,   // stored as reference for resize recomputation
 }
 
 /// Shared init path: requests adapter + device, builds grid/simulation/renderer.
 /// Called by both `new` (HtmlCanvasElement) and `new_offscreen` (OffscreenCanvas).
 async fn from_surface(
-    instance: wgpu::Instance,
-    surface:  wgpu::Surface<'static>,
-    width:    u32,
-    height:   u32,
-    cell_px:  u32,
+    instance:     wgpu::Instance,
+    surface:      wgpu::Surface<'static>,
+    width:        u32,
+    height:       u32,
+    target_pitch: f32,
 ) -> Result<GpuGameOfLife, JsValue> {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
@@ -51,20 +63,23 @@ async fn from_surface(
         .await
         .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
+    let grid_pitch = aligned_pitch(width, target_pitch);
+    let cell_px    = grid_pitch.round() as u32;
+
     let grid       = Grid::new(width, height, cell_px);
     let simulation = Simulation::new(&device, &queue, &grid);
-    let renderer   = GpuRenderer::new(&device, &queue, &adapter, surface, &grid,
+    let renderer   = GpuRenderer::new(&device, &queue, &adapter, surface, &grid, grid_pitch,
                                       &simulation.buf_a, &simulation.buf_b);
 
-    Ok(GpuGameOfLife { device, queue, grid, simulation, renderer })
+    Ok(GpuGameOfLife { device, queue, grid, simulation, renderer, target_pitch })
 }
 
 #[wasm_bindgen]
 impl GpuGameOfLife {
     /// Create from an HtmlCanvasElement (main-thread usage).
     pub async fn new(
-        canvas:  web_sys::HtmlCanvasElement,
-        cell_px: u32,
+        canvas:      web_sys::HtmlCanvasElement,
+        grid_pitch:  f32,
     ) -> Result<GpuGameOfLife, JsValue> {
         let (width, height) = (canvas.width(), canvas.height());
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -75,13 +90,13 @@ impl GpuGameOfLife {
         let surface = instance
             .create_surface(wgpu::SurfaceTarget::Canvas(canvas))
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
-        from_surface(instance, surface, width, height, cell_px).await
+        from_surface(instance, surface, width, height, grid_pitch).await
     }
 
     /// Create from an OffscreenCanvas (Web Worker usage).
     pub async fn new_offscreen(
-        canvas:  web_sys::OffscreenCanvas,
-        cell_px: u32,
+        canvas:     web_sys::OffscreenCanvas,
+        grid_pitch: f32,
     ) -> Result<GpuGameOfLife, JsValue> {
         let (width, height) = (canvas.width(), canvas.height());
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -92,7 +107,25 @@ impl GpuGameOfLife {
         let surface = instance
             .create_surface(wgpu::SurfaceTarget::OffscreenCanvas(canvas))
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
-        from_surface(instance, surface, width, height, cell_px).await
+        from_surface(instance, surface, width, height, grid_pitch).await
+    }
+
+    /// Presents the current simulation state without advancing a generation.
+    /// Call this on render frames that fall between simulation ticks so the
+    /// display stays at vsync rate while the simulation runs at a lower rate.
+    pub fn render_only(&mut self) {
+        let mut encoder = self.device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor { label: Some("gol_render_only") }
+        );
+        match self.renderer.render(&mut encoder, self.simulation.frame) {
+            Ok(output) => {
+                self.queue.submit([encoder.finish()]);
+                output.present();
+            }
+            Err(_) => {
+                self.renderer.reconfigure(&self.device);
+            }
+        }
     }
 
     /// Advances one GoL generation and presents the result to the canvas.
@@ -116,13 +149,20 @@ impl GpuGameOfLife {
         }
     }
 
+    /// Updates the vertical scroll offset (canvas pixels). Call on every scroll event.
+    pub fn set_scroll(&self, scroll_y: f32) {
+        self.renderer.set_scroll(&self.queue, scroll_y);
+    }
+
     /// Call whenever the canvas dimensions change.
     pub fn resize(&mut self, width: u32, height: u32) {
         if width == 0 || height == 0 { return; }
-        self.grid = Grid::new(width, height, self.grid.cell_px);
+        let grid_pitch = aligned_pitch(width, self.target_pitch);
+        let cell_px    = grid_pitch.round() as u32;
+        self.grid = Grid::new(width, height, cell_px);
         self.simulation.resize(&self.device, &self.queue, &self.grid);
         self.renderer.resize(
-            &self.device, &self.queue, &self.grid,
+            &self.device, &self.queue, &self.grid, grid_pitch,
             &self.simulation.buf_a, &self.simulation.buf_b,
         );
     }
