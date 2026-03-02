@@ -2938,7 +2938,7 @@ const n0 = Ea({ __name: "AppBackground", setup(e) {
     if (!u) return;
     r = Math.round(window.innerWidth * devicePixelRatio), s = Math.round(window.innerHeight * devicePixelRatio), u.width = r, u.height = s, t.debug("Canvas initialised", r, "x", s, "dpr", devicePixelRatio);
     const c = u.transferControlToOffscreen();
-    l = new Worker(new URL("/assets/backgroundRenderer-CqhQhs-o.js", import.meta.url), { type: "module" }), l.onmessage = (f) => {
+    l = new Worker(new URL("/assets/backgroundRenderer-PSzUOGmN.js", import.meta.url), { type: "module" }), l.onmessage = (f) => {
       switch (f.data.type) {
         case "ready":
           t.info(`${f.data.backend.toUpperCase()} renderer active`);
