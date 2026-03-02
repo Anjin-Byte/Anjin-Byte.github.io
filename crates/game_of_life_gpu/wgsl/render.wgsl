@@ -231,7 +231,7 @@ fn sponge_stamp(pCell: vec2f, cellId: vec2f) -> f32 {
     // leftward strokes are essentially absent, matching real handwriting.
     let u1    = hash21(cellId);
     let u2    = hash21(cellId + vec2f(17.0, 53.0));
-    let angle = 0.436 + (u1 + u2 - 1.0) * 0.698;  // preferred=25°, spread=±40°
+    let angle = 0.436 + (u1 + u2 - 1.0) * 0.349;  // preferred=25°, spread=±20°
     let dir   = vec2f(cos(angle), sin(angle));   // unit vector along stroke
     let perp  = vec2f(-dir.y, dir.x);            // unit vector across stroke
 
@@ -248,7 +248,7 @@ fn sponge_stamp(pCell: vec2f, cellId: vec2f) -> f32 {
     let noiseB = vec2f(p_s * 2.0, p_p * 6.0) + shiftB;
 
     // ── Box SDF: grid-aligned square (shape stays natural, only texture rotates)
-    let d = sd_box(pCell, vec2f(0.42));
+    let d = sd_box(pCell, vec2f(0.46));
 
     // ── Pores (cellular gaps in the foam) ─────────────────────────────────────
     let pore_a = aastep(0.60, 1.0 - worley(noiseA * 2.0));
@@ -318,14 +318,27 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     let pitch_minor = paper.grid_pitch_px;
     let pitch_major = pitch_minor * paper.major_every;
 
-    let minor_cov = max(
-        grid_line_aa(px, pitch_minor, paper.minor_half_px),
-        grid_line_aa(py, pitch_minor, paper.minor_half_px),
-    );
-    let major_cov = max(
-        grid_line_aa(px, pitch_major, paper.major_half_px),
-        grid_line_aa(py, pitch_major, paper.major_half_px),
-    );
+    // Fiber-dependent ink bleed: open fiber absorbs more dye, spreading the edge.
+    // ns.r is already in [0,1]; 0.3px max bleed keeps lines recognisably straight.
+    let fiber_bleed = ns.r * 0.3;
+
+    // Low-frequency printing variation: ink roller/ribbon inconsistency during
+    // manufacture.  Each axis fades independently — the print head's condition
+    // varies per pass.  Period ≈ 200px (spans ~25 cells); range [0.80, 1.00].
+    let print_fade_x = mix(0.70, 1.0, value_noise(vec2f(px * 0.005,  7.3)));
+    let print_fade_y = mix(0.70, 1.0, value_noise(vec2f(3.9, py * 0.005)));
+
+    let minor_x   = grid_line_aa(px, pitch_minor, paper.minor_half_px + fiber_bleed) * print_fade_x;
+    let minor_y   = grid_line_aa(py, pitch_minor, paper.minor_half_px + fiber_bleed) * print_fade_y;
+    let minor_cov = max(minor_x, minor_y);
+
+    // Major lines get a separate, more aggressive fade — they're bolder so need
+    // a lower floor to show the same perceptual variation as the minor lines.
+    let major_fade_x = mix(0.45, 1.0, value_noise(vec2f(px * 0.004 + 11.7, 23.1)));
+    let major_fade_y = mix(0.45, 1.0, value_noise(vec2f(19.4, py * 0.004 + 11.7)));
+    let major_x   = grid_line_aa(px, pitch_major, paper.major_half_px + fiber_bleed) * major_fade_x;
+    let major_y   = grid_line_aa(py, pitch_major, paper.major_half_px + fiber_bleed) * major_fade_y;
+    let major_cov = max(major_x, major_y);
 
     // Transmittance (linear sRGB): (R, G, B) = fraction transmitted per channel.
     // Minor: (0.52, 0.82, 0.92) — faint teal tint.
@@ -349,12 +362,15 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     // ── 6. Ink absorption: Beer-Lambert + OKLab perceptual mix ────────────────
     // Near-black graphite/ballpoint, very slightly cool.
     // OKLab (0.15, 0.003, -0.012) ≈ linear sRGB (0.003, 0.003, 0.005)
-    let ink_linear = oklab_to_linear(vec3f(0.15, 0.003, -0.012));
+    // Fiber-modulated: ink picks up the same micro-lighting as the paper
+    // so it reads as soaked in rather than rendered on top.
+    let ink_albedo = oklab_to_linear(vec3f(0.15, 0.003, -0.012));
+    let ink_lit    = ink_albedo * (diffuse * mix(0.88, 1.0, ns.r)) + vec3f(spec * 0.5);
     let transmit   = exp(-paper.ink_od * coverage);
     // Mix in OKLab: perceptual uniformity across the paper→ink transition.
     // At t=0 (transmit=1, no ink): paper color.
     // At t=1 (transmit→0, full ink): ink color.
-    let result_lin = oklab_mix(paper_grid, ink_linear, 1.0 - transmit);
+    let result_lin = oklab_mix(paper_grid, ink_lit, 1.0 - transmit);
 
     // ── 7. Gamma encode for non-sRGB surface ──────────────────────────────────
     return vec4f(linear_to_srgb(clamp(result_lin, vec3f(0.0), vec3f(1.0))), 1.0);
