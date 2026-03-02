@@ -1,55 +1,57 @@
 (async ()=>{
-    const f = {
+    const b = {
         debug: 0,
         info: 1,
         warn: 2,
         error: 3
-    }, b = f.warn;
-    function h(e) {
-        const i = (r, n)=>{
-            f[r] < b || console[r](`[${e}]`, ...n);
+    }, w = b.warn;
+    function y(e) {
+        const i = (t, n)=>{
+            b[t] < w || console[t](`[${e}]`, ...n);
         };
         return {
-            debug: (...r)=>i("debug", r),
-            info: (...r)=>i("info", r),
-            warn: (...r)=>i("warn", r),
-            error: (...r)=>i("error", r)
+            debug: (...t)=>i("debug", t),
+            info: (...t)=>i("info", t),
+            warn: (...t)=>i("warn", t),
+            error: (...t)=>i("error", t)
         };
     }
-    const a = h("Renderer"), l = self;
-    let s = null;
+    const a = y("Renderer"), h = self;
+    let s = null, l = 0;
+    const k = 32;
+    let f = 0;
     function g(e) {
-        l.postMessage(e);
+        h.postMessage(e);
     }
     function u(e) {
         return e instanceof Error ? e.message : String(e);
     }
-    const c = 5, w = "#0a0a0f", y = "#7c4dff";
-    async function P(e) {
+    const c = 5, m = "#0a0a0f", P = "#7c4dff";
+    async function U(e) {
         a.debug("CPU: loading WASM bridge...");
-        const i = e.getContext("2d"), { WasmBridge: r } = await import("./index-BIHyjIdh.js").then(async (m)=>{
+        const i = e.getContext("2d"), { WasmBridge: t } = await import("./index-BIHyjIdh.js").then(async (m)=>{
             await m.__tla;
             return m;
-        }), n = await r.create();
+        }), n = await t.create();
         return e.width = (c + 1) * n.width + 1, e.height = (c + 1) * n.height + 1, a.debug("CPU: bridge ready, grid", n.width, "x", n.height), {
             tick () {
                 n.tick();
                 const o = n.getCells();
-                for(let t = 0; t < n.height; t++)for(let d = 0; d < n.width; d++){
-                    const p = t * n.width + d;
-                    i.fillStyle = o[p] === 0 ? w : y, i.fillRect(d * (c + 1) + 1, t * (c + 1) + 1, c, c);
+                for(let r = 0; r < n.height; r++)for(let d = 0; d < n.width; d++){
+                    const p = r * n.width + d;
+                    i.fillStyle = o[p] === 0 ? m : P, i.fillRect(d * (c + 1) + 1, r * (c + 1) + 1, c, c);
                 }
             },
-            resize (o, t) {},
+            resize (o, r) {},
             free () {}
         };
     }
-    l.onmessage = async (e)=>{
+    h.onmessage = async (e)=>{
         switch(e.data.type){
             case "init":
                 {
-                    const { canvas: i, cellPx: r } = e.data;
-                    a.debug("Init received — canvas", i.width, "x", i.height, "cell_px", r), a.debug("GPU: probing WebGPU availability...");
+                    const { canvas: i, cellPx: t } = e.data;
+                    a.debug("Init received — canvas", i.width, "x", i.height, "cell_px", t), a.debug("GPU: probing WebGPU availability...");
                     let n = !1;
                     try {
                         if (!(await navigator.gpu?.requestAdapter() ?? null)) throw new Error("No WebGPU adapter");
@@ -64,54 +66,59 @@
                     if (n) {
                         a.debug("GPU: loading wasm module...");
                         try {
-                            const { GpuGameOfLife: o } = await import("./game_of_life_gpu-CKjBif0o.js").then(async (m)=>{
+                            const { GpuGameOfLife: o } = await import("./game_of_life_gpu-4lQu_B9N.js").then(async (m)=>{
                                 await m.__tla;
                                 return m;
                             });
                             a.debug("GPU: module loaded, initialising surface...");
-                            const t = await o.new_offscreen(i, r);
+                            const r = await o.new_offscreen(i, t);
                             s = {
-                                tick: ()=>t.tick_and_render(),
+                                tick: ()=>r.tick_and_render(),
+                                renderOnly: ()=>r.render_only(),
                                 resize: (d, p)=>{
-                                    i.width = d, i.height = p, t.resize(d, p);
+                                    i.width = d, i.height = p, r.resize(d, p);
                                 },
-                                free: ()=>t.free()
-                            }, a.info("GPU renderer ready"), g({
+                                setScroll: (d)=>r.set_scroll(d),
+                                free: ()=>r.free()
+                            }, s.setScroll?.(l), a.info("GPU renderer ready"), g({
                                 type: "ready",
                                 backend: "gpu"
                             });
                             break;
                         } catch (o) {
-                            const t = u(o);
-                            a.error("GPU init failed after probe passed (canvas may be locked):", t), g({
+                            const r = u(o);
+                            a.error("GPU init failed after probe passed (canvas may be locked):", r), g({
                                 type: "error",
                                 phase: "gpu-init",
-                                message: t
+                                message: r
                             });
                             break;
                         }
                     }
                     a.debug("CPU: starting software renderer...");
                     try {
-                        s = await P(i), a.info("CPU renderer ready"), g({
+                        s = await U(i), s.setScroll?.(l), a.info("CPU renderer ready"), g({
                             type: "ready",
                             backend: "cpu"
                         });
                     } catch (o) {
-                        const t = u(o);
-                        a.error("CPU init failed:", t), g({
+                        const r = u(o);
+                        a.error("CPU init failed:", r), g({
                             type: "error",
                             phase: "cpu-init",
-                            message: t
+                            message: r
                         });
                     }
                     break;
                 }
             case "frame":
-                s?.tick();
+                f++, s?.renderOnly && f % k !== 0 ? s.renderOnly() : s?.tick();
                 break;
             case "resize":
-                a.debug("Resize →", e.data.width, "x", e.data.height), s?.resize(e.data.width, e.data.height);
+                a.debug("Resize →", e.data.width, "x", e.data.height), s?.resize(e.data.width, e.data.height), s?.setScroll?.(l);
+                break;
+            case "scroll":
+                l = e.data.scrollY, s?.setScroll?.(l);
                 break;
             case "stop":
                 a.debug("Stop received, freeing renderer"), s?.free(), s = null;

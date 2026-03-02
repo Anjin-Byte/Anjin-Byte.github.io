@@ -1,7 +1,7 @@
 import { _ as W } from "./__vite-plugin-wasm-helper-oqf-7dtx.js";
 let h;
 let __tla = (async ()=>{
-    var O = "/assets/game_of_life_gpu_bg-DYmujBaU.wasm";
+    var O = "/assets/game_of_life_gpu_bg-C9SsVOQy.wasm";
     h = class {
         static __wrap(_) {
             _ = _ >>> 0;
@@ -22,8 +22,14 @@ let __tla = (async ()=>{
         static new_offscreen(_, t) {
             return c.gpugameoflife_new_offscreen(_, t);
         }
+        render_only() {
+            c.gpugameoflife_render_only(this.__wbg_ptr);
+        }
         resize(_, t) {
             c.gpugameoflife_resize(this.__wbg_ptr, _, t);
+        }
+        set_scroll(_) {
+            c.gpugameoflife_set_scroll(this.__wbg_ptr, _);
         }
         tick_and_render() {
             c.gpugameoflife_tick_and_render(this.__wbg_ptr);
@@ -70,12 +76,12 @@ let __tla = (async ()=>{
     function Q(e) {
         return e.buffer;
     }
-    function Y() {
+    function X() {
         return y(function(e, _, t) {
             return e.call(_, t);
         }, arguments);
     }
-    function X(e, _, t) {
+    function Y(e, _, t) {
         e.clearBuffer(_, t);
     }
     function Z(e, _, t, n) {
@@ -138,10 +144,10 @@ let __tla = (async ()=>{
     function we(e, _) {
         return e.createView(_);
     }
-    function me(e) {
+    function le(e) {
         e.destroy();
     }
-    function le(e) {
+    function me(e) {
         e.destroy();
     }
     function pe(e) {
@@ -175,10 +181,10 @@ let __tla = (async ()=>{
     function ve(e, _, t) {
         e.drawIndirect(_, t);
     }
-    function ke(e, _, t, n, r) {
+    function Ce(e, _, t, n, r) {
         e.draw(_ >>> 0, t >>> 0, n >>> 0, r >>> 0);
     }
-    function Ce(e, _, t, n, r) {
+    function ke(e, _, t, n, r) {
         e.draw(_ >>> 0, t >>> 0, n >>> 0, r >>> 0);
     }
     function Ge(e) {
@@ -246,11 +252,11 @@ let __tla = (async ()=>{
     function Qe(e, _, t) {
         return e.getMappedRange(_, t);
     }
-    function Ye(e) {
+    function Xe(e) {
         const _ = e.getPreferredCanvasFormat();
-        return (kn.indexOf(_) + 1 || 96) - 1;
+        return (Cn.indexOf(_) + 1 || 96) - 1;
     }
-    function Xe(e, _) {
+    function Ye(e, _) {
         return e[_ >>> 0];
     }
     function Ze(e, _) {
@@ -357,10 +363,10 @@ let __tla = (async ()=>{
     function w_(e) {
         return e.lineNum;
     }
-    function m_(e) {
+    function l_(e) {
         return e.lost;
     }
-    function l_(e, _, t, n) {
+    function m_(e, _, t, n) {
         return e.mapAsync(_ >>> 0, t, n);
     }
     function p_(e) {
@@ -393,10 +399,10 @@ let __tla = (async ()=>{
     function v_(e) {
         return e.maxComputeWorkgroupStorageSize;
     }
-    function k_(e) {
+    function C_(e) {
         return e.maxComputeWorkgroupsPerDimension;
     }
-    function C_(e) {
+    function k_(e) {
         return e.maxDynamicStorageBuffersPerPipelineLayout;
     }
     function G_(e) {
@@ -455,11 +461,11 @@ let __tla = (async ()=>{
         const t = _.message, n = w(t, c.__wbindgen_malloc, c.__wbindgen_realloc), r = i;
         u().setInt32(e + 4, r, !0), u().setInt32(e + 0, n, !0);
     }
-    function Y_(e, _) {
+    function X_(e, _) {
         const t = _.message, n = w(t, c.__wbindgen_malloc, c.__wbindgen_realloc), r = i;
         u().setInt32(e + 4, r, !0), u().setInt32(e + 0, n, !0);
     }
-    function X_(e) {
+    function Y_(e) {
         return e.messages;
     }
     function Z_(e) {
@@ -481,7 +487,7 @@ let __tla = (async ()=>{
         return new Object;
     }
     function tt(e, _) {
-        return new Uint8Array(C(e, _));
+        return new Uint8Array(k(e, _));
     }
     function nt(e, _) {
         try {
@@ -515,7 +521,7 @@ let __tla = (async ()=>{
         return e.popErrorScope();
     }
     function ft(e, _, t) {
-        Uint8Array.prototype.set.call(C(e, _), t);
+        Uint8Array.prototype.set.call(k(e, _), t);
     }
     function bt(e, _) {
         e.pushErrorScope(vn[_]);
@@ -541,10 +547,10 @@ let __tla = (async ()=>{
         const _ = e.reason;
         return (Pn.indexOf(_) + 1 || 3) - 1;
     }
-    function mt(e, _) {
+    function lt(e, _) {
         return e.requestAdapter(_);
     }
-    function lt(e, _) {
+    function mt(e, _) {
         return _?.requiredLimits && delete _.requiredLimits.maxInterStageShaderComponents, e.requestDevice(_);
     }
     function pt(e, _, t, n, r, o) {
@@ -557,16 +563,16 @@ let __tla = (async ()=>{
         e.setBindGroup(_ >>> 0, t);
     }
     function yt(e, _, t, n, r, o, a) {
-        e.setBindGroup(_ >>> 0, t, k(n, r), o, a >>> 0);
+        e.setBindGroup(_ >>> 0, t, C(n, r), o, a >>> 0);
     }
     function Bt(e, _, t, n, r, o, a) {
-        e.setBindGroup(_ >>> 0, t, k(n, r), o, a >>> 0);
+        e.setBindGroup(_ >>> 0, t, C(n, r), o, a >>> 0);
     }
     function St(e, _, t) {
         e.setBindGroup(_ >>> 0, t);
     }
     function It(e, _, t, n, r, o, a) {
-        e.setBindGroup(_ >>> 0, t, k(n, r), o, a >>> 0);
+        e.setBindGroup(_ >>> 0, t, C(n, r), o, a >>> 0);
     }
     function Tt(e, _, t) {
         e.setBindGroup(_ >>> 0, t);
@@ -577,10 +583,10 @@ let __tla = (async ()=>{
     function vt(e, _, t, n, r) {
         e.setIndexBuffer(_, T[t], n, r);
     }
-    function kt(e, _, t, n) {
+    function Ct(e, _, t, n) {
         e.setIndexBuffer(_, T[t], n);
     }
-    function Ct(e, _, t, n) {
+    function kt(e, _, t, n) {
         e.setIndexBuffer(_, T[t], n);
     }
     function Gt(e, _, t, n, r) {
@@ -639,10 +645,10 @@ let __tla = (async ()=>{
     function Qt(e, _) {
         e.width = _ >>> 0;
     }
-    function Yt(e) {
+    function Xt(e) {
         return e.size;
     }
-    function Xt(e, _) {
+    function Yt(e, _) {
         const t = _.stack, n = w(t, c.__wbindgen_malloc, c.__wbindgen_realloc), r = i;
         u().setInt32(e + 4, r, !0), u().setInt32(e + 0, n, !0);
     }
@@ -708,14 +714,14 @@ let __tla = (async ()=>{
     function wn(e, _) {
         return G(e, _, c.wasm_bindgen__closure__destroy__h6a06e28996890e73, Bn);
     }
-    function mn(e, _) {
+    function ln(e, _) {
         return G(e, _, c.wasm_bindgen__closure__destroy__hfcf6415a4c156013, Sn);
     }
-    function ln(e) {
+    function mn(e) {
         return e;
     }
     function pn(e, _) {
-        return C(e, _);
+        return k(e, _);
     }
     function xn(e, _) {
         return g(e, _);
@@ -751,7 +757,7 @@ let __tla = (async ()=>{
     ], T = [
         "uint16",
         "uint32"
-    ], kn = [
+    ], Cn = [
         "r8unorm",
         "r8snorm",
         "r8uint",
@@ -890,21 +896,21 @@ let __tla = (async ()=>{
         return e instanceof Error ? `${e.name}: ${e.message}
 ${e.stack}` : n;
     }
-    function k(e, _) {
-        return e = e >>> 0, Cn().subarray(e / 4, e / 4 + _);
-    }
     function C(e, _) {
+        return e = e >>> 0, kn().subarray(e / 4, e / 4 + _);
+    }
+    function k(e, _) {
         return e = e >>> 0, p().subarray(e / 1, e / 1 + _);
     }
-    let m = null;
+    let l = null;
     function u() {
-        return (m === null || m.buffer.detached === !0 || m.buffer.detached === void 0 && m.buffer !== c.memory.buffer) && (m = new DataView(c.memory.buffer)), m;
+        return (l === null || l.buffer.detached === !0 || l.buffer.detached === void 0 && l.buffer !== c.memory.buffer) && (l = new DataView(c.memory.buffer)), l;
     }
     function g(e, _) {
         return e = e >>> 0, Dn(e, _);
     }
     let B = null;
-    function Cn() {
+    function kn() {
         return (B === null || B.byteLength === 0) && (B = new Uint32Array(c.memory.buffer)), B;
     }
     let S = null;
@@ -944,8 +950,8 @@ ${e.stack}` : n;
     }
     function w(e, _, t) {
         if (t === void 0) {
-            const b = x.encode(e), l = _(b.length, 1) >>> 0;
-            return p().subarray(l, l + b.length).set(b), i = b.length, l;
+            const b = x.encode(e), m = _(b.length, 1) >>> 0;
+            return p().subarray(m, m + b.length).set(b), i = b.length, m;
         }
         let n = e.length, r = _(n, 1) >>> 0;
         const o = p();
@@ -957,8 +963,8 @@ ${e.stack}` : n;
         }
         if (a !== n) {
             a !== 0 && (e = e.slice(a)), r = t(r, n, n = a + e.length * 3, 1) >>> 0;
-            const b = p().subarray(r + a, r + n), l = x.encodeInto(e, b);
-            a += l.written, r = t(r, n, a, 1) >>> 0;
+            const b = p().subarray(r + a, r + n), m = x.encodeInto(e, b);
+            a += m.written, r = t(r, n, a, 1) >>> 0;
         }
         return i = a, r;
     }
@@ -996,9 +1002,9 @@ ${e.stack}` : n;
         "./game_of_life_gpu_bg.js": {
             __wbg_gpugameoflife_new: Je,
             __wbg_new_typed_aaaeaf29cf802876: nt,
-            __wbg_call_2d781c1f4d5c0ef8: Y,
+            __wbg_call_2d781c1f4d5c0ef8: X,
             __wbg_new_227d7c05414eb861: et,
-            __wbg_stack_3b0d974bbf31e44f: Xt,
+            __wbg_stack_3b0d974bbf31e44f: Yt,
             __wbg_error_a6fa202b58aa1cd3: Le,
             __wbg_getMappedRange_11ec4cfce4df1e72: Qe,
             __wbg_instanceof_GpuValidationError_2828a9f6f4ea2c0b: o_,
@@ -1008,14 +1014,14 @@ ${e.stack}` : n;
             __wbg_instanceof_GpuDeviceLostInfo_9385c1b1d1700172: r_,
             __wbg_limits_5b3783fcc0d36428: d_,
             __wbg_limits_becc24c879d87717: g_,
-            __wbg_destroy_50767c0458f7c8d1: me,
-            __wbg_destroy_80182ff6e496228e: le,
+            __wbg_destroy_50767c0458f7c8d1: le,
+            __wbg_destroy_80182ff6e496228e: me,
             __wbg_features_30a76d141781ad80: Oe,
             __wbg_end_54134488dbc5b7a9: Ge,
             __wbg_destroy_a2c0702c5d1269b5: pe,
             __wbg_features_fdbd3daed26aa468: Ee,
             __wbg_end_57a2746c247f499a: Ae,
-            __wbg_draw_57caf8f0bc1ea050: ke,
+            __wbg_draw_57caf8f0bc1ea050: Ce,
             __wbg_popErrorScope_2869a89dd4626f0c: at,
             __wbg_pushErrorScope_72e651b0f8f64c0e: bt,
             __wbg_drawIndexed_9c9719597507e735: Te,
@@ -1023,7 +1029,7 @@ ${e.stack}` : n;
             __wbg_setViewport_94128a2b1a708040: Rt,
             __wbg_setPipeline_481f34ae14c49d67: At,
             __wbg_drawIndirect_73df189881970a43: Pe,
-            __wbg_draw_ce5e8b8ad56571cb: Ce,
+            __wbg_draw_ce5e8b8ad56571cb: ke,
             __wbg_getCurrentTexture_6dc2cdde9bdc098d: Ne,
             __wbg_setScissorRect_0578b1de90caf434: Wt,
             __wbg_dispatchWorkgroups_c122d0482fa3f389: he,
@@ -1048,7 +1054,7 @@ ${e.stack}` : n;
             __wbg_maxBindGroups_5d3409c14d2756b5: p_,
             __wbg_maxBindingsPerBindGroup_512a63ba20ee714c: x_,
             __wbg_maxDynamicUniformBuffersPerPipelineLayout_ade9d0536439985a: G_,
-            __wbg_maxDynamicStorageBuffersPerPipelineLayout_6974d29539996dc2: C_,
+            __wbg_maxDynamicStorageBuffersPerPipelineLayout_6974d29539996dc2: k_,
             __wbg_maxSampledTexturesPerShaderStage_e560c5b5b6029c57: D_,
             __wbg_maxSamplersPerShaderStage_28a8a2de2a3d656e: L_,
             __wbg_maxStorageBuffersPerShaderStage_b81c4449fbcb39c3: O_,
@@ -1070,7 +1076,7 @@ ${e.stack}` : n;
             __wbg_maxComputeWorkgroupSizeX_b6f88bafac1581bf: I_,
             __wbg_maxComputeWorkgroupSizeY_e1a1ecdbdc9d75d8: T_,
             __wbg_maxComputeWorkgroupSizeZ_fe66cf9606e1a594: P_,
-            __wbg_maxComputeWorkgroupsPerDimension_8cb3348843013a6b: k_,
+            __wbg_maxComputeWorkgroupsPerDimension_8cb3348843013a6b: C_,
             __wbg_has_2184fc4b845f2b5f: Ke,
             __wbg_queue_6b07ccdd49a6ba90: gt,
             __wbg_instanceof_GpuAdapter_8825bf3533b2dc81: t_,
@@ -1079,7 +1085,7 @@ ${e.stack}` : n;
             __wbg_WorkerGlobalScope_defda269b75e179a: z,
             __wbg_unmap_4aa38f8c5283cc1d: on,
             __wbg_submit_60f2469dc00130cc: en,
-            __wbg_mapAsync_8d0ffc031e86e9a0: l_,
+            __wbg_mapAsync_8d0ffc031e86e9a0: m_,
             __wbg_configure_6e1ccd3ac31b721c: H,
             __wbg_writeBuffer_b5e6e8f3f93629bc: sn,
             __wbg_writeTexture_57e41dd94bac65c4: dn,
@@ -1087,12 +1093,12 @@ ${e.stack}` : n;
             __wbg_createBuffer_e3f8b2bd8b492498: ce,
             __wbg_createSampler_cb4137c4e97c7098: se,
             __wbg_createTexture_1a3ebeb1ddd7a035: ge,
-            __wbg_requestDevice_6130c3ba10d633f9: lt,
+            __wbg_requestDevice_6130c3ba10d633f9: mt,
             __wbg_finish_35be15c58b55a95b: ze,
             __wbg_finish_41491ca602373cde: Ve,
             __wbg_createQuerySet_6050df2adcb1f167: be,
             __wbg_createBindGroup_876adbf7e329ce2e: re,
-            __wbg_requestAdapter_e4b32f2647c66726: mt,
+            __wbg_requestAdapter_e4b32f2647c66726: lt,
             __wbg_set_onuncapturederror_729c2e42c36923f4: $t,
             __wbg_setBindGroup_f4d552dcef65a491: It,
             __wbg_setBindGroup_f930832baeb4279b: Tt,
@@ -1100,17 +1106,17 @@ ${e.stack}` : n;
             __wbg_setBindGroup_9877b57492cb7e1c: St,
             __wbg_createShaderModule_912a19a8ccc2aa1a: de,
             __wbg_usage_ee2982f59567c06f: an,
-            __wbg_size_1dfbf7241f9df1cc: Yt,
+            __wbg_size_1dfbf7241f9df1cc: Xt,
             __wbg_executeBundles_2905636f81aabf99: We,
             __wbg_getCompilationInfo_b41435ddc0bb40c8: qe,
-            __wbg_messages_4e98c7e63c5efe7b: X_,
+            __wbg_messages_4e98c7e63c5efe7b: Y_,
             __wbg_length_b3416cf66a5452c8: i_,
             __wbg_clearBuffer_f24f8de43db597ec: Z,
-            __wbg_clearBuffer_b08b15b7ee3c9d57: X,
+            __wbg_clearBuffer_b08b15b7ee3c9d57: Y,
             __wbg_finish_eb06372cc93f8d50: Ue,
             __wbg_finish_ee515f526784acd5: Re,
             __wbg_setIndexBuffer_f0ab50b0e1d8658c: Gt,
-            __wbg_setIndexBuffer_5eb14c0c19ab80c2: kt,
+            __wbg_setIndexBuffer_5eb14c0c19ab80c2: Ct,
             __wbg_createCommandEncoder_e617922978f8b4de: oe,
             __wbg_createPipelineLayout_1a8ea1f550cfa5e7: fe,
             __wbg_createRenderPipeline_921034ccba195ffe: ie,
@@ -1119,7 +1125,7 @@ ${e.stack}` : n;
             __wbg_createComputePipeline_6794bf24c6c03583: ae,
             __wbg_setBlendConstant_257274277b0e3153: Pt,
             __wbg_createBindGroupLayout_e37f9323c278f93f: ne,
-            __wbg_lost_2c34651e3317be8b: m_,
+            __wbg_lost_2c34651e3317be8b: l_,
             __wbg_then_1d7a5273811a5cea: tn,
             __wbg_beginRenderPass_9a7bf53d588737dc: N,
             __wbg_beginComputePass_5d05bddfd3eb7ba4: $,
@@ -1130,23 +1136,23 @@ ${e.stack}` : n;
             __wbg_copyBufferToTexture_48aa78a412b2a467: K,
             __wbg_copyTextureToBuffer_5aef45a98e34a97e: _e,
             __wbg_setIndexBuffer_4219294fa3e2d59b: vt,
-            __wbg_setIndexBuffer_7e208bb69310ed01: Ct,
+            __wbg_setIndexBuffer_7e208bb69310ed01: kt,
             __wbg_copyTextureToTexture_97d0e9333a1e1008: te,
             __wbg_setVertexBuffer_c643d7ac0abf4554: Vt,
             __wbg_setVertexBuffer_caad1ac6b71dea4a: Ut,
             __wbg_lineNum_24517b98f306fcae: w_,
             __wbg_instanceof_Object_be1962063fcc0c9f: a_,
-            __wbg_get_a8ee5c45dabc1b3b: Xe,
+            __wbg_get_a8ee5c45dabc1b3b: Ye,
             __wbg_push_e87b0e732085a946: ut,
             __wbg_new_typed_bccac67128ed885a: rt,
             __wbg_then_9e335f6dd892bc11: nn,
-            __wbg_message_f762db05c1294eca: Y_,
+            __wbg_message_f762db05c1294eca: X_,
             __wbg_label_cdc2b7a875dc5123: b_,
             __wbg_reason_d7f4ddcad86f8d99: wt,
             __wbg_message_1b27ea1ad3998a9f: N_,
             __wbg_type_4b0a304ebc25e195: cn,
             __wbg_message_a77e1a9202609622: Q_,
-            __wbg_getPreferredCanvasFormat_4314f4e4f5895771: Ye,
+            __wbg_getPreferredCanvasFormat_4314f4e4f5895771: Xe,
             __wbg_then_098abe61755d12f6: _n,
             __wbg_queueMicrotask_a082d78ce798393e: dt,
             __wbg_queueMicrotask_0c399741342fb10f: st,
@@ -1190,36 +1196,38 @@ ${e.stack}` : n;
             __wbindgen_init_externref_table: hn,
             __wbindgen_cast_0000000000000001: gn,
             __wbindgen_cast_0000000000000002: wn,
-            __wbindgen_cast_0000000000000003: mn,
-            __wbindgen_cast_0000000000000004: ln,
+            __wbindgen_cast_0000000000000003: ln,
+            __wbindgen_cast_0000000000000004: mn,
             __wbindgen_cast_0000000000000005: pn,
             __wbindgen_cast_0000000000000006: xn
         }
-    }, O), Wn = f.memory, On = f.__wbg_gpugameoflife_free, En = f.gpugameoflife_new, zn = f.gpugameoflife_new_offscreen, Vn = f.gpugameoflife_resize, Un = f.gpugameoflife_tick_and_render, Rn = f.wasm_bindgen__closure__destroy__h6a06e28996890e73, Mn = f.wasm_bindgen__closure__destroy__hfcf6415a4c156013, Fn = f.wasm_bindgen__convert__closures_____invoke__h29a19422643663ce, qn = f.wasm_bindgen__convert__closures_____invoke__h50545f502e4e684f, jn = f.wasm_bindgen__convert__closures_____invoke__h7f92db7c987a73ed, $n = f.wasm_bindgen__convert__closures_____invoke__h7f92db7c987a73ed_1, Nn = f.__wbindgen_malloc, Qn = f.__wbindgen_realloc, Yn = f.__wbindgen_exn_store, Xn = f.__externref_table_alloc, Zn = f.__wbindgen_externrefs, Hn = f.__wbindgen_free, Jn = f.__externref_table_dealloc, L = f.__wbindgen_start;
-    var Kn = Object.freeze({
+    }, O), Wn = f.memory, On = f.__wbg_gpugameoflife_free, En = f.gpugameoflife_new, zn = f.gpugameoflife_new_offscreen, Vn = f.gpugameoflife_render_only, Un = f.gpugameoflife_resize, Rn = f.gpugameoflife_set_scroll, Mn = f.gpugameoflife_tick_and_render, Fn = f.wasm_bindgen__closure__destroy__h6a06e28996890e73, qn = f.wasm_bindgen__closure__destroy__hfcf6415a4c156013, jn = f.wasm_bindgen__convert__closures_____invoke__h29a19422643663ce, $n = f.wasm_bindgen__convert__closures_____invoke__h50545f502e4e684f, Nn = f.wasm_bindgen__convert__closures_____invoke__h7f92db7c987a73ed, Qn = f.wasm_bindgen__convert__closures_____invoke__h7f92db7c987a73ed_1, Xn = f.__wbindgen_malloc, Yn = f.__wbindgen_realloc, Zn = f.__wbindgen_exn_store, Hn = f.__externref_table_alloc, Jn = f.__wbindgen_externrefs, Kn = f.__wbindgen_free, er = f.__externref_table_dealloc, L = f.__wbindgen_start;
+    var _r = Object.freeze({
         __proto__: null,
-        __externref_table_alloc: Xn,
-        __externref_table_dealloc: Jn,
+        __externref_table_alloc: Hn,
+        __externref_table_dealloc: er,
         __wbg_gpugameoflife_free: On,
-        __wbindgen_exn_store: Yn,
-        __wbindgen_externrefs: Zn,
-        __wbindgen_free: Hn,
-        __wbindgen_malloc: Nn,
-        __wbindgen_realloc: Qn,
+        __wbindgen_exn_store: Zn,
+        __wbindgen_externrefs: Jn,
+        __wbindgen_free: Kn,
+        __wbindgen_malloc: Xn,
+        __wbindgen_realloc: Yn,
         __wbindgen_start: L,
         gpugameoflife_new: En,
         gpugameoflife_new_offscreen: zn,
-        gpugameoflife_resize: Vn,
-        gpugameoflife_tick_and_render: Un,
+        gpugameoflife_render_only: Vn,
+        gpugameoflife_resize: Un,
+        gpugameoflife_set_scroll: Rn,
+        gpugameoflife_tick_and_render: Mn,
         memory: Wn,
-        wasm_bindgen__closure__destroy__h6a06e28996890e73: Rn,
-        wasm_bindgen__closure__destroy__hfcf6415a4c156013: Mn,
-        wasm_bindgen__convert__closures_____invoke__h29a19422643663ce: Fn,
-        wasm_bindgen__convert__closures_____invoke__h50545f502e4e684f: qn,
-        wasm_bindgen__convert__closures_____invoke__h7f92db7c987a73ed: jn,
-        wasm_bindgen__convert__closures_____invoke__h7f92db7c987a73ed_1: $n
+        wasm_bindgen__closure__destroy__h6a06e28996890e73: Fn,
+        wasm_bindgen__closure__destroy__hfcf6415a4c156013: qn,
+        wasm_bindgen__convert__closures_____invoke__h29a19422643663ce: jn,
+        wasm_bindgen__convert__closures_____invoke__h50545f502e4e684f: $n,
+        wasm_bindgen__convert__closures_____invoke__h7f92db7c987a73ed: Nn,
+        wasm_bindgen__convert__closures_____invoke__h7f92db7c987a73ed_1: Qn
     });
-    Ln(Kn);
+    Ln(_r);
     L();
 })();
 export { h as GpuGameOfLife, __tla };
