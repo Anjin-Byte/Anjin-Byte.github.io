@@ -319,12 +319,12 @@ fn stroke_noise_reveal(pCell: vec2f, cellId: vec2f, t: f32) -> f32 {
     let foam     = density * pores;
     let material = mix(density, foam, 0.65);
 
-    // Directional reveal front moves from the leading end of the stroke toward
-    // the trailing end, while the foam field perturbs the frontier so it fills
-    // as an irregular hand-drawn mark instead of a clean wipe.
+    // Reveal using the perpendicular coordinate so the visible frontier itself
+    // runs along the same slant as the stretched mark texture, rather than
+    // cutting across it at 90 degrees.
     let front        = mix(-0.78, 0.78, t);
     let noise_bias   = (0.5 - material) * 0.22 + (hash21(cellId + vec2f(5.0, 29.0)) - 0.5) * 0.04;
-    let directional  = 1.0 - smoothstep(front - 0.09, front + 0.09, p_s + noise_bias);
+    let directional  = 1.0 - smoothstep(front - 0.09, front + 0.09, p_p + noise_bias);
     let materialGate = smoothstep(0.10, 1.02, t * 1.12 + (material - 0.5) * 0.38);
 
     return clamp(directional * materialGate, 0.0, 1.0);
@@ -376,7 +376,7 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     let ch = f32(uniforms.canvas_height);
     // grid_pitch_px is computed from canvas_width so cw = n_total * pitch_major exactly.
     // 2 major squares per margin → both left and right borders land on major lines.
-    let margin = .8 * pitch_major;
+    let margin = 0.0 * pitch_major;
     // 0 inside margin band, 1 inside content area.
     // Grid lines and cell ink are only drawn inside the content area.
     let in_cx = step(margin, px) * (1.0 - step(cw - margin, px));
