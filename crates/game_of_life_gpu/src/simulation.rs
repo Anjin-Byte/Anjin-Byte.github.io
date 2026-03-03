@@ -7,7 +7,7 @@ use crate::shaders;
 /// Uniform buffer layout — must match compute.wgsl `Uniforms` struct.
 #[repr(C)]
 #[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy)]
-pub struct Uniforms {
+pub struct ComputeUniforms {
     pub screen_cols:   u32,
     pub screen_rows:   u32,
     pub padded_rows:   u32,
@@ -15,12 +15,12 @@ pub struct Uniforms {
     pub cell_px:       u32,
     pub canvas_width:  u32,
     pub canvas_height: u32,
-    pub scroll_y:      f32,   // vertical scroll in canvas pixels (render shader only)
+    pub pad:           u32,
 }
 
-impl Uniforms {
+impl ComputeUniforms {
     pub fn from_grid(grid: &Grid) -> Self {
-        Uniforms {
+        ComputeUniforms {
             screen_cols:   grid.screen_cols,
             screen_rows:   grid.screen_rows,
             padded_rows:   grid.padded_rows,
@@ -28,7 +28,7 @@ impl Uniforms {
             cell_px:       grid.cell_px,
             canvas_width:  grid.canvas_width,
             canvas_height: grid.canvas_height,
-            scroll_y:      0.0,
+            pad:           0,
         }
     }
 }
@@ -47,7 +47,7 @@ impl Simulation {
     pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, grid: &Grid) -> Self {
         let uniform_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label:    Some("sim_uniforms"),
-            contents: bytes_of(&Uniforms::from_grid(grid)),
+            contents: bytes_of(&ComputeUniforms::from_grid(grid)),
             usage:    wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -93,7 +93,7 @@ impl Simulation {
         let wg_x = grid.words_per_row.div_ceil(8);
         let wg_y = grid.padded_rows.div_ceil(8);
 
-        let bg = if self.frame & 1 == 0 { &self.bind_group_a } else { &self.bind_group_b };
+        let bg = self.next_compute_bind_group();
 
         let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
             label:              Some("gol_tick"),
@@ -110,13 +110,25 @@ impl Simulation {
     /// Rebuilds cell buffers for a new grid size, preserving the pipeline.
     pub fn resize(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, grid: &Grid) {
         let bgl = self.pipeline.get_bind_group_layout(0);
-        queue.write_buffer(&self.uniform_buf, 0, bytes_of(&Uniforms::from_grid(grid)));
+        queue.write_buffer(&self.uniform_buf, 0, bytes_of(&ComputeUniforms::from_grid(grid)));
         let (buf_a, buf_b) = make_cell_buffers(device, queue, grid);
         self.bind_group_a = make_bind_group(device, &bgl, &self.uniform_buf, &buf_a, &buf_b, "bg_a");
         self.bind_group_b = make_bind_group(device, &bgl, &self.uniform_buf, &buf_b, &buf_a, "bg_b");
         self.buf_a = buf_a;
         self.buf_b = buf_b;
         self.frame = 0;
+    }
+
+    pub fn current_visible_buffer(&self) -> &wgpu::Buffer {
+        if self.current_visible_is_a() { &self.buf_a } else { &self.buf_b }
+    }
+
+    pub fn next_compute_bind_group(&self) -> &wgpu::BindGroup {
+        if self.current_visible_is_a() { &self.bind_group_a } else { &self.bind_group_b }
+    }
+
+    pub fn current_visible_is_a(&self) -> bool {
+        self.frame & 1 == 0
     }
 }
 
@@ -131,7 +143,9 @@ fn make_cell_buffers(device: &wgpu::Device, queue: &wgpu::Queue, grid: &Grid)
         .map(|_| { rng_state = lcg(rng_state); rng_state })
         .collect();
 
-    let usage = wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST;
+    let usage = wgpu::BufferUsages::STORAGE
+        | wgpu::BufferUsages::COPY_DST
+        | wgpu::BufferUsages::COPY_SRC;
 
     let buf_a = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label:    Some("cells_a"),

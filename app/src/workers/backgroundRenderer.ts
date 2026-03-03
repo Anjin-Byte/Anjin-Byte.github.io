@@ -15,6 +15,7 @@ interface Renderer {
   renderOnly?(): void;
   resize(w: number, h: number): void;
   setScroll?(scrollY: number): void;
+  setTransition?(transitionT: number): void;
   free(): void;
 }
 
@@ -25,8 +26,8 @@ let renderer: Renderer | null = null;
 let pendingScrollY = 0;
 // Simulation tick rate throttle. The display renders every frame for smooth
 // scrolling; the GoL simulation only advances every TICK_EVERY frames.
-// At 60 Hz: TICK_EVERY=4 → ~15 sim fps. Adjust to taste.
-const TICK_EVERY = 32;
+// At 60 Hz: TICK_EVERY=32 → ~1.9 sim fps. Adjust to taste.
+const TICK_EVERY = 256;
 let frameCount  = 0;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -37,6 +38,11 @@ function post(msg: WorkerOutMsg): void {
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+function easeTransition(t: number): number {
+  const clamped = Math.min(1, Math.max(0, t));
+  return clamped * clamped * (3 - 2 * clamped);
 }
 
 // ── CPU fallback ──────────────────────────────────────────────────────────────
@@ -114,11 +120,13 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
             renderOnly: () => gpu.render_only(),
             resize:     (w, h) => { canvas.width = w; canvas.height = h; gpu.resize(w, h); },
             setScroll:  (scrollY) => gpu.set_scroll(scrollY),
+            setTransition: (transitionT) => gpu.set_transition(transitionT),
             free:       () => gpu.free(),
           };
           // Scroll messages sent during async GPU init were dropped (renderer was null).
           // Re-apply the latest position now that the renderer is accepting commands.
           renderer.setScroll?.(pendingScrollY);
+          renderer.setTransition?.(1);
           log.info('GPU renderer ready');
           post({ type: 'ready', backend: 'gpu' });
           break;
@@ -150,8 +158,10 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
     case 'frame':
       frameCount++;
       if (renderer?.renderOnly && frameCount % TICK_EVERY !== 0) {
+        renderer.setTransition?.(easeTransition((frameCount % TICK_EVERY) / TICK_EVERY));
         renderer.renderOnly();
       } else {
+        renderer?.setTransition?.(0);
         renderer?.tick();
       }
       break;
@@ -161,6 +171,7 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
       renderer?.resize(e.data.width, e.data.height);
       // resize() rewrites the uniform buffer (scroll_y resets to 0); re-apply.
       renderer?.setScroll?.(pendingScrollY);
+      renderer?.setTransition?.(1);
       break;
 
     case 'scroll':

@@ -3,7 +3,43 @@ use wgpu::util::DeviceExt;
 
 use crate::grid::Grid;
 use crate::shaders;
-use crate::simulation::Uniforms;
+use crate::simulation::Simulation;
+
+#[repr(C)]
+#[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy)]
+pub struct RenderUniforms {
+    pub screen_cols:   u32,
+    pub screen_rows:   u32,
+    pub padded_rows:   u32,
+    pub words_per_row: u32,
+    pub cell_px:       u32,
+    pub canvas_width:  u32,
+    pub canvas_height: u32,
+    pub scroll_y:      f32,
+    pub transition_t:  f32,
+    pub pad0:          f32,
+    pub pad1:          f32,
+    pub pad2:          f32,
+}
+
+impl RenderUniforms {
+    pub fn from_grid(grid: &Grid) -> Self {
+        RenderUniforms {
+            screen_cols:   grid.screen_cols,
+            screen_rows:   grid.screen_rows,
+            padded_rows:   grid.padded_rows,
+            words_per_row: grid.words_per_row,
+            cell_px:       grid.cell_px,
+            canvas_width:  grid.canvas_width,
+            canvas_height: grid.canvas_height,
+            scroll_y:      0.0,
+            transition_t:  1.0,
+            pad0:          0.0,
+            pad1:          0.0,
+            pad2:          0.0,
+        }
+    }
+}
 
 // ── PaperParams ───────────────────────────────────────────────────────────────
 
@@ -49,6 +85,7 @@ pub struct GpuRenderer {
     pipeline:       wgpu::RenderPipeline,
     uniform_buf:    wgpu::Buffer,
     paper_buf:      wgpu::Buffer,
+    prev_visible_buf: wgpu::Buffer,
     grid_pitch:     f32,             // stored so resize can recompute PaperParams
     _noise_texture: wgpu::Texture,
     noise_view:     wgpu::TextureView,
@@ -89,7 +126,7 @@ impl GpuRenderer {
 
         let uniform_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label:    Some("render_uniforms"),
-            contents: bytes_of(&Uniforms::from_grid(grid)),
+            contents: bytes_of(&RenderUniforms::from_grid(grid)),
             usage:    wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -99,6 +136,19 @@ impl GpuRenderer {
             usage:    wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
+        let prev_visible_buf = device.create_buffer(&wgpu::BufferDescriptor {
+            label:              Some("prev_visible_cells"),
+            size:               grid.buffer_bytes(),
+            usage:              wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let mut encoder = device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor { label: Some("seed_prev_visible_cells") }
+        );
+        encoder.copy_buffer_to_buffer(buf_a, 0, &prev_visible_buf, 0, grid.buffer_bytes());
+        queue.submit([encoder.finish()]);
+
         let (noise_texture, noise_view, noise_sampler) = make_noise_texture(device, queue);
 
         let bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -106,17 +156,20 @@ impl GpuRenderer {
             entries: &[
                 uniform_bgl_entry(0),
                 storage_bgl_entry(1),
-                uniform_bgl_entry(2),
-                texture_bgl_entry(3),
-                sampler_bgl_entry(4),
+                storage_bgl_entry(2),
+                uniform_bgl_entry(3),
+                texture_bgl_entry(4),
+                sampler_bgl_entry(5),
             ],
         });
 
         let bind_group_a = make_bind_group(
-            device, &bgl, &uniform_buf, buf_a, &paper_buf, &noise_view, &noise_sampler, "rbg_a",
+            device, &bgl, &uniform_buf, buf_a, &prev_visible_buf,
+            &paper_buf, &noise_view, &noise_sampler, "rbg_a",
         );
         let bind_group_b = make_bind_group(
-            device, &bgl, &uniform_buf, buf_b, &paper_buf, &noise_view, &noise_sampler, "rbg_b",
+            device, &bgl, &uniform_buf, buf_b, &prev_visible_buf,
+            &paper_buf, &noise_view, &noise_sampler, "rbg_b",
         );
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -158,7 +211,7 @@ impl GpuRenderer {
 
         GpuRenderer {
             surface, surface_config, pipeline,
-            uniform_buf, paper_buf, grid_pitch,
+            uniform_buf, paper_buf, prev_visible_buf, grid_pitch,
             _noise_texture: noise_texture, noise_view, noise_sampler,
             bind_group_a, bind_group_b, bgl,
         }
@@ -168,12 +221,12 @@ impl GpuRenderer {
     pub fn render(
         &self,
         encoder: &mut wgpu::CommandEncoder,
-        frame:   u32,
+        current_visible_is_a: bool,
     ) -> Result<wgpu::SurfaceTexture, wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
         let view   = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let bg = if frame & 1 == 0 { &self.bind_group_b } else { &self.bind_group_a };
+        let bg = if current_visible_is_a { &self.bind_group_a } else { &self.bind_group_b };
 
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label:             Some("gol_render"),
@@ -200,8 +253,22 @@ impl GpuRenderer {
     /// Updates the scroll offset in the render uniform buffer.
     /// scroll_y is the vertical scroll in canvas pixels.
     pub fn set_scroll(&self, queue: &wgpu::Queue, scroll_y: f32) {
-        // scroll_y is the last field in Uniforms (offset 7 * 4 = 28 bytes).
+        // scroll_y is the 8th scalar in RenderUniforms (offset 7 * 4 = 28 bytes).
         queue.write_buffer(&self.uniform_buf, 28, bytemuck::bytes_of(&scroll_y));
+    }
+
+    pub fn set_transition(&self, queue: &wgpu::Queue, transition_t: f32) {
+        // transition_t follows scroll_y in RenderUniforms (offset 8 * 4 = 32 bytes).
+        queue.write_buffer(&self.uniform_buf, 32, bytemuck::bytes_of(&transition_t));
+    }
+
+    pub fn capture_previous_state(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        current_visible_buf: &wgpu::Buffer,
+        grid: &Grid,
+    ) {
+        encoder.copy_buffer_to_buffer(current_visible_buf, 0, &self.prev_visible_buf, 0, grid.buffer_bytes());
     }
 
     /// Re-applies the current surface configuration (e.g. after Lost/Outdated error).
@@ -216,23 +283,33 @@ impl GpuRenderer {
         queue:      &wgpu::Queue,
         grid:       &Grid,
         grid_pitch: f32,
-        buf_a:      &wgpu::Buffer,
-        buf_b:      &wgpu::Buffer,
+        simulation: &Simulation,
     ) {
         self.grid_pitch = grid_pitch;
         self.surface_config.width  = grid.canvas_width;
         self.surface_config.height = grid.canvas_height;
         self.surface.configure(device, &self.surface_config);
-        queue.write_buffer(&self.uniform_buf, 0, bytes_of(&Uniforms::from_grid(grid)));
+        queue.write_buffer(&self.uniform_buf, 0, bytes_of(&RenderUniforms::from_grid(grid)));
         queue.write_buffer(&self.paper_buf,   0, bytes_of(&PaperParams::for_pitch(grid_pitch)));
+        self.prev_visible_buf = device.create_buffer(&wgpu::BufferDescriptor {
+            label:              Some("prev_visible_cells"),
+            size:               grid.buffer_bytes(),
+            usage:              wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
         self.bind_group_a = make_bind_group(
-            device, &self.bgl, &self.uniform_buf, buf_a,
+            device, &self.bgl, &self.uniform_buf, &simulation.buf_a, &self.prev_visible_buf,
             &self.paper_buf, &self.noise_view, &self.noise_sampler, "rbg_a",
         );
         self.bind_group_b = make_bind_group(
-            device, &self.bgl, &self.uniform_buf, buf_b,
+            device, &self.bgl, &self.uniform_buf, &simulation.buf_b, &self.prev_visible_buf,
             &self.paper_buf, &self.noise_view, &self.noise_sampler, "rbg_b",
         );
+        let mut encoder = device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor { label: Some("resize_prev_visible_cells") }
+        );
+        self.capture_previous_state(&mut encoder, simulation.current_visible_buffer(), grid);
+        queue.submit([encoder.finish()]);
     }
 }
 
@@ -353,7 +430,8 @@ fn make_bind_group(
     device:        &wgpu::Device,
     bgl:           &wgpu::BindGroupLayout,
     uniform_buf:   &wgpu::Buffer,
-    cell_buf:      &wgpu::Buffer,
+    current_buf:   &wgpu::Buffer,
+    previous_buf:  &wgpu::Buffer,
     paper_buf:     &wgpu::Buffer,
     noise_view:    &wgpu::TextureView,
     noise_sampler: &wgpu::Sampler,
@@ -364,14 +442,15 @@ fn make_bind_group(
         layout:  bgl,
         entries: &[
             wgpu::BindGroupEntry { binding: 0, resource: uniform_buf.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 1, resource: cell_buf.as_entire_binding()    },
-            wgpu::BindGroupEntry { binding: 2, resource: paper_buf.as_entire_binding()   },
+            wgpu::BindGroupEntry { binding: 1, resource: current_buf.as_entire_binding() },
+            wgpu::BindGroupEntry { binding: 2, resource: previous_buf.as_entire_binding() },
+            wgpu::BindGroupEntry { binding: 3, resource: paper_buf.as_entire_binding()   },
             wgpu::BindGroupEntry {
-                binding:  3,
+                binding:  4,
                 resource: wgpu::BindingResource::TextureView(noise_view),
             },
             wgpu::BindGroupEntry {
-                binding:  4,
+                binding:  5,
                 resource: wgpu::BindingResource::Sampler(noise_sampler),
             },
         ],

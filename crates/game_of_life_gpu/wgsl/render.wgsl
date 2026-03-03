@@ -19,7 +19,7 @@
 //   6. Ink absorption     (Beer-Lambert; paper→ink mix in OKLab)
 //   7. sRGB encode
 
-struct Uniforms {
+struct RenderUniforms {
     screen_cols:   u32,
     screen_rows:   u32,
     padded_rows:   u32,
@@ -28,6 +28,10 @@ struct Uniforms {
     canvas_width:  u32,
     canvas_height: u32,
     scroll_y:      f32,   // vertical scroll offset in canvas pixels
+    transition_t:  f32,   // progress between previous/current generations
+    pad0:          f32,
+    pad1:          f32,
+    pad2:          f32,
 }
 
 struct PaperParams {
@@ -41,11 +45,12 @@ struct PaperParams {
     spec_weight:   f32,  // specular contribution scale
 }
 
-@group(0) @binding(0) var<uniform>       uniforms: Uniforms;
-@group(0) @binding(1) var<storage, read> cells:    array<u32>;
-@group(0) @binding(2) var<uniform>       paper:    PaperParams;
-@group(0) @binding(3) var                noise_tex: texture_2d<f32>;
-@group(0) @binding(4) var                noise_smp: sampler;
+@group(0) @binding(0) var<uniform>       uniforms: RenderUniforms;
+@group(0) @binding(1) var<storage, read> current_cells: array<u32>;
+@group(0) @binding(2) var<storage, read> previous_cells: array<u32>;
+@group(0) @binding(3) var<uniform>       paper:         PaperParams;
+@group(0) @binding(4) var                noise_tex:     texture_2d<f32>;
+@group(0) @binding(5) var                noise_smp:     sampler;
 
 // ── Vertex ────────────────────────────────────────────────────────────────────
 
@@ -194,14 +199,20 @@ fn grid_line_aa(coord: f32, pitch: f32, half_w: f32) -> f32 {
 
 // ── Cell helpers ──────────────────────────────────────────────────────────────
 
-fn cell_alive(cx: u32, cy: u32) -> u32 {
-    // Wrap with modulo so the simulation grid tiles infinitely as the page scrolls.
-    // screen_cols / screen_rows are always > 0 at this point.
+fn cell_alive_current(cx: u32, cy: u32) -> u32 {
     let cx_w = cx % uniforms.screen_cols;
     let cy_w = cy % uniforms.screen_rows;
     let word_idx = cy_w * uniforms.words_per_row + cx_w / 32u;
     let safe_idx = word_idx & (uniforms.words_per_row * uniforms.padded_rows - 1u);
-    return (cells[safe_idx] >> (cx_w & 31u)) & 1u;
+    return (current_cells[safe_idx] >> (cx_w & 31u)) & 1u;
+}
+
+fn cell_alive_prev(cx: u32, cy: u32) -> u32 {
+    let cx_w = cx % uniforms.screen_cols;
+    let cy_w = cy % uniforms.screen_rows;
+    let word_idx = cy_w * uniforms.words_per_row + cx_w / 32u;
+    let safe_idx = word_idx & (uniforms.words_per_row * uniforms.padded_rows - 1u);
+    return (previous_cells[safe_idx] >> (cx_w & 31u)) & 1u;
 }
 
 // ── Sponge stamp ──────────────────────────────────────────────────────────────
@@ -281,6 +292,42 @@ fn sponge_stamp(pCell: vec2f, cellId: vec2f) -> f32 {
     var C  = edge * (0.65 * density + 0.35 * pores) * mix(0.6, 1.15, pressure);
     C     += 0.12 * ring;
     return clamp(C, 0.0, 1.5);
+}
+
+fn stroke_noise_reveal(pCell: vec2f, cellId: vec2f, t: f32) -> f32 {
+    let u1    = hash21(cellId);
+    let u2    = hash21(cellId + vec2f(17.0, 53.0));
+    let angle = 0.436 + (u1 + u2 - 1.0) * 0.349;
+    let dir   = vec2f(cos(angle), sin(angle));
+    let perp  = vec2f(-dir.y, dir.x);
+
+    let p_s = dot(pCell, dir);
+    let p_p = dot(pCell, perp);
+
+    let shiftA = hash22(cellId) * 97.0;
+    let shiftB = hash22(cellId + vec2f(31.0, 71.0)) * 97.0;
+    let noiseA = vec2f(p_s * 2.0, p_p * 6.0) + shiftA;
+    let noiseB = vec2f(p_s * 2.0, p_p * 6.0) + shiftB;
+
+    let pore_a = aastep(0.60, 1.0 - worley(noiseA * 2.0));
+    let pore_b = aastep(0.60, 1.0 - worley(noiseB * 2.0));
+    let pores  = 0.5 * pore_a + 0.5 * pore_b;
+
+    let dens_a   = smoothstep(0.25, 0.85, fbm(noiseA));
+    let dens_b   = smoothstep(0.25, 0.85, fbm(noiseB));
+    let density  = mix(dens_a, dens_b, 0.5);
+    let foam     = density * pores;
+    let material = mix(density, foam, 0.65);
+
+    // Directional reveal front moves from the leading end of the stroke toward
+    // the trailing end, while the foam field perturbs the frontier so it fills
+    // as an irregular hand-drawn mark instead of a clean wipe.
+    let front        = mix(-0.78, 0.78, t);
+    let noise_bias   = (0.5 - material) * 0.22 + (hash21(cellId + vec2f(5.0, 29.0)) - 0.5) * 0.04;
+    let directional  = 1.0 - smoothstep(front - 0.09, front + 0.09, p_s + noise_bias);
+    let materialGate = smoothstep(0.10, 1.02, t * 1.12 + (material - 0.5) * 0.38);
+
+    return clamp(directional * materialGate, 0.0, 1.0);
 }
 
 // ── Fragment ──────────────────────────────────────────────────────────────────
@@ -389,8 +436,23 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     let pCell  = vec2f(fract(px / gp) - 0.5, fract(world_y / gp) - 0.5);
     let cellId = vec2f(f32(cx), f32(cy));
 
-    let raw_cov  = sponge_stamp(pCell, cellId);
-    let coverage = raw_cov * f32(cell_alive(cx, cy)) * content_mask;
+    let raw_cov    = sponge_stamp(pCell, cellId);
+    let prev_state = cell_alive_prev(cx, cy);
+    let curr_state = cell_alive_current(cx, cy);
+    let prev_alive = f32(prev_state);
+    let curr_alive = f32(curr_state);
+    let t          = smoothstep(0.0, 1.0, uniforms.transition_t);
+    // Stage the transition: fully fade the old state out before the new state starts.
+    let out_t      = smoothstep(0.0, 1.0, clamp(t * 2.0, 0.0, 1.0));
+    let in_t       = smoothstep(0.0, 1.0, clamp((t - 0.5) * 2.0, 0.0, 1.0));
+    let death_mix  = prev_alive * stroke_noise_reveal(pCell, cellId, 1.0 - out_t);
+    let birth_mix  = curr_alive * stroke_noise_reveal(pCell, cellId, in_t);
+    let changed    = prev_state != curr_state;
+    let is_birth   = curr_state == 1u;
+    var alive_mix  = curr_alive;
+    alive_mix      = select(alive_mix, birth_mix, changed && is_birth);
+    alive_mix      = select(alive_mix, death_mix, changed && !is_birth);
+    let coverage   = raw_cov * alive_mix * content_mask;
 
     // ── 7. Ink shading: anisotropic graphite specular + Beer-Lambert mix ────────
     //

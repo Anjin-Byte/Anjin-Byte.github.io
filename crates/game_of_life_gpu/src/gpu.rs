@@ -117,7 +117,7 @@ impl GpuGameOfLife {
         let mut encoder = self.device.create_command_encoder(
             &wgpu::CommandEncoderDescriptor { label: Some("gol_render_only") }
         );
-        match self.renderer.render(&mut encoder, self.simulation.frame) {
+        match self.renderer.render(&mut encoder, self.simulation.current_visible_is_a()) {
             Ok(output) => {
                 self.queue.submit([encoder.finish()]);
                 output.present();
@@ -134,9 +134,14 @@ impl GpuGameOfLife {
             &wgpu::CommandEncoderDescriptor { label: Some("gol_encoder") }
         );
 
+        self.renderer.capture_previous_state(
+            &mut encoder,
+            self.simulation.current_visible_buffer(),
+            &self.grid,
+        );
         self.simulation.tick(&mut encoder, &self.grid);
 
-        match self.renderer.render(&mut encoder, self.simulation.frame) {
+        match self.renderer.render(&mut encoder, self.simulation.current_visible_is_a()) {
             Ok(output) => {
                 self.queue.submit([encoder.finish()]);
                 output.present();
@@ -154,6 +159,10 @@ impl GpuGameOfLife {
         self.renderer.set_scroll(&self.queue, scroll_y);
     }
 
+    pub fn set_transition(&self, t: f32) {
+        self.renderer.set_transition(&self.queue, t.clamp(0.0, 1.0));
+    }
+
     /// Call whenever the canvas dimensions change.
     pub fn resize(&mut self, width: u32, height: u32) {
         if width == 0 || height == 0 { return; }
@@ -162,8 +171,7 @@ impl GpuGameOfLife {
         self.grid = Grid::new(width, height, cell_px);
         self.simulation.resize(&self.device, &self.queue, &self.grid);
         self.renderer.resize(
-            &self.device, &self.queue, &self.grid, grid_pitch,
-            &self.simulation.buf_a, &self.simulation.buf_b,
+            &self.device, &self.queue, &self.grid, grid_pitch, &self.simulation,
         );
     }
 }
