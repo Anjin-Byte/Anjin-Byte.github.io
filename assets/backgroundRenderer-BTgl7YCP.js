@@ -18,7 +18,7 @@
     }
     const i = m("Renderer"), w = self;
     let a = null, l = 0;
-    const f = 256;
+    const f = 210;
     let b = 0;
     function g(e) {
         w.postMessage(e);
