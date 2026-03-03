@@ -27,7 +27,7 @@ let pendingScrollY = 0;
 // Simulation tick rate throttle. The display renders every frame for smooth
 // scrolling; the GoL simulation only advances every TICK_EVERY frames.
 // At 60 Hz: TICK_EVERY=32 → ~1.9 sim fps. Adjust to taste.
-const TICK_EVERY = 256;
+const TICK_EVERY = 210;
 let frameCount  = 0;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
