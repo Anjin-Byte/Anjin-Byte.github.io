@@ -41,6 +41,19 @@ pub struct Simulation {
     pipeline:         wgpu::ComputePipeline,
     pub uniform_buf:  wgpu::Buffer,
     pub frame:        u32,
+    /// Pending cell edits: each entry is a (word_index, xor_mask) pair.
+    ///
+    /// Between simulation ticks, user clicks accumulate XOR masks per word.
+    /// Before the next `tick()`, these edits are flushed to the current
+    /// visible GPU buffer via `queue.write_buffer` at pinpoint byte offsets.
+    ///
+    /// This avoids GPU→CPU readback entirely: we never need to know the
+    /// current GPU buffer contents.  XOR is self-inverse, so double-clicking
+    /// the same cell toggles it back regardless of the underlying state.
+    ///
+    /// Stored as a Vec rather than HashMap because the typical edit count
+    /// between ticks is tiny (1-5 clicks at ~1.9 tps).
+    pending_edits: Vec<(u32, u32)>,
 }
 
 impl Simulation {
@@ -85,7 +98,7 @@ impl Simulation {
         let bind_group_a = make_bind_group(device, &bgl, &uniform_buf, &buf_a, &buf_b, "bg_a");
         let bind_group_b = make_bind_group(device, &bgl, &uniform_buf, &buf_b, &buf_a, "bg_b");
 
-        Simulation { buf_a, buf_b, bind_group_a, bind_group_b, pipeline, uniform_buf, frame: 0 }
+        Simulation { buf_a, buf_b, bind_group_a, bind_group_b, pipeline, uniform_buf, frame: 0, pending_edits: Vec::new() }
     }
 
     /// Advances simulation by one generation using the provided command encoder.
@@ -117,6 +130,149 @@ impl Simulation {
         self.buf_a = buf_a;
         self.buf_b = buf_b;
         self.frame = 0;
+        // Grid changed — any pending edits targeted the old buffer layout.
+        self.pending_edits.clear();
+    }
+
+    /// Queue a cell toggle.  `cx` and `cy` must be pre-wrapped into
+    /// [0, screen_cols) and [0, screen_rows) by the caller.
+    ///
+    /// The edit is stored as an XOR mask and flushed to the GPU before the
+    /// next simulation tick.  If the same cell is toggled twice before a
+    /// tick, the masks cancel out (XOR is self-inverse) and the cell reverts.
+    pub fn queue_toggle(&mut self, grid: &Grid, cx: u32, cy: u32) {
+        let (word_idx, bit_off) = grid.cell_address(cx, cy);
+        let mask = 1u32 << bit_off;
+
+        // Merge with an existing edit for the same word if present.
+        for entry in &mut self.pending_edits {
+            if entry.0 == word_idx {
+                entry.1 ^= mask;
+                // If the net edit for this word is zero, remove it entirely.
+                if entry.1 == 0 {
+                    // Swap-remove is fine; order doesn't matter.
+                    let idx = self.pending_edits.iter().position(|e| e.0 == word_idx).unwrap();
+                    self.pending_edits.swap_remove(idx);
+                }
+                return;
+            }
+        }
+        self.pending_edits.push((word_idx, mask));
+    }
+
+    /// Write all pending edits to the current visible GPU buffer.
+    ///
+    /// Each edit is a single-word XOR that gets applied by reading the GPU
+    /// buffer's current word, XOR-ing the mask, and writing it back.
+    ///
+    /// **Important:** WebGPU's `queue.write_buffer` *replaces* bytes — it
+    /// doesn't XOR.  To apply an XOR without readback we use a tiny compute
+    /// shader dispatch... except that's heavy for 1-5 words.
+    ///
+    /// Instead, we keep a full CPU-side mirror of the initial seed for buf_a
+    /// and track the cumulative XOR per word.  This is the `pending_edits`
+    /// approach: we write the already-XOR'd final word value.
+    ///
+    /// Actually, the simplest correct approach: maintain a full CPU-side
+    /// copy of the visible buffer.  On init we have the seed data.  On each
+    /// tick, the GPU evolves state and the CPU copy becomes stale — but we
+    /// refresh it by running the same LCG... no, the GPU runs GoL not LCG.
+    ///
+    /// **Final design:** Use a 1-word compute shader that applies XOR in-place.
+    /// This avoids readback AND avoids maintaining a CPU mirror.  But that's
+    /// overengineered for the edit rate we expect.
+    ///
+    /// **Pragmatic solution:** Use `queue.write_buffer` with a staging
+    /// approach: we maintain a CPU shadow that starts from the seed and
+    /// diverges as the GPU evolves.  For the XOR-toggle use case, we accept
+    /// that the GPU state is authoritative and edits are "blind XOR" —
+    /// the visual result is: if cell was alive → dies; if dead → lives.
+    /// This is correct regardless of whether our shadow matches GPU state.
+    ///
+    /// We achieve this by encoding edits as **XOR patches** applied via a
+    /// small compute shader bound to the current visible buffer.
+    pub fn flush_edits(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+        if self.pending_edits.is_empty() {
+            return;
+        }
+
+        // Upload the edit list as a storage buffer.
+        let edit_data: Vec<u32> = self.pending_edits.iter()
+            .flat_map(|&(word_idx, mask)| [word_idx, mask])
+            .collect();
+        let edit_count = self.pending_edits.len() as u32;
+
+        let edit_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label:    Some("cell_edits"),
+            contents: bytemuck::cast_slice(&edit_data),
+            usage:    wgpu::BufferUsages::STORAGE,
+        });
+
+        let count_data: [u32; 4] = [edit_count, 0, 0, 0];
+        let count_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label:    Some("edit_count"),
+            contents: bytemuck::cast_slice(&count_data),
+            usage:    wgpu::BufferUsages::UNIFORM,
+        });
+
+        let target_buf = self.current_visible_buffer();
+
+        // One-shot pipeline: apply XOR edits to the target buffer.
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label:  Some("xor_edit"),
+            source: wgpu::ShaderSource::Wgsl(XOR_EDIT_SHADER.into()),
+        });
+
+        let bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label:   Some("xor_edit_bgl"),
+            entries: &[
+                bgl_entry(0, wgpu::BufferBindingType::Uniform, false),
+                bgl_entry(1, wgpu::BufferBindingType::Storage { read_only: true }, false),
+                bgl_entry(2, wgpu::BufferBindingType::Storage { read_only: false }, false),
+            ],
+        });
+
+        let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label:                Some("xor_edit_layout"),
+            bind_group_layouts:   &[&bgl],
+            push_constant_ranges: &[],
+        });
+
+        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label:       Some("xor_edit_pipeline"),
+            layout:      Some(&layout),
+            module:      &shader,
+            entry_point: "main",
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            cache:       None,
+        });
+
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label:   Some("xor_edit_bg"),
+            layout:  &bgl,
+            entries: &[
+                wgpu::BindGroupEntry { binding: 0, resource: count_buf.as_entire_binding() },
+                wgpu::BindGroupEntry { binding: 1, resource: edit_buf.as_entire_binding() },
+                wgpu::BindGroupEntry { binding: 2, resource: target_buf.as_entire_binding() },
+            ],
+        });
+
+        let mut encoder = device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor { label: Some("xor_edit_enc") },
+        );
+        {
+            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label:            Some("xor_edit_pass"),
+                timestamp_writes: None,
+            });
+            pass.set_pipeline(&pipeline);
+            pass.set_bind_group(0, &bind_group, &[]);
+            // One thread per edit, rounded up to workgroup size 64.
+            pass.dispatch_workgroups(edit_count.div_ceil(64), 1, 1);
+        }
+        queue.submit([encoder.finish()]);
+
+        self.pending_edits.clear();
     }
 
     pub fn current_visible_buffer(&self) -> &wgpu::Buffer {
@@ -129,6 +285,10 @@ impl Simulation {
 
     pub fn current_visible_is_a(&self) -> bool {
         self.frame & 1 == 0
+    }
+
+    pub fn has_pending_edits(&self) -> bool {
+        !self.pending_edits.is_empty()
     }
 }
 
@@ -197,3 +357,27 @@ fn bgl_entry(binding: u32, ty: wgpu::BufferBindingType, has_dynamic_offset: bool
 fn lcg(s: u32) -> u32 {
     s.wrapping_mul(1664525).wrapping_add(1013904223)
 }
+
+/// Tiny compute shader that applies XOR edits to the cell buffer in-place.
+///
+/// Edits are stored as (word_index, xor_mask) pairs in a storage buffer.
+/// Each thread handles one edit.  Atomic XOR ensures correctness even if
+/// multiple edits target the same word (unlikely but possible with fast
+/// clicks on adjacent cells in the same 32-cell word).
+const XOR_EDIT_SHADER: &str = r#"
+struct EditCount { count: u32, _pad0: u32, _pad1: u32, _pad2: u32 }
+
+@group(0) @binding(0) var<uniform>             meta:  EditCount;
+@group(0) @binding(1) var<storage, read>       edits: array<vec2<u32>>;
+@group(0) @binding(2) var<storage, read_write> cells: array<atomic<u32>>;
+
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+    let idx = gid.x;
+    if idx >= meta.count { return; }
+    let word_idx = edits[idx].x;
+    let xor_mask = edits[idx].y;
+    // atomicXor is safe even if two edits hit the same word.
+    atomicXor(&cells[word_idx], xor_mask);
+}
+"#;

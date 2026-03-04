@@ -17,6 +17,19 @@ pub struct Grid {
 }
 
 impl Grid {
+    /// Locate a cell in the bitpacked buffer.
+    ///
+    /// `cx` and `cy` must already be wrapped into [0, screen_cols) / [0, screen_rows).
+    /// Returns (word_index, bit_offset) matching the layout used by compute.wgsl
+    /// and render.wgsl.
+    pub fn cell_address(&self, cx: u32, cy: u32) -> (u32, u32) {
+        let word_idx = cy * self.words_per_row + cx / 32;
+        let bit_off  = cx & 31;
+        (word_idx, bit_off)
+    }
+}
+
+impl Grid {
     pub fn new(canvas_width: u32, canvas_height: u32, cell_px: u32) -> Self {
         let cell_px = cell_px.max(1);
         let screen_cols = canvas_width.div_ceil(cell_px);

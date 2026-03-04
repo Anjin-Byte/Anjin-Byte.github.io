@@ -130,6 +130,14 @@ impl GpuGameOfLife {
 
     /// Advances one GoL generation and presents the result to the canvas.
     pub fn tick_and_render(&mut self) {
+        // Flush any pending cell edits to the current visible buffer BEFORE
+        // the compute pass reads it.  This is a separate submit because the
+        // XOR edits must complete before the GoL compute shader samples from
+        // the same buffer.
+        if self.simulation.has_pending_edits() {
+            self.simulation.flush_edits(&self.device, &self.queue);
+        }
+
         let mut encoder = self.device.create_command_encoder(
             &wgpu::CommandEncoderDescriptor { label: Some("gol_encoder") }
         );
@@ -173,5 +181,34 @@ impl GpuGameOfLife {
         self.renderer.resize(
             &self.device, &self.queue, &self.grid, grid_pitch, &self.simulation,
         );
+    }
+
+    /// Queue a cell toggle.  `cx` and `cy` are column/row indices already
+    /// wrapped into [0, screen_cols) / [0, screen_rows) by the JS caller.
+    ///
+    /// The edit is deferred until the next `tick_and_render` or an explicit
+    /// `flush_edits` call, so rapid clicks accumulate cheaply.
+    pub fn toggle_cell(&mut self, cx: u32, cy: u32) {
+        self.simulation.queue_toggle(&self.grid, cx, cy);
+    }
+
+    /// Flush pending cell edits to the GPU and re-render immediately.
+    ///
+    /// Call this after `toggle_cell` when you want instant visual feedback
+    /// without waiting for the next simulation tick.
+    pub fn flush_and_render(&mut self) {
+        if self.simulation.has_pending_edits() {
+            self.simulation.flush_edits(&self.device, &self.queue);
+        }
+        self.render_only();
+    }
+
+    /// Return grid dimensions for the main thread's coordinate mapping.
+    pub fn screen_cols(&self)   -> u32  { self.grid.screen_cols }
+    pub fn screen_rows(&self)   -> u32  { self.grid.screen_rows }
+    pub fn padded_rows(&self)   -> u32  { self.grid.padded_rows }
+    pub fn words_per_row(&self) -> u32  { self.grid.words_per_row }
+    pub fn grid_pitch(&self)    -> f32  {
+        aligned_pitch(self.grid.canvas_width, self.target_pitch)
     }
 }

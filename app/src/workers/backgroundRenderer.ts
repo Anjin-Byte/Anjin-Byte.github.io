@@ -3,7 +3,7 @@
 // Main thread sends 'frame' messages at requestAnimationFrame rate for vsync sync.
 
 import { createLogger } from '../logger';
-import type { WorkerInMsg, WorkerOutMsg } from './rendererProtocol';
+import type { WorkerInMsg, WorkerOutMsg, GridInfo } from './rendererProtocol';
 
 const log = createLogger('Renderer');
 const ws  = self as unknown as DedicatedWorkerGlobalScope;
@@ -16,6 +16,8 @@ interface Renderer {
   resize(w: number, h: number): void;
   setScroll?(scrollY: number): void;
   setTransition?(transitionT: number): void;
+  toggleCell?(cx: number, cy: number): void;
+  gridInfo?(): GridInfo;
   free(): void;
 }
 
@@ -115,12 +117,22 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
           const { GpuGameOfLife } = await import('@gpu-pkg/game_of_life_gpu.js');
           log.debug('GPU: module loaded, initialising surface...');
           const gpu = await GpuGameOfLife.new_offscreen(canvas, cellPx);
+          const getGridInfo = (): GridInfo => ({
+            screenCols:  gpu.screen_cols(),
+            screenRows:  gpu.screen_rows(),
+            paddedRows:  gpu.padded_rows(),
+            wordsPerRow: gpu.words_per_row(),
+            gridPitch:   gpu.grid_pitch(),
+          });
+
           renderer = {
             tick:       () => gpu.tick_and_render(),
             renderOnly: () => gpu.render_only(),
             resize:     (w, h) => { canvas.width = w; canvas.height = h; gpu.resize(w, h); },
             setScroll:  (scrollY) => gpu.set_scroll(scrollY),
             setTransition: (transitionT) => gpu.set_transition(transitionT),
+            toggleCell: (cx, cy) => { gpu.toggle_cell(cx, cy); gpu.flush_and_render(); },
+            gridInfo:   getGridInfo,
             free:       () => gpu.free(),
           };
           // Scroll messages sent during async GPU init were dropped (renderer was null).
@@ -128,7 +140,7 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
           renderer.setScroll?.(pendingScrollY);
           renderer.setTransition?.(1);
           log.info('GPU renderer ready');
-          post({ type: 'ready', backend: 'gpu' });
+          post({ type: 'ready', backend: 'gpu', gridInfo: getGridInfo() });
           break;
         } catch (gpuErr) {
           const message = errorMessage(gpuErr);
@@ -146,7 +158,8 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
         renderer = await makeCpuRenderer(canvas);
         renderer.setScroll?.(pendingScrollY);
         log.info('CPU renderer ready');
-        post({ type: 'ready', backend: 'cpu' });
+        // CPU renderer has no grid info; supply zeroed placeholder.
+        post({ type: 'ready', backend: 'cpu', gridInfo: { screenCols: 0, screenRows: 0, paddedRows: 0, wordsPerRow: 0, gridPitch: 0 } });
       } catch (cpuErr) {
         const message = errorMessage(cpuErr);
         log.error('CPU init failed:', message);
@@ -172,11 +185,19 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
       // resize() rewrites the uniform buffer (scroll_y resets to 0); re-apply.
       renderer?.setScroll?.(pendingScrollY);
       renderer?.setTransition?.(1);
+      // Grid dimensions change on resize; notify main thread.
+      if (renderer?.gridInfo) {
+        post({ type: 'grid_info', gridInfo: renderer.gridInfo() });
+      }
       break;
 
     case 'scroll':
       pendingScrollY = e.data.scrollY;
       renderer?.setScroll?.(pendingScrollY);
+      break;
+
+    case 'toggle_cell':
+      renderer?.toggleCell?.(e.data.cx, e.data.cy);
       break;
 
     case 'stop':
