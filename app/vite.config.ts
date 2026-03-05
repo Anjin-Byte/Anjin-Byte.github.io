@@ -1,4 +1,5 @@
 import { defineConfig, type Plugin } from 'vite';
+import { fileURLToPath } from 'node:url';
 import vue from '@vitejs/plugin-vue';
 import wasm from 'vite-plugin-wasm';
 import topLevelAwait from 'vite-plugin-top-level-await';
@@ -28,10 +29,16 @@ function patchWgpuFirefoxLimits(): Plugin {
 
 // Plugins needed in both the main pipeline and the worker sub-pipeline.
 const sharedPlugins = () => [wasm(), topLevelAwait(), patchWgpuFirefoxLimits()];
+const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 
 export default defineConfig({
   base: '/',
   plugins: [vue(), ...sharedPlugins()],
+  server: {
+    fs: {
+      allow: [repoRoot],
+    },
+  },
   worker: {
     // Workers are spawned as ES modules (type: 'module' in AppBackground.vue).
     format: 'es',

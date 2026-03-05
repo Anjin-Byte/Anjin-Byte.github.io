@@ -1,5 +1,8 @@
 // Shared message types between AppBackground (main thread) and backgroundRenderer (worker).
 
+import type { BlankZone } from '../types/blankZones';
+import type { Decal } from '../types/decals';
+
 export type RendererBackend = 'gpu' | 'cpu';
 
 /** Grid dimensions needed by the main thread for pixel→cell coordinate mapping. */
@@ -20,11 +23,25 @@ export type WorkerInMsg =
   // visible grid by the main thread. scrollCanvasPx is the scroll offset
   // at click time so the worker can validate/log if needed.
   | { type: 'toggle_cell'; cx: number; cy: number; scrollCanvasPx: number }
+  | { type: 'set_zones';    zones: BlankZone[] }
+  | { type: 'add_zone';    zone:  BlankZone   }
+  | { type: 'update_zone'; zone:  BlankZone   }
+  | { type: 'remove_zone'; id:    string      }
+  | { type: 'clear_zones' }
+  | { type: 'set_decals';    decals: Decal[] }
+  | { type: 'add_decal';    decal:  Decal   }
+  | { type: 'update_decal'; decal:  Decal   }
+  | { type: 'remove_decal'; id:     string  }
+  | { type: 'clear_decals' }
   | { type: 'stop' };
 
 export type WorkerOutMsg =
   | { type: 'ready'; backend: RendererBackend; gridInfo: GridInfo }
   // Sent after resize so the main thread can update its CoordSnapshot.
   | { type: 'grid_info'; gridInfo: GridInfo }
+  | { type: 'zones_state';  zones: BlankZone[] }
+  | { type: 'zones_error';  message: string }
+  | { type: 'decals_state'; decals: Decal[] }
+  | { type: 'decals_error'; message: string }
   // Non-fatal diagnostic: the named phase failed and a fallback was (or was not) attempted.
   | { type: 'error'; phase: string; message: string };

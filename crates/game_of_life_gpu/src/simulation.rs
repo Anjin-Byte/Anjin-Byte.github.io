@@ -8,39 +8,39 @@ use crate::shaders;
 #[repr(C)]
 #[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy)]
 pub struct ComputeUniforms {
-    pub screen_cols:   u32,
-    pub screen_rows:   u32,
-    pub padded_rows:   u32,
+    pub screen_cols: u32,
+    pub screen_rows: u32,
+    pub padded_rows: u32,
     pub words_per_row: u32,
-    pub cell_px:       u32,
-    pub canvas_width:  u32,
+    pub cell_px: u32,
+    pub canvas_width: u32,
     pub canvas_height: u32,
-    pub pad:           u32,
+    pub pad: u32,
 }
 
 impl ComputeUniforms {
     pub fn from_grid(grid: &Grid) -> Self {
         ComputeUniforms {
-            screen_cols:   grid.screen_cols,
-            screen_rows:   grid.screen_rows,
-            padded_rows:   grid.padded_rows,
+            screen_cols: grid.screen_cols,
+            screen_rows: grid.screen_rows,
+            padded_rows: grid.padded_rows,
             words_per_row: grid.words_per_row,
-            cell_px:       grid.cell_px,
-            canvas_width:  grid.canvas_width,
+            cell_px: grid.cell_px,
+            canvas_width: grid.canvas_width,
             canvas_height: grid.canvas_height,
-            pad:           0,
+            pad: 0,
         }
     }
 }
 
 pub struct Simulation {
-    pub buf_a:        wgpu::Buffer,
-    pub buf_b:        wgpu::Buffer,
-    bind_group_a:     wgpu::BindGroup,  // a=read, b=write
-    bind_group_b:     wgpu::BindGroup,  // b=read, a=write
-    pipeline:         wgpu::ComputePipeline,
-    pub uniform_buf:  wgpu::Buffer,
-    pub frame:        u32,
+    pub buf_a: wgpu::Buffer,
+    pub buf_b: wgpu::Buffer,
+    bind_group_a: wgpu::BindGroup, // a=read, b=write
+    bind_group_b: wgpu::BindGroup, // b=read, a=write
+    pipeline: wgpu::ComputePipeline,
+    pub uniform_buf: wgpu::Buffer,
+    pub frame: u32,
     /// Pending cell edits: each entry is a (word_index, xor_mask) pair.
     ///
     /// Between simulation ticks, user clicks accumulate XOR masks per word.
@@ -59,46 +59,63 @@ pub struct Simulation {
 impl Simulation {
     pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, grid: &Grid) -> Self {
         let uniform_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label:    Some("sim_uniforms"),
+            label: Some("sim_uniforms"),
             contents: bytes_of(&ComputeUniforms::from_grid(grid)),
-            usage:    wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
         let (buf_a, buf_b) = make_cell_buffers(device, queue, grid);
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label:  Some("compute"),
+            label: Some("compute"),
             source: wgpu::ShaderSource::Wgsl(shaders::COMPUTE.into()),
         });
 
         let bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label:   Some("sim_bgl"),
+            label: Some("sim_bgl"),
             entries: &[
-                bgl_entry(0, wgpu::BufferBindingType::Uniform,            false),
-                bgl_entry(1, wgpu::BufferBindingType::Storage { read_only: true  }, false),
-                bgl_entry(2, wgpu::BufferBindingType::Storage { read_only: false }, false),
+                bgl_entry(0, wgpu::BufferBindingType::Uniform, false),
+                bgl_entry(
+                    1,
+                    wgpu::BufferBindingType::Storage { read_only: true },
+                    false,
+                ),
+                bgl_entry(
+                    2,
+                    wgpu::BufferBindingType::Storage { read_only: false },
+                    false,
+                ),
             ],
         });
 
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label:                Some("sim_layout"),
-            bind_group_layouts:   &[&bgl],
+            label: Some("sim_layout"),
+            bind_group_layouts: &[&bgl],
             push_constant_ranges: &[],
         });
 
         let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label:       Some("sim_pipeline"),
-            layout:      Some(&layout),
-            module:      &shader,
+            label: Some("sim_pipeline"),
+            layout: Some(&layout),
+            module: &shader,
             entry_point: "main",
             compilation_options: wgpu::PipelineCompilationOptions::default(),
-            cache:       None,
+            cache: None,
         });
 
         let bind_group_a = make_bind_group(device, &bgl, &uniform_buf, &buf_a, &buf_b, "bg_a");
         let bind_group_b = make_bind_group(device, &bgl, &uniform_buf, &buf_b, &buf_a, "bg_b");
 
-        Simulation { buf_a, buf_b, bind_group_a, bind_group_b, pipeline, uniform_buf, frame: 0, pending_edits: Vec::new() }
+        Simulation {
+            buf_a,
+            buf_b,
+            bind_group_a,
+            bind_group_b,
+            pipeline,
+            uniform_buf,
+            frame: 0,
+            pending_edits: Vec::new(),
+        }
     }
 
     /// Advances simulation by one generation using the provided command encoder.
@@ -109,8 +126,8 @@ impl Simulation {
         let bg = self.next_compute_bind_group();
 
         let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label:              Some("gol_tick"),
-            timestamp_writes:   None,
+            label: Some("gol_tick"),
+            timestamp_writes: None,
         });
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, bg, &[]);
@@ -123,10 +140,16 @@ impl Simulation {
     /// Rebuilds cell buffers for a new grid size, preserving the pipeline.
     pub fn resize(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, grid: &Grid) {
         let bgl = self.pipeline.get_bind_group_layout(0);
-        queue.write_buffer(&self.uniform_buf, 0, bytes_of(&ComputeUniforms::from_grid(grid)));
+        queue.write_buffer(
+            &self.uniform_buf,
+            0,
+            bytes_of(&ComputeUniforms::from_grid(grid)),
+        );
         let (buf_a, buf_b) = make_cell_buffers(device, queue, grid);
-        self.bind_group_a = make_bind_group(device, &bgl, &self.uniform_buf, &buf_a, &buf_b, "bg_a");
-        self.bind_group_b = make_bind_group(device, &bgl, &self.uniform_buf, &buf_b, &buf_a, "bg_b");
+        self.bind_group_a =
+            make_bind_group(device, &bgl, &self.uniform_buf, &buf_a, &buf_b, "bg_a");
+        self.bind_group_b =
+            make_bind_group(device, &bgl, &self.uniform_buf, &buf_b, &buf_a, "bg_b");
         self.buf_a = buf_a;
         self.buf_b = buf_b;
         self.frame = 0;
@@ -151,7 +174,11 @@ impl Simulation {
                 // If the net edit for this word is zero, remove it entirely.
                 if entry.1 == 0 {
                     // Swap-remove is fine; order doesn't matter.
-                    let idx = self.pending_edits.iter().position(|e| e.0 == word_idx).unwrap();
+                    let idx = self
+                        .pending_edits
+                        .iter()
+                        .position(|e| e.0 == word_idx)
+                        .unwrap();
                     self.pending_edits.swap_remove(idx);
                 }
                 return;
@@ -197,72 +224,91 @@ impl Simulation {
         }
 
         // Upload the edit list as a storage buffer.
-        let edit_data: Vec<u32> = self.pending_edits.iter()
+        let edit_data: Vec<u32> = self
+            .pending_edits
+            .iter()
             .flat_map(|&(word_idx, mask)| [word_idx, mask])
             .collect();
         let edit_count = self.pending_edits.len() as u32;
 
         let edit_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label:    Some("cell_edits"),
+            label: Some("cell_edits"),
             contents: bytemuck::cast_slice(&edit_data),
-            usage:    wgpu::BufferUsages::STORAGE,
+            usage: wgpu::BufferUsages::STORAGE,
         });
 
         let count_data: [u32; 4] = [edit_count, 0, 0, 0];
         let count_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label:    Some("edit_count"),
+            label: Some("edit_count"),
             contents: bytemuck::cast_slice(&count_data),
-            usage:    wgpu::BufferUsages::UNIFORM,
+            usage: wgpu::BufferUsages::UNIFORM,
         });
 
         let target_buf = self.current_visible_buffer();
 
         // One-shot pipeline: apply XOR edits to the target buffer.
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label:  Some("xor_edit"),
+            label: Some("xor_edit"),
             source: wgpu::ShaderSource::Wgsl(XOR_EDIT_SHADER.into()),
         });
 
         let bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label:   Some("xor_edit_bgl"),
+            label: Some("xor_edit_bgl"),
             entries: &[
                 bgl_entry(0, wgpu::BufferBindingType::Uniform, false),
-                bgl_entry(1, wgpu::BufferBindingType::Storage { read_only: true }, false),
-                bgl_entry(2, wgpu::BufferBindingType::Storage { read_only: false }, false),
+                bgl_entry(
+                    1,
+                    wgpu::BufferBindingType::Storage { read_only: true },
+                    false,
+                ),
+                bgl_entry(
+                    2,
+                    wgpu::BufferBindingType::Storage { read_only: false },
+                    false,
+                ),
             ],
         });
 
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label:                Some("xor_edit_layout"),
-            bind_group_layouts:   &[&bgl],
+            label: Some("xor_edit_layout"),
+            bind_group_layouts: &[&bgl],
             push_constant_ranges: &[],
         });
 
         let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label:       Some("xor_edit_pipeline"),
-            layout:      Some(&layout),
-            module:      &shader,
+            label: Some("xor_edit_pipeline"),
+            layout: Some(&layout),
+            module: &shader,
             entry_point: "main",
             compilation_options: wgpu::PipelineCompilationOptions::default(),
-            cache:       None,
+            cache: None,
         });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label:   Some("xor_edit_bg"),
-            layout:  &bgl,
+            label: Some("xor_edit_bg"),
+            layout: &bgl,
             entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: count_buf.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 1, resource: edit_buf.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 2, resource: target_buf.as_entire_binding() },
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: count_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: edit_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: target_buf.as_entire_binding(),
+                },
             ],
         });
 
-        let mut encoder = device.create_command_encoder(
-            &wgpu::CommandEncoderDescriptor { label: Some("xor_edit_enc") },
-        );
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("xor_edit_enc"),
+        });
         {
             let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label:            Some("xor_edit_pass"),
+                label: Some("xor_edit_pass"),
                 timestamp_writes: None,
             });
             pass.set_pipeline(&pipeline);
@@ -276,11 +322,19 @@ impl Simulation {
     }
 
     pub fn current_visible_buffer(&self) -> &wgpu::Buffer {
-        if self.current_visible_is_a() { &self.buf_a } else { &self.buf_b }
+        if self.current_visible_is_a() {
+            &self.buf_a
+        } else {
+            &self.buf_b
+        }
     }
 
     pub fn next_compute_bind_group(&self) -> &wgpu::BindGroup {
-        if self.current_visible_is_a() { &self.bind_group_a } else { &self.bind_group_b }
+        if self.current_visible_is_a() {
+            &self.bind_group_a
+        } else {
+            &self.bind_group_b
+        }
     }
 
     pub fn current_visible_is_a(&self) -> bool {
@@ -294,28 +348,32 @@ impl Simulation {
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-fn make_cell_buffers(device: &wgpu::Device, queue: &wgpu::Queue, grid: &Grid)
-    -> (wgpu::Buffer, wgpu::Buffer)
-{
+fn make_cell_buffers(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    grid: &Grid,
+) -> (wgpu::Buffer, wgpu::Buffer) {
     let bytes = grid.buffer_bytes() as usize;
     let mut rng_state: u32 = 0xdeadbeef;
     let data: Vec<u32> = (0..grid.total_words())
-        .map(|_| { rng_state = lcg(rng_state); rng_state })
+        .map(|_| {
+            rng_state = lcg(rng_state);
+            rng_state
+        })
         .collect();
 
-    let usage = wgpu::BufferUsages::STORAGE
-        | wgpu::BufferUsages::COPY_DST
-        | wgpu::BufferUsages::COPY_SRC;
+    let usage =
+        wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC;
 
     let buf_a = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label:    Some("cells_a"),
+        label: Some("cells_a"),
         contents: bytemuck::cast_slice(&data),
         usage,
     });
     // buf_b starts zeroed; simulation will evolve from buf_a on frame 0.
     let buf_b = device.create_buffer(&wgpu::BufferDescriptor {
-        label:              Some("cells_b"),
-        size:               bytes as u64,
+        label: Some("cells_b"),
+        size: bytes as u64,
         usage,
         mapped_at_creation: false,
     });
@@ -324,31 +382,46 @@ fn make_cell_buffers(device: &wgpu::Device, queue: &wgpu::Queue, grid: &Grid)
 }
 
 fn make_bind_group(
-    device:      &wgpu::Device,
-    bgl:         &wgpu::BindGroupLayout,
+    device: &wgpu::Device,
+    bgl: &wgpu::BindGroupLayout,
     uniform_buf: &wgpu::Buffer,
-    read_buf:    &wgpu::Buffer,
-    write_buf:   &wgpu::Buffer,
-    label:       &str,
+    read_buf: &wgpu::Buffer,
+    write_buf: &wgpu::Buffer,
+    label: &str,
 ) -> wgpu::BindGroup {
     device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label:   Some(label),
-        layout:  bgl,
+        label: Some(label),
+        layout: bgl,
         entries: &[
-            wgpu::BindGroupEntry { binding: 0, resource: uniform_buf.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 1, resource: read_buf.as_entire_binding()    },
-            wgpu::BindGroupEntry { binding: 2, resource: write_buf.as_entire_binding()   },
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: uniform_buf.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: read_buf.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: write_buf.as_entire_binding(),
+            },
         ],
     })
 }
 
-fn bgl_entry(binding: u32, ty: wgpu::BufferBindingType, has_dynamic_offset: bool)
-    -> wgpu::BindGroupLayoutEntry
-{
+fn bgl_entry(
+    binding: u32,
+    ty: wgpu::BufferBindingType,
+    has_dynamic_offset: bool,
+) -> wgpu::BindGroupLayoutEntry {
     wgpu::BindGroupLayoutEntry {
         binding,
         visibility: wgpu::ShaderStages::COMPUTE,
-        ty: wgpu::BindingType::Buffer { ty, has_dynamic_offset, min_binding_size: None },
+        ty: wgpu::BindingType::Buffer {
+            ty,
+            has_dynamic_offset,
+            min_binding_size: None,
+        },
         count: None,
     }
 }

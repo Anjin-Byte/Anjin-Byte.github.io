@@ -24,7 +24,7 @@ impl Grid {
     /// and render.wgsl.
     pub fn cell_address(&self, cx: u32, cy: u32) -> (u32, u32) {
         let word_idx = cy * self.words_per_row + cx / 32;
-        let bit_off  = cx & 31;
+        let bit_off = cx & 31;
         (word_idx, bit_off)
     }
 }
@@ -40,7 +40,15 @@ impl Grid {
         let padded_rows = next_pow2(screen_rows).max(1);
         let words_per_row = padded_cols / 32;
 
-        Grid { screen_cols, screen_rows, padded_rows, words_per_row, cell_px, canvas_width, canvas_height }
+        Grid {
+            screen_cols,
+            screen_rows,
+            padded_rows,
+            words_per_row,
+            cell_px,
+            canvas_width,
+            canvas_height,
+        }
     }
 
     /// Total number of u32 words in the cell buffer.
@@ -55,6 +63,8 @@ impl Grid {
 }
 
 fn next_pow2(n: u32) -> u32 {
-    if n <= 1 { return 1; }
+    if n <= 1 {
+        return 1;
+    }
     n.next_power_of_two()
 }

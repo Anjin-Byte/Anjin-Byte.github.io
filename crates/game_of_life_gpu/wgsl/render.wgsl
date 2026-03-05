@@ -45,12 +45,46 @@ struct PaperParams {
     spec_weight:   f32,  // specular contribution scale
 }
 
+struct ZoneMeta {
+    zone_count: u32,
+    pad0:       u32,
+    pad1:       u32,
+    pad2:       u32,
+}
+
+struct ZoneEntry {
+    // x1, y1, x2, y2 (inclusive). x is wrapped viewport col; y is world row.
+    rect:  vec4i,
+    // mode, edge_style, hide_interior_border, reserved.
+    style: vec4u,
+    // edge_width_cells, edge_opacity, fade_strength, note_pitch_cells.
+    edge:  vec4f,
+}
+
+struct DecalMeta {
+    decal_count: u32,
+    pad0:        u32,
+    pad1:        u32,
+    pad2:        u32,
+}
+
+struct DecalEntry {
+    rect:   vec4i,  // [x1, y1, x2, y2] world cell-space (inclusive)
+    flags:  vec4u,  // [kind, blend_mode, suppress_cells, reserved]
+    params: vec4f,  // solid:[coverage,r,g,b]  checker:[size]  stripes:[pitch]  dots:[radius,spacing]
+    tint:   vec4f,  // RGBA linear sRGB — multiplied into pattern output
+}
+
 @group(0) @binding(0) var<uniform>       uniforms: RenderUniforms;
 @group(0) @binding(1) var<storage, read> current_cells: array<u32>;
 @group(0) @binding(2) var<storage, read> previous_cells: array<u32>;
 @group(0) @binding(3) var<uniform>       paper:         PaperParams;
 @group(0) @binding(4) var                noise_tex:     texture_2d<f32>;
 @group(0) @binding(5) var                noise_smp:     sampler;
+@group(0) @binding(6) var<uniform>       zone_meta:     ZoneMeta;
+@group(0) @binding(7) var<storage, read> zones:         array<ZoneEntry>;
+@group(0) @binding(8) var<uniform>       decal_meta:    DecalMeta;
+@group(0) @binding(9) var<storage, read> decals:        array<DecalEntry>;
 
 // ── Vertex ────────────────────────────────────────────────────────────────────
 
@@ -215,6 +249,167 @@ fn cell_alive_prev(cx: u32, cy: u32) -> u32 {
     return (previous_cells[safe_idx] >> (cx_w & 31u)) & 1u;
 }
 
+// ── Blank-zone helpers ───────────────────────────────────────────────────────
+// mode: 0=minor, 1=major, 2=both
+// edge: 0=none, 1=bold-major, 2=fade, 3=noted
+//
+// NOTE: Both helpers below do a linear scan over all active zones (O(zone_count)
+// per fragment). With MAX_BLANK_ZONES=128 this is fine for current use.
+// A future optimisation could pre-filter to only zones that overlap the current
+// screen row and upload a compact per-row index instead.
+
+fn zone_mask_for_cell(cx: u32, world_row: i32) -> vec4f {
+    var minor_mask = 1.0;
+    var major_mask = 1.0;
+    var major_edge_boost = 0.0;
+    var ink_mask = 1.0;
+
+    for (var i: u32 = 0u; i < zone_meta.zone_count; i = i + 1u) {
+        let zone = zones[i];
+        let rect = zone.rect;
+        let rect_x1 = u32(rect.x);
+        let rect_x2 = u32(rect.z);
+        let inside = cx >= rect_x1 && cx <= rect_x2 && world_row >= rect.y && world_row <= rect.w;
+        if !inside {
+            continue;
+        }
+
+        let mode = zone.style.x;
+        let edge_style = zone.style.y;
+
+        let edge_width = max(1.0, zone.edge.x);
+        let edge_opacity = clamp(zone.edge.y, 0.0, 1.0);
+        let fade_strength = clamp(zone.edge.z, 0.0, 1.0);
+        let note_pitch = max(1.0, zone.edge.w);
+
+        let d_left = i32(cx) - rect.x;
+        let d_right = rect.z - i32(cx);
+        let d_top = world_row - rect.y;
+        let d_bottom = rect.w - world_row;
+        let d_edge = min(min(d_left, d_right), min(d_top, d_bottom));
+        let in_edge_band = f32(d_edge) < edge_width;
+
+        var visibility = 0.0;
+        if edge_style == 2u {
+            // At the boundary, lines remain visible; deeper inside, hide toward 0.
+            let depth = clamp((f32(d_edge) + 1.0) / edge_width, 0.0, 1.0);
+            let hidden = depth * fade_strength;
+            visibility = 1.0 - hidden;
+        }
+
+        if edge_style == 2u {
+            // Fade-style zones keep a soft ink transition at the boundary band.
+            ink_mask = min(ink_mask, visibility);
+        } else {
+            // Non-fade zones fully hide cell ink inside the zone interior.
+            ink_mask = 0.0;
+        }
+
+        if mode == 0u || mode == 2u {
+            if edge_style == 2u {
+                minor_mask = min(minor_mask, visibility);
+            } else {
+                minor_mask = 0.0;
+            }
+        }
+        if mode == 1u || mode == 2u {
+            if edge_style == 2u {
+                major_mask = min(major_mask, visibility);
+            } else {
+                major_mask = 0.0;
+            }
+        }
+
+        if in_edge_band && edge_style == 3u {
+            // Noted: single ↗ diagonal hatch.
+            // When hideInteriorBorder is set, suppress hatching wherever this fragment
+            // also falls inside another active zone.
+            var not_interior = 1.0;
+            if zone.style.z == 1u {
+                var inside_other: u32 = 0u;
+                for (var j: u32 = 0u; j < zone_meta.zone_count; j = j + 1u) {
+                    let or = zones[j].rect;
+                    inside_other += select(0u, 1u,
+                        j != i
+                        && cx >= u32(or.x) && cx <= u32(or.z)
+                        && world_row >= or.y && world_row <= or.w);
+                }
+                not_interior = select(0.0, 1.0, inside_other == 0u);
+            }
+            let hatch_phase = fract((f32(cx) + f32(world_row)) / note_pitch);
+            let hatch = select(0.0, 1.0, hatch_phase >= 0.5);
+            major_edge_boost = max(major_edge_boost, hatch * edge_opacity * 0.75 * not_interior);
+        }
+    }
+
+    return vec4f(minor_mask, major_mask, major_edge_boost, ink_mask);
+}
+
+fn zone_bold_major_edge_cov(px: f32, world_y: f32, pitch_minor: f32, half_px: f32) -> f32 {
+    var edge_cov = 0.0;
+    // Pre-compute integer cell coordinates for the interior-suppression inner loop.
+    let cell_x = u32(floor(px / pitch_minor)) % uniforms.screen_cols;
+    let cell_y = i32(floor(world_y / pitch_minor));
+
+    for (var i: u32 = 0u; i < zone_meta.zone_count; i = i + 1u) {
+        let zone = zones[i];
+        if zone.style.y != 1u {
+            continue;
+        }
+
+        let rect = zone.rect;
+        let edge_opacity = clamp(zone.edge.y, 0.0, 1.0);
+        if edge_opacity <= 0.0 {
+            continue;
+        }
+
+        // Rectangle boundary in world pixel space. x2/y2 are inclusive cell
+        // indices, so the right/bottom boundary is at +1 cell.
+        let left_x = f32(rect.x) * pitch_minor;
+        let right_x = f32(rect.z + 1) * pitch_minor;
+        let top_y = f32(rect.y) * pitch_minor;
+        let bottom_y = f32(rect.w + 1) * pitch_minor;
+
+        // Fast reject when fragment is not near this zone boundary.
+        if px < left_x - half_px || px > right_x + half_px
+            || world_y < top_y - half_px || world_y > bottom_y + half_px {
+            continue;
+        }
+
+        let in_vertical_span = select(0.0, 1.0, world_y >= top_y && world_y <= bottom_y);
+        let in_horizontal_span = select(0.0, 1.0, px >= left_x && px <= right_x);
+
+        // Use smoothstep with a fixed 1.0-pixel feather instead of aastep/fwidth.
+        // fwidth requires uniform control flow, which the continue-guarded loop above
+        // cannot guarantee. Since px/world_y are linear screen-space coords,
+        // fwidth(d) ≈ 1.0 canvas pixel, so the constant feather is equivalent.
+        let line_l = (1.0 - smoothstep(half_px - 1.0, half_px + 1.0, abs(px - left_x))) * in_vertical_span;
+        let line_r = (1.0 - smoothstep(half_px - 1.0, half_px + 1.0, abs(px - right_x))) * in_vertical_span;
+        let line_t = (1.0 - smoothstep(half_px - 1.0, half_px + 1.0, abs(world_y - top_y))) * in_horizontal_span;
+        let line_b = (1.0 - smoothstep(half_px - 1.0, half_px + 1.0, abs(world_y - bottom_y))) * in_horizontal_span;
+
+        // When hideInteriorBorder is set (style.z == 1), suppress this zone's border
+        // for any fragment that falls inside another active zone's rect. This lets
+        // adjacent zones share a unified outer boundary instead of showing interior lines.
+        var interior_weight = 1.0;
+        if zone.style.z == 1u {
+            var inside_other: u32 = 0u;
+            for (var j: u32 = 0u; j < zone_meta.zone_count; j = j + 1u) {
+                let or = zones[j].rect;
+                inside_other += select(0u, 1u,
+                    j != i
+                    && cell_x >= u32(or.x) && cell_x <= u32(or.z)
+                    && cell_y >= or.y && cell_y <= or.w);
+            }
+            interior_weight = select(0.0, 1.0, inside_other == 0u);
+        }
+        let zone_edge_cov = max(max(line_l, line_r), max(line_t, line_b)) * edge_opacity * interior_weight;
+        edge_cov = max(edge_cov, zone_edge_cov);
+    }
+
+    return edge_cov;
+}
+
 // ── Sponge stamp ──────────────────────────────────────────────────────────────
 //
 // Models a rubber/foam stamp loaded with ink and pressed onto paper.
@@ -330,6 +525,59 @@ fn stroke_noise_reveal(pCell: vec2f, cellId: vec2f, t: f32) -> f32 {
     return clamp(directional * materialGate, 0.0, 1.0);
 }
 
+// ── Decal helpers ─────────────────────────────────────────────────────────────
+
+// Safe non-negative modulo for signed integers.
+// WGSL i32 % i32 returns negative results for negative dividends.
+fn pos_mod(n: i32, m: i32) -> i32 { return ((n % m) + m) % m; }
+
+// kind 0: Solid fill — coverage from params.x; colour from params.gba.
+fn decal_solid(d: DecalEntry) -> f32 { return clamp(d.params.x, 0.0, 1.0); }
+
+// kind 1: Checkerboard in cell space.
+fn decal_checkerboard(d: DecalEntry, cx: u32, world_row: i32) -> f32 {
+    let sz = max(1.0, d.params.x);
+    let gx = u32(pos_mod(i32(floor(f32(cx)        / sz)), 2)) & 1u;
+    let gy = u32(pos_mod(i32(floor(f32(world_row) / sz)), 2)) & 1u;
+    return f32((gx + gy) & 1u);
+}
+
+// kind 2: ↗ diagonal stripes.
+// fract(n/pitch) is safe for negative n because WGSL defines fract as n - floor(n).
+fn decal_stripes(d: DecalEntry, cx: u32, world_row: i32) -> f32 {
+    let pitch = max(2.0, d.params.x);
+    return select(0.0, 1.0, fract(f32(i32(cx) + world_row) / pitch) >= 0.5);
+}
+
+// kind 3: Dots (cell-centred, hard-edge at cell granularity).
+fn decal_dots(d: DecalEntry, cx: u32, world_row: i32) -> f32 {
+    let sp   = max(2.0, d.params.y);
+    let sp_i = i32(sp);
+    let gx   = i32(cx) % sp_i;          // cx is u32, always non-negative
+    let gy   = pos_mod(world_row, sp_i);
+    return select(0.0, 1.0, sqrt(f32(gx * gx + gy * gy)) < max(d.params.x, 0.1) * sp * 0.5);
+}
+
+fn decal_pattern(d: DecalEntry, cx: u32, world_row: i32) -> f32 {
+    if d.flags.x == 0u { return decal_solid(d); }
+    if d.flags.x == 1u { return decal_checkerboard(d, cx, world_row); }
+    if d.flags.x == 2u { return decal_stripes(d, cx, world_row); }
+    if d.flags.x == 3u { return decal_dots(d, cx, world_row); }
+    return 0.0;
+}
+
+// Solid kind: colour from params.gba; tint multiplies on top.
+// All other kinds: colour from tint.rgb.
+// mode branches are on d.flags.y which is uniform per-wave — no divergence.
+fn decal_blend(base: vec3f, coverage: f32, d: DecalEntry, mode: u32) -> vec3f {
+    let col = select(d.tint.rgb, d.params.gba, d.flags.x == 0u);
+    let c   = col * coverage * d.tint.a;
+    if mode == 0u { return mix(base, col, coverage * d.tint.a); }  // alpha-over
+    if mode == 1u { return base * (1.0 - coverage + c); }          // multiply
+    if mode == 2u { return 1.0 - (1.0 - base) * (1.0 - c); }      // screen
+    return base;
+}
+
 // ── Fragment ──────────────────────────────────────────────────────────────────
 
 @fragment
@@ -393,17 +641,33 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     let print_fade_x = mix(0.70, 1.0, value_noise(vec2f(px       * 0.005,  7.3)));
     let print_fade_y = mix(0.70, 1.0, value_noise(vec2f(3.9, world_y * 0.005)));
 
-    let minor_x   = grid_line_aa(px,      pitch_minor, paper.minor_half_px + fiber_bleed) * print_fade_x;
-    let minor_y   = grid_line_aa(world_y, pitch_minor, paper.minor_half_px + fiber_bleed) * print_fade_y;
-    let minor_cov = max(minor_x, minor_y) * content_mask;
+    let minor_x = grid_line_aa(px,      pitch_minor, paper.minor_half_px + fiber_bleed) * print_fade_x;
+    let minor_y = grid_line_aa(world_y, pitch_minor, paper.minor_half_px + fiber_bleed) * print_fade_y;
+    var minor_cov = max(minor_x, minor_y) * content_mask;
 
     // Major lines get a separate, more aggressive fade — they're bolder so need
     // a lower floor to show the same perceptual variation as the minor lines.
     let major_fade_x = mix(0.45, 1.0, value_noise(vec2f(px       * 0.004 + 11.7, 23.1)));
     let major_fade_y = mix(0.45, 1.0, value_noise(vec2f(19.4, world_y * 0.004 + 11.7)));
-    let major_x   = grid_line_aa(px,      pitch_major, paper.major_half_px + fiber_bleed) * major_fade_x;
-    let major_y   = grid_line_aa(world_y, pitch_major, paper.major_half_px + fiber_bleed) * major_fade_y;
-    let major_cov = max(major_x, major_y) * content_mask;
+    let major_x = grid_line_aa(px,      pitch_major, paper.major_half_px + fiber_bleed) * major_fade_x;
+    let major_y = grid_line_aa(world_y, pitch_major, paper.major_half_px + fiber_bleed) * major_fade_y;
+    var major_cov = max(major_x, major_y) * content_mask;
+
+    let zone_cx = u32(floor(px / pitch_minor)) % uniforms.screen_cols;
+    let zone_world_row = i32(floor(world_y / pitch_minor));
+    let zone_mask = zone_mask_for_cell(zone_cx, zone_world_row);
+    minor_cov *= zone_mask.x;
+    // Zone edge overlays share the same factory roller fade profile as regular
+    // major grid lines.
+    let major_roller_fade = max(major_fade_x, major_fade_y);
+    let bold_major_edge_cov = zone_bold_major_edge_cov(
+        px,
+        world_y,
+        pitch_minor,
+        paper.major_half_px + fiber_bleed,
+    );
+    let edge_major_cov = max(zone_mask.z, bold_major_edge_cov) * major_roller_fade * content_mask;
+    major_cov = max(major_cov * zone_mask.y, edge_major_cov);
 
     // Transmittance (linear sRGB): (R, G, B) = fraction transmitted per channel.
     // Minor: (0.52, 0.82, 0.92) — faint teal tint.
@@ -452,7 +716,19 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     var alive_mix  = curr_alive;
     alive_mix      = select(alive_mix, birth_mix, changed && is_birth);
     alive_mix      = select(alive_mix, death_mix, changed && !is_birth);
-    let coverage   = raw_cov * alive_mix * content_mask;
+    // ── 6a. Decal cell-suppression pre-pass ──────────────────────────────────
+    // select-weighted max accumulation — no continue/break, preserving wave coherence.
+    // Reuses zone_cx / zone_world_row computed above in §4.
+    var cell_suppress = 0.0;
+    for (var di: u32 = 0u; di < decal_meta.decal_count; di = di + 1u) {
+        let dd = decals[di];
+        let in_rect = select(0.0, 1.0,
+            zone_cx        >= u32(dd.rect.x) && zone_cx        <= u32(dd.rect.z)
+            && zone_world_row >= dd.rect.y       && zone_world_row <= dd.rect.w);
+        cell_suppress = max(cell_suppress, f32(dd.flags.z) * in_rect);
+    }
+
+    let coverage   = raw_cov * alive_mix * content_mask * zone_mask.w * (1.0 - cell_suppress);
 
     // ── 7. Ink shading: anisotropic graphite specular + Beer-Lambert mix ────────
     //
@@ -492,10 +768,19 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     // At t=1 (transmit→0, full ink): ink color.
     let result_lin = oklab_mix(paper_bordered, ink_lit, 1.0 - transmit);
 
-    // ── 8. Greyscale (BT.709 luminance in linear light) ──────────────────────
-    //let luma   = dot(result_lin, vec3f(0.2126, 0.7152, 0.0722));
-    //let result = vec3f(luma);
+    // ── 8. Decal compositing ──────────────────────────────────────────────────
+    // Runs after cells/ink, before gamma encode.
+    // select-weighted — no continue/break; wave coherence preserved.
+    var surface_colour = result_lin;
+    for (var di: u32 = 0u; di < decal_meta.decal_count; di = di + 1u) {
+        let dd = decals[di];
+        let in_rect = select(0.0, 1.0,
+            zone_cx        >= u32(dd.rect.x) && zone_cx        <= u32(dd.rect.z)
+            && zone_world_row >= dd.rect.y       && zone_world_row <= dd.rect.w);
+        let weighted = decal_pattern(dd, zone_cx, zone_world_row) * in_rect;
+        surface_colour = decal_blend(surface_colour, weighted, dd, dd.flags.y);
+    }
 
     // ── 9. Gamma encode for non-sRGB surface ──────────────────────────────────
-    return vec4f(linear_to_srgb(clamp(result_lin, vec3f(0.0), vec3f(1.0))), 1.0);
+    return vec4f(linear_to_srgb(clamp(surface_colour, vec3f(0.0), vec3f(1.0))), 1.0);
 }

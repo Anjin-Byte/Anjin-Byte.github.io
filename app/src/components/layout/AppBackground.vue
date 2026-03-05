@@ -2,7 +2,12 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { createLogger } from '../../logger';
 import type { WorkerOutMsg, GridInfo } from '../../workers/rendererProtocol';
-import { alignedPitch, screenToCell, wrapCell, type CoordSnapshot } from '../../utils/gridCoords';
+import { alignedPitch, screenToCell, wrapCell, type CellCoord, type CoordSnapshot } from '../../utils/gridCoords';
+import { useBlankZones } from '../../composables/useBlankZones';
+import type { BlankZone, BlankZoneDraft, BlankZoneRect } from '../../types/blankZones';
+import { useDecals } from '../../composables/useDecals';
+import type { Decal } from '../../types/decals';
+import GridBlankZonePanel from './GridBlankZonePanel.vue';
 
 const log = createLogger('AppBackground');
 
@@ -19,24 +24,275 @@ let canvasW = 0;
 let canvasH = 0;
 
 // Mutable state used to build CoordSnapshots at click time.
-let currentGridInfo: GridInfo | null = null;
-let currentScrollCanvasPx = 0;
+const currentGridInfo = ref<GridInfo | null>(null);
+const currentScrollCanvasPx = ref(0);
 let mainEl: HTMLElement | null = null;
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function toWorkerZone(zone: BlankZone): BlankZone {
+  return {
+    ...zone,
+    edge: { ...zone.edge },
+  };
+}
+
+function toWorkerZones(zones: BlankZone[]): BlankZone[] {
+  return zones.map((zone) => toWorkerZone(zone));
+}
+
+function toWorkerDecal(d: Decal): Decal {
+  return {
+    ...d,
+    pattern: { ...d.pattern },
+    tint: [...d.tint] as [number, number, number, number],
+  };
+}
+
+function toWorkerDecals(d: Decal[]): Decal[] {
+  return d.map(toWorkerDecal);
+}
+
+function postToWorker(message: Parameters<Worker['postMessage']>[0], transfer?: Transferable[]): void {
+  if (!worker) {
+    return;
+  }
+
+  try {
+    if (transfer && transfer.length > 0) {
+      worker.postMessage(message, transfer);
+    } else {
+      worker.postMessage(message);
+    }
+  } catch (err) {
+    log.error('Worker postMessage failed:', errorMessage(err));
+  }
+}
+
+const blankZones = useBlankZones({
+  onSetZones: (zones) => postToWorker({ type: 'set_zones', zones: toWorkerZones(zones) }),
+  onAddZone: (zone) => postToWorker({ type: 'add_zone', zone: toWorkerZone(zone) }),
+  onUpdateZone: (zone) => postToWorker({ type: 'update_zone', zone: toWorkerZone(zone) }),
+  onRemoveZone: (id) => postToWorker({ type: 'remove_zone', id }),
+  onClearZones: () => postToWorker({ type: 'clear_zones' }),
+});
+
+const decals = useDecals({
+  onSetDecals: (d) => postToWorker({ type: 'set_decals', decals: toWorkerDecals(d) }),
+  onAddDecal: (d) => postToWorker({ type: 'add_decal', decal: toWorkerDecal(d) }),
+  onUpdateDecal: (d) => postToWorker({ type: 'update_decal', decal: toWorkerDecal(d) }),
+  onRemoveDecal: (id) => postToWorker({ type: 'remove_decal', id }),
+  onClearDecals: () => postToWorker({ type: 'clear_decals' }),
+});
+const zoneToolEnabled = ref(false);
+const zoneSnapMajor = ref(false);
+const zoneDraft = ref<BlankZoneDraft>({
+  mode: 'both',
+  edge: { style: 'none', widthCells: 1, opacity: 1 },
+});
+const zonePreviewRect = ref<BlankZoneRect | null>(null);
+const zonePreviewStyle = ref<Record<string, string> | null>(null);
+let dragAnchor: CellCoord | null = null;
+
+function onAddZone(zone: BlankZone): void {
+  blankZones.addZone(zone);
+}
+
+function onUpdateZone(zone: BlankZone): void {
+  blankZones.updateZone(zone);
+}
+
+function onRemoveZone(id: string): void {
+  blankZones.removeZone(id);
+}
+
+function onClearZones(): void {
+  blankZones.clearZones();
+}
+
+function onToolChange(payload: { enabled: boolean; snapMajor: boolean }): void {
+  zoneToolEnabled.value = payload.enabled;
+  zoneSnapMajor.value = payload.snapMajor;
+  if (!payload.enabled) {
+    dragAnchor = null;
+    zonePreviewRect.value = null;
+    zonePreviewStyle.value = null;
+  }
+}
+
+function onDraftChange(draft: BlankZoneDraft): void {
+  zoneDraft.value = draft;
+}
+
+function onAddDecal(decal: Decal): void { decals.addDecal(decal); }
+function onUpdateDecal(decal: Decal): void { decals.updateDecal(decal); }
+function onRemoveDecal(id: string): void { decals.removeDecal(id); }
+function onClearDecals(): void { decals.clearDecals(); }
 
 /** Build a CoordSnapshot from the latest cached values. */
 function makeSnapshot(): CoordSnapshot | null {
-  if (!currentGridInfo || currentGridInfo.gridPitch === 0) return null;
+  const info = currentGridInfo.value;
+  if (!info || info.gridPitch === 0) return null;
   return {
-    gridPitch:       currentGridInfo.gridPitch,
-    scrollCanvasPx:  currentScrollCanvasPx,
+    gridPitch:       info.gridPitch,
+    scrollCanvasPx:  currentScrollCanvasPx.value,
     dpr:             devicePixelRatio,
-    screenCols:      currentGridInfo.screenCols,
-    screenRows:      currentGridInfo.screenRows,
+    screenCols:      info.screenCols,
+    screenRows:      info.screenRows,
   };
 }
 
 /** Tags that should NOT trigger cell toggling when clicked. */
 const INTERACTIVE_TAGS = new Set(['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'LABEL']);
+const INTERACTIVE_SELECTORS = '.zone-panel, .v-overlay-container, [data-grid-ignore-click="true"]';
+
+function isInteractiveTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  if (target.closest(INTERACTIVE_SELECTORS)) {
+    return true;
+  }
+
+  let el: HTMLElement | null = target;
+  while (el) {
+    if (INTERACTIVE_TAGS.has(el.tagName)) return true;
+    if (el.getAttribute('role') === 'button') return true;
+    el = el.parentElement;
+  }
+  return false;
+}
+
+function normalizeRect(a: CellCoord, b: CellCoord): BlankZoneRect {
+  return {
+    x1: Math.min(a.cx, b.cx),
+    y1: Math.min(a.cy, b.cy),
+    x2: Math.max(a.cx, b.cx),
+    y2: Math.max(a.cy, b.cy),
+  };
+}
+
+function wrapXToViewport(x: number, snap: CoordSnapshot): number {
+  return ((x % snap.screenCols) + snap.screenCols) % snap.screenCols;
+}
+
+function worldZoneCellFromPointer(event: PointerEvent): CellCoord | null {
+  const snap = makeSnapshot();
+  if (!snap) {
+    return null;
+  }
+  const cell = screenToCell(event.clientX, event.clientY, snap);
+  return {
+    cx: wrapXToViewport(cell.cx, snap),
+    // World-space row for scroll-stable authoring.
+    cy: cell.cy,
+  };
+}
+
+function snapRectToMajor(rect: BlankZoneRect, snap: CoordSnapshot): BlankZoneRect {
+  const toStart = (v: number): number => Math.floor(v / MAJOR_EVERY) * MAJOR_EVERY;
+  const toEnd = (v: number): number => toStart(v) + (MAJOR_EVERY - 1);
+  return {
+    x1: Math.max(0, Math.min(snap.screenCols - 1, toStart(rect.x1))),
+    y1: toStart(rect.y1),
+    x2: Math.max(0, Math.min(snap.screenCols - 1, toEnd(rect.x2))),
+    y2: toEnd(rect.y2),
+  };
+}
+
+function makeZoneFromRect(rect: BlankZoneRect): BlankZone {
+  const now = Date.now();
+  const draft = zoneDraft.value;
+  return {
+    id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `zone-${now}-${Math.random().toString(36).slice(2, 9)}`,
+    x1: rect.x1,
+    y1: rect.y1,
+    x2: rect.x2,
+    y2: rect.y2,
+    mode: draft.mode,
+    edge: { ...draft.edge },
+    enabled: true,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function updateZonePreviewStyle(): void {
+  const rect = zonePreviewRect.value;
+  const snap = makeSnapshot();
+  if (!rect || !snap) {
+    zonePreviewStyle.value = null;
+    return;
+  }
+
+  const left = rect.x1 * snap.gridPitch / snap.dpr;
+  const top = (rect.y1 * snap.gridPitch - snap.scrollCanvasPx) / snap.dpr;
+  const width = (rect.x2 - rect.x1 + 1) * snap.gridPitch / snap.dpr;
+  const height = (rect.y2 - rect.y1 + 1) * snap.gridPitch / snap.dpr;
+  zonePreviewStyle.value = {
+    left: `${left}px`,
+    top: `${top}px`,
+    width: `${width}px`,
+    height: `${height}px`,
+  };
+}
+
+function onDocumentPointerDown(event: PointerEvent): void {
+  if (!zoneToolEnabled.value || event.button !== 0 || isInteractiveTarget(event.target)) {
+    return;
+  }
+  const start = worldZoneCellFromPointer(event);
+  if (!start) {
+    return;
+  }
+  dragAnchor = start;
+  zonePreviewRect.value = { x1: start.cx, y1: start.cy, x2: start.cx, y2: start.cy };
+  updateZonePreviewStyle();
+  // Capture the pointer so pointermove/pointerup keep firing even if the cursor
+  // leaves the browser window mid-drag.
+  if (event.target instanceof Element) {
+    event.target.setPointerCapture(event.pointerId);
+  }
+  event.preventDefault();
+}
+
+function onDocumentPointerMove(event: PointerEvent): void {
+  if (!zoneToolEnabled.value || !dragAnchor) {
+    return;
+  }
+  const next = worldZoneCellFromPointer(event);
+  const snap = makeSnapshot();
+  if (!next || !snap) {
+    return;
+  }
+  const rawRect = normalizeRect(dragAnchor, next);
+  zonePreviewRect.value = zoneSnapMajor.value ? snapRectToMajor(rawRect, snap) : rawRect;
+  updateZonePreviewStyle();
+}
+
+function onDocumentPointerUp(event: PointerEvent): void {
+  if (!zoneToolEnabled.value || !dragAnchor || event.button !== 0) {
+    return;
+  }
+  if (event.target instanceof Element && event.target.hasPointerCapture(event.pointerId)) {
+    event.target.releasePointerCapture(event.pointerId);
+  }
+  const next = worldZoneCellFromPointer(event);
+  const snap = makeSnapshot();
+  if (next && snap) {
+    const rawRect = normalizeRect(dragAnchor, next);
+    const finalRect = zoneSnapMajor.value ? snapRectToMajor(rawRect, snap) : rawRect;
+    blankZones.addZone(makeZoneFromRect(finalRect));
+  }
+  dragAnchor = null;
+  zonePreviewRect.value = null;
+  zonePreviewStyle.value = null;
+}
 
 /** Handle clicks anywhere on the page — toggle the cell under the cursor.
  *
@@ -45,13 +301,8 @@ const INTERACTIVE_TAGS = new Set(['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 
  *  that land on interactive elements (buttons, links, inputs).
  */
 function onDocumentClick(event: MouseEvent): void {
-  // Walk up the DOM from the click target to see if it's interactive.
-  let el = event.target as HTMLElement | null;
-  while (el) {
-    if (INTERACTIVE_TAGS.has(el.tagName)) return;
-    // Vuetify chips, cards with click handlers, etc. use role="button".
-    if (el.getAttribute('role') === 'button') return;
-    el = el.parentElement;
+  if (zoneToolEnabled.value || dragAnchor || isInteractiveTarget(event.target)) {
+    return;
   }
 
   const snap = makeSnapshot();
@@ -61,7 +312,7 @@ function onDocumentClick(event: MouseEvent): void {
   const wrapped = wrapCell(cell, snap);
 
   log.debug('Click →', event.clientX, event.clientY, '→ cell', wrapped.cx, wrapped.cy);
-  worker?.postMessage({
+  postToWorker({
     type: 'toggle_cell',
     cx: wrapped.cx,
     cy: wrapped.cy,
@@ -90,10 +341,26 @@ onMounted(() => {
     switch (e.data.type) {
       case 'ready':
         log.info(`${e.data.backend.toUpperCase()} renderer active`);
-        currentGridInfo = e.data.gridInfo;
+        currentGridInfo.value = e.data.gridInfo;
+        postToWorker({ type: 'set_zones', zones: toWorkerZones(blankZones.zones.value) });
+        postToWorker({ type: 'set_decals', decals: toWorkerDecals(decals.decals.value) });
+        updateZonePreviewStyle();
         break;
       case 'grid_info':
-        currentGridInfo = e.data.gridInfo;
+        currentGridInfo.value = e.data.gridInfo;
+        updateZonePreviewStyle();
+        break;
+      case 'zones_state':
+        blankZones.syncFromWorker(e.data.zones);
+        break;
+      case 'zones_error':
+        log.error('Zone update rejected:', e.data.message);
+        break;
+      case 'decals_state':
+        decals.syncFromWorker(e.data.decals);
+        break;
+      case 'decals_error':
+        log.error('Decal update rejected:', e.data.message);
         break;
       case 'error':
         // gpu-init failures are expected on browsers without WebGPU; log at debug.
@@ -113,6 +380,9 @@ onMounted(() => {
 
   // Listen on document so clicks pass through foreground content to toggle cells.
   document.addEventListener('click', onDocumentClick);
+  document.addEventListener('pointerdown', onDocumentPointerDown);
+  document.addEventListener('pointermove', onDocumentPointerMove);
+  document.addEventListener('pointerup', onDocumentPointerUp);
 
   // Compute float grid pitch: canvas_width = nTotal * MAJOR_EVERY * gridPitch exactly,
   // so both left and right margin borders land on major grid lines.
@@ -123,7 +393,7 @@ onMounted(() => {
   const marginCss = 0.8 * gridPitch * MAJOR_EVERY / devicePixelRatio;
   document.documentElement.style.setProperty('--grid-margin', `${marginCss.toFixed(1)}px`);
 
-  worker.postMessage({ type: 'init', canvas: offscreen, cellPx: gridPitch }, [offscreen]);
+  postToWorker({ type: 'init', canvas: offscreen, cellPx: gridPitch }, [offscreen]);
   log.debug('Worker spawned, init message sent, gridPitch', gridPitch.toFixed(2));
 
   // Poll scroll position each animation frame rather than relying on scroll events.
@@ -136,15 +406,16 @@ onMounted(() => {
   let lastScrollPx = -1;
 
   const loop = () => {
-    worker?.postMessage({ type: 'frame' });
+    postToWorker({ type: 'frame' });
 
     // Prefer .v-main.scrollTop (Vuetify layout mode); fall back to window.scrollY.
     // Both are checked so this works regardless of which element Vuetify scrolls.
     const rawPx = (mainEl?.scrollTop || window.scrollY);
     if (rawPx !== lastScrollPx) {
       lastScrollPx = rawPx;
-      currentScrollCanvasPx = rawPx * devicePixelRatio;
-      worker?.postMessage({ type: 'scroll', scrollY: currentScrollCanvasPx });
+      currentScrollCanvasPx.value = rawPx * devicePixelRatio;
+      postToWorker({ type: 'scroll', scrollY: currentScrollCanvasPx.value });
+      updateZonePreviewStyle();
     }
 
     animFrameId = requestAnimationFrame(loop);
@@ -160,7 +431,7 @@ onMounted(() => {
     const gp = alignedPitch(w, TARGET_CELL_CSS_PX, devicePixelRatio);
     document.documentElement.style.setProperty('--grid-margin', `${(0.8 * gp * MAJOR_EVERY / devicePixelRatio).toFixed(1)}px`);
     log.debug('Resize →', w, 'x', h);
-    worker?.postMessage({ type: 'resize', width: w, height: h });
+    postToWorker({ type: 'resize', width: w, height: h });
   });
   resizeObserver.observe(canvas);
 });
@@ -169,7 +440,10 @@ onUnmounted(() => {
   cancelAnimationFrame(animFrameId);
   resizeObserver?.disconnect();
   document.removeEventListener('click', onDocumentClick);
-  worker?.postMessage({ type: 'stop' });
+  document.removeEventListener('pointerdown', onDocumentPointerDown);
+  document.removeEventListener('pointermove', onDocumentPointerMove);
+  document.removeEventListener('pointerup', onDocumentPointerUp);
+  postToWorker({ type: 'stop' });
   worker?.terminate();
   worker = null;
   log.debug('Unmounted, worker terminated');
@@ -178,6 +452,22 @@ onUnmounted(() => {
 
 <template>
   <canvas ref="canvasRef" class="app-bg" />
+  <div v-if="zonePreviewStyle" class="zone-preview-overlay" :style="zonePreviewStyle" />
+  <GridBlankZonePanel
+    :zones="blankZones.zones.value"
+    :preview-rect="zonePreviewRect"
+    :decals="decals.decals.value"
+    @add-zone="onAddZone"
+    @update-zone="onUpdateZone"
+    @remove-zone="onRemoveZone"
+    @clear-zones="onClearZones"
+    @tool-change="onToolChange"
+    @draft-change="onDraftChange"
+    @add-decal="onAddDecal"
+    @update-decal="onUpdateDecal"
+    @remove-decal="onRemoveDecal"
+    @clear-decals="onClearDecals"
+  />
 </template>
 
 <style scoped>
@@ -189,5 +479,14 @@ onUnmounted(() => {
   z-index: 0;
   pointer-events: none;
   opacity: 1;
+}
+
+.zone-preview-overlay {
+  position: fixed;
+  z-index: 18;
+  pointer-events: none;
+  border: 2px dashed rgba(20, 120, 250, 0.92);
+  background: rgba(20, 120, 250, 0.15);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55) inset;
 }
 </style>

@@ -1,7 +1,9 @@
+mod decals;
+mod gpu;
 mod grid;
+mod renderer;
 mod shaders;
 mod simulation;
-mod renderer;
-mod gpu;
+mod zones;
 
 pub use gpu::GpuGameOfLife;
