@@ -8,12 +8,15 @@
     "typecheck": "vue-tsc --noEmit",
     "test:zones": "tsc -p tsconfig.tests.json && node ./.tests-dist/tests/blankZones.test.js",
     "test:decals": "tsc -p tsconfig.tests.json && node ./.tests-dist/tests/decals.test.js",
-    "test": "tsc -p tsconfig.tests.json && node ./.tests-dist/tests/blankZones.test.js && node ./.tests-dist/tests/decals.test.js",
+    "test:text": "tsc -p tsconfig.tests.json && node ./.tests-dist/tests/text.test.js",
+    "test:hires": "tsc -p tsconfig.tests.json && node ./.tests-dist/tests/hires.test.js",
+    "test": "tsc -p tsconfig.tests.json && node ./.tests-dist/tests/blankZones.test.js && node ./.tests-dist/tests/decals.test.js && node ./.tests-dist/tests/text.test.js && node ./.tests-dist/tests/hires.test.js",
     "format": "prettier --write \"src/**/*.{ts,vue}\"",
     "preview": "vite preview",
     "deploy": "gh-pages -d dist -b main -t true"
   },
   "dependencies": {
+    "@mapbox/tiny-sdf": "^2.0.7",
     "@mdi/font": "^7.4.47",
     "vue": "^3.5.13",
     "vuetify": "^3.7.4"

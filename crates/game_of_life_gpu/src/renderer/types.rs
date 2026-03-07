@@ -72,7 +72,7 @@ impl PaperParams {
 
 // ── Placeholder structs for future features ──────────────────────────────────
 
-/// SDF text placeholder meta — binding 10 (reserved, not yet implemented).
+/// SDF text meta — binding 10.
 #[repr(C)]
 #[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy, Default)]
 pub struct SdfTextMetaGpu {
@@ -80,6 +80,26 @@ pub struct SdfTextMetaGpu {
     pub pad0: u32,
     pub pad1: u32,
     pub pad2: u32,
+}
+
+/// SDF text glyph — binding 11 (array). Must match WGSL `SdfGlyph`.
+pub const MAX_TEXT_GLYPHS: usize = 256;
+
+#[repr(C)]
+#[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy, Default)]
+pub struct TextGlyphGpu {
+    pub cell_x: f32,
+    pub cell_y: f32,
+    pub cell_w: f32,
+    pub cell_h: f32,
+    pub uv_x: f32,
+    pub uv_y: f32,
+    pub uv_w: f32,
+    pub uv_h: f32,
+    pub color_r: f32,
+    pub color_g: f32,
+    pub color_b: f32,
+    pub pad0: f32,
 }
 
 /// Hi-res region global meta — binding 14.

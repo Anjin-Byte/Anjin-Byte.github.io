@@ -26,6 +26,7 @@ struct Params {
 @group(0) @binding(1) var<storage, read>       src:     array<u32>;
 @group(0) @binding(2) var<storage, read_write> dst:     array<atomic<u32>>;
 @group(0) @binding(3) var<storage, read>       outward: array<u32>;
+@group(0) @binding(4) var<storage, read>       frozen:  array<u32>;
 
 fn read_fine(x: u32, y: u32) -> u32 {
     return (src[y * params.wpr + (x >> 5u)] >> (x & 31u)) & 1u;
@@ -83,10 +84,12 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     let alive = read_fine(x, y);
     let lives = count == 3u || (count == 2u && alive == 1u);
+    let word_idx = y * params.wpr + (x >> 5u);
+    let bit = 1u << (x & 31u);
+    let is_frozen = (frozen[word_idx] & bit) != 0u;
 
-    if lives {
-        let word_idx = y * params.wpr + (x >> 5u);
-        atomicOr(&dst[word_idx], 1u << (x & 31u));
+    if lives || is_frozen {
+        atomicOr(&dst[word_idx], bit);
     }
     // Dead cells: bit stays 0 (dst pre-cleared before dispatch).
 }

@@ -6,6 +6,7 @@ use crate::hires::HiResManager;
 use crate::renderer::GpuRenderer;
 use crate::renderer::types::{HiResGlobalMetaGpu, HiResRegionMetaGpu};
 use crate::simulation::Simulation;
+use crate::text::{parse_frozen_cells_json, parse_text_glyphs_json};
 use crate::zones::parse_zone_entries_json;
 
 // Major-grid divisor: 5 minor cells per major square (must match render.wgsl major_every).
@@ -37,10 +38,7 @@ pub struct GpuGameOfLife {
     target_pitch: f32,   // stored as reference for resize recomputation
     zones_json: String,  // latest sanitized zone payload from the app
     decals_json: String, // latest sanitized decal payload from the app
-    hires_show_grid: bool,
-    hires_show_base_grid: bool,
-    hires_show_border: bool,
-    hires_paused: bool,
+    hires_dirty: bool,
 }
 
 /// Shared init path: requests adapter + device, builds grid/simulation/renderer.
@@ -106,10 +104,7 @@ async fn from_surface(
         target_pitch,
         zones_json: String::new(),
         decals_json: String::new(),
-        hires_show_grid: true,
-        hires_show_base_grid: true,
-        hires_show_border: true,
-        hires_paused: false,
+        hires_dirty: true,
     })
 }
 
@@ -158,7 +153,10 @@ impl GpuGameOfLife {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("gol_render_only"),
             });
-        self.copy_hires_to_render(&mut encoder);
+        if self.hires_dirty {
+            self.copy_hires_to_render(&mut encoder);
+            self.hires_dirty = false;
+        }
         match self
             .renderer
             .render(&mut encoder, self.simulation.current_visible_is_a())
@@ -194,11 +192,10 @@ impl GpuGameOfLife {
             self.simulation.current_visible_buffer(),
             &self.grid,
         );
-        if !self.hires_paused {
-            self.hires.tick(&mut encoder, &self.queue, self.simulation.frame);
-        }
+        self.hires.tick(&mut encoder, self.simulation.frame);
         self.simulation.tick(&mut encoder, &self.grid);
         self.copy_hires_to_render(&mut encoder);
+        self.hires_dirty = false;
 
         match self
             .renderer
@@ -238,7 +235,7 @@ impl GpuGameOfLife {
             &self.device, &self.queue, &self.grid,
             self.hires.mask_buffer(), self.hires.inward_buffer(),
         );
-        self.hires.rebuild_boundary_for_resize(
+        self.hires.rebuild_all_bind_groups(
             &self.device, &self.grid, &self.simulation.buf_a, &self.simulation.buf_b,
         );
         self.renderer.resize(
@@ -325,104 +322,165 @@ impl GpuGameOfLife {
         Ok(())
     }
 
-    /// Sets a hi-res region from rect + multiplier. Phase 1: single region only.
-    pub fn set_hires_region(
-        &mut self, x1: i32, y1: i32, x2: i32, y2: i32, multiplier: u32,
+    /// Upload frozen cell coordinates (JSON array of `{cx, cy}` pairs).
+    /// Packs into the bitpacked frozen buffer and rebuilds compute bind groups.
+    pub fn set_frozen_cells(&mut self, cells_json: &str) -> Result<(), JsValue> {
+        let buf = parse_frozen_cells_json(cells_json, &self.grid)?;
+        self.queue.write_buffer(
+            &self.simulation.frozen_buf,
+            0,
+            bytemuck::cast_slice(&buf),
+        );
+        Ok(())
+    }
+
+    /// Clear all frozen cells (zero the frozen buffer).
+    pub fn clear_frozen_cells(&mut self) {
+        let zeros = vec![0u32; self.grid.total_words() as usize];
+        self.queue.write_buffer(
+            &self.simulation.frozen_buf,
+            0,
+            bytemuck::cast_slice(&zeros),
+        );
+    }
+
+    /// Upload SDF glyph metadata (JSON array of positioned glyph records).
+    pub fn set_text_glyphs(&mut self, glyphs_json: &str) -> Result<(), JsValue> {
+        let glyphs = parse_text_glyphs_json(glyphs_json)?;
+        self.renderer.set_text_glyphs(&self.queue, &glyphs);
+        Ok(())
+    }
+
+    /// Clear all SDF text glyphs.
+    pub fn clear_text_glyphs(&mut self) {
+        self.renderer.clear_text_glyphs(&self.queue);
+    }
+
+    /// Upload the SDF atlas texture (R8unorm raw data).
+    pub fn upload_text_atlas(&mut self, data: &[u8], width: u32, height: u32) -> Result<(), JsValue> {
+        if data.len() != (width * height) as usize {
+            return Err(JsValue::from_str("atlas data size mismatch"));
+        }
+        self.renderer.upload_text_atlas(
+            &self.device, &self.queue, &self.simulation, data, width, height,
+        );
+        Ok(())
+    }
+
+    /// Add a hi-res region with the given id, rect, and multiplier.
+    pub fn add_hires_region(
+        &mut self, id: u32, x1: i32, y1: i32, x2: i32, y2: i32, multiplier: u32,
         show_grid: bool, show_base_grid: bool, show_border: bool,
     ) {
-        self.hires_show_grid = show_grid;
-        self.hires_show_base_grid = show_base_grid;
-        self.hires_show_border = show_border;
         let rect = [x1, y1, x2, y2];
-        self.hires.set_region(
-            &self.device, &self.queue, &self.grid, rect, multiplier,
+        self.hires.add_region(
+            &self.device, &self.queue, &self.grid, id, rect, multiplier,
+            show_grid, show_base_grid, show_border,
             &self.simulation.buf_a, &self.simulation.buf_b,
             self.simulation.frame,
         );
+        self.hires_dirty = true;
         self.sync_hires_to_renderer();
     }
 
-    /// Pause or resume the hi-res simulation without destroying the region.
-    ///
-    /// On pause: copies current → previous so the repeating transition_t
-    /// cycle produces no visual change while paused.
-    ///
-    /// On unpause: re-aligns the region's ping-pong frame counter to the
-    /// base simulation's frame so bind-group parity is correct, then copies
-    /// current → previous so the first resumed tick transitions cleanly.
-    pub fn set_hires_paused(&mut self, paused: bool) {
-        if paused == self.hires_paused { return; }
-        if let Some(ref mut region) = self.hires.region {
-            if !paused {
-                // Resync parity before the next hires.tick() uses sim_frame.
-                region.resync_frame(self.simulation.frame);
-            }
-            // In both directions: make prev == current so there's no stale
-            // diff for the transition shader to animate.
-            let src = region.current_visible_buffer() as *const wgpu::Buffer;
-            let dst = region.previous_visible_buffer() as *const wgpu::Buffer;
-            let size = region.buffer_bytes();
-            let mut encoder = self.device.create_command_encoder(
-                &wgpu::CommandEncoderDescriptor { label: Some("hires_pause_sync") },
-            );
-            // SAFETY: src and dst are different buffers (ping-pong pair).
-            unsafe {
-                encoder.copy_buffer_to_buffer(&*src, 0, &*dst, 0, size);
-            }
-            self.queue.submit([encoder.finish()]);
-        }
-        self.hires_paused = paused;
+    /// Remove a hi-res region by id.
+    pub fn remove_hires_region(&mut self, id: u32) {
+        self.hires.remove_region(&self.queue, id);
+        self.hires_dirty = true;
+        self.sync_hires_to_renderer();
     }
 
-    /// Update display flags without recreating the region.
-    pub fn update_hires_flags(&mut self, show_grid: bool, show_base_grid: bool, show_border: bool) {
-        self.hires_show_grid = show_grid;
-        self.hires_show_base_grid = show_base_grid;
-        self.hires_show_border = show_border;
+    /// Pause or resume a specific hi-res region.
+    pub fn set_hires_paused(&mut self, id: u32, paused: bool) {
+        self.hires.set_paused(id, paused, &self.device, &self.queue, self.simulation.frame);
+        self.hires_dirty = true;
+    }
+
+    /// Update display flags for a specific hi-res region.
+    pub fn update_hires_flags(&mut self, id: u32, show_grid: bool, show_base_grid: bool, show_border: bool) {
+        self.hires.update_flags(id, show_grid, show_base_grid, show_border);
         if self.hires.is_active() {
             self.sync_hires_to_renderer();
         }
     }
 
-    pub fn clear_hires_region(&mut self) {
-        self.hires.clear_region(&self.queue);
+    /// Clear all hi-res regions.
+    pub fn clear_hires_regions(&mut self) {
+        self.hires.clear_regions(&self.queue);
         self.renderer.clear_hires(&self.queue);
+    }
+
+    /// Upload frozen cells for a hi-res region (fine-cell space, region-relative).
+    pub fn set_hires_frozen_cells(&mut self, region_id: u32, cells_json: &str) -> Result<(), JsValue> {
+        let region = self.hires.regions.iter().find(|r| r.id == region_id);
+        let (wpr, padded_rows) = match region {
+            Some(r) => (r.words_per_row, r.padded_rows),
+            None => return Err(JsValue::from_str("Region not found")),
+        };
+        let buf = crate::text::parse_hires_frozen_cells_json(cells_json, wpr, padded_rows)?;
+        self.hires.set_region_frozen(&self.device, &self.queue, region_id, &buf);
+        Ok(())
+    }
+
+    /// Clear frozen cells for a hi-res region.
+    pub fn clear_hires_frozen_cells(&mut self, region_id: u32) {
+        self.hires.clear_region_frozen(&self.device, region_id);
     }
 }
 
 // Private helpers (outside #[wasm_bindgen] impl block).
 impl GpuGameOfLife {
     fn copy_hires_to_render(&self, encoder: &mut wgpu::CommandEncoder) {
-        if let Some((src, size)) = self.hires.visible_fine_buffer() {
-            let dst = self.renderer.hires_cells_buf();
-            if dst.size() >= size {
-                encoder.copy_buffer_to_buffer(src, 0, dst, 0, size);
+        let dst_cur = self.renderer.hires_cells_buf();
+        let dst_prev = self.renderer.hires_cells_prev_buf();
+        let mut offset: u64 = 0;
+        let vis = self.hires.visible_fine_buffers();
+        let prev = self.hires.previous_fine_buffers();
+        for i in 0..vis.len() {
+            let (src, size) = vis[i];
+            if dst_cur.size() >= offset + size {
+                encoder.copy_buffer_to_buffer(src, 0, dst_cur, offset, size);
             }
-        }
-        if let Some((src, size)) = self.hires.previous_fine_buffer() {
-            let dst = self.renderer.hires_cells_prev_buf();
-            if dst.size() >= size {
-                encoder.copy_buffer_to_buffer(src, 0, dst, 0, size);
+            let (psrc, psize) = prev[i];
+            if dst_prev.size() >= offset + psize {
+                encoder.copy_buffer_to_buffer(psrc, 0, dst_prev, offset, psize);
             }
+            offset += size;
         }
     }
 
     fn sync_hires_to_renderer(&mut self) {
-        if let Some((rect, mult, cols, wpr)) = self.hires.render_meta() {
-            let meta = HiResGlobalMetaGpu { region_count: 1, ..Default::default() };
-            let region = HiResRegionMetaGpu {
-                rect, multiplier: mult, buffer_offset: 0, cols, wpr,
-                flags: (if self.hires_show_grid { 1u32 } else { 0 })
-                     | (if self.hires_show_base_grid { 2u32 } else { 0 })
-                     | (if self.hires_show_border { 4u32 } else { 0 }),
-                pad0: 0, pad1: 0, pad2: 0,
-            };
-            let cells_size = self.hires.visible_fine_buffer()
-                .map(|(_, s)| s).unwrap_or(4);
-            self.renderer.set_hires(
-                &self.device, &self.queue, &self.simulation,
-                &meta, &[region], cells_size,
-            );
+        let metas = self.hires.render_meta();
+        if metas.is_empty() {
+            self.renderer.clear_hires(&self.queue);
+            return;
         }
+        let global = HiResGlobalMetaGpu {
+            region_count: metas.len() as u32,
+            ..Default::default()
+        };
+        let mut regions = Vec::with_capacity(metas.len());
+        let mut offset: u32 = 0;
+        for (rect, mult, cols, wpr, sg, sbg, sb) in &metas {
+            let total_words = {
+                let r = self.hires.regions.iter().find(|r| r.rect == *rect).unwrap();
+                r.total_words()
+            };
+            regions.push(HiResRegionMetaGpu {
+                rect: *rect, multiplier: *mult, buffer_offset: offset,
+                cols: *cols, wpr: *wpr,
+                flags: (if *sg { 1u32 } else { 0 })
+                     | (if *sbg { 2u32 } else { 0 })
+                     | (if *sb { 4u32 } else { 0 }),
+                pad0: 0, pad1: 0, pad2: 0,
+            });
+            offset += total_words;
+        }
+        let total_bytes = offset as u64 * 4;
+        let cells_size = total_bytes.max(4);
+        self.renderer.set_hires(
+            &self.device, &self.queue, &self.simulation,
+            &global, &regions, cells_size,
+        );
     }
 }

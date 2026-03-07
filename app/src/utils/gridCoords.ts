@@ -103,6 +103,26 @@ export interface BitAddress {
   bitOffset: number;
 }
 
+/**
+ * Map a simulation grid cell back to CSS screen coordinates.
+ * Exact inverse of screenToCell().
+ */
+export function cellToScreen(
+  cx: number,
+  cy: number,
+  snap: CoordSnapshot,
+): { cssX: number; cssY: number } {
+  return {
+    cssX: cx * snap.gridPitch / snap.dpr,
+    cssY: (cy * snap.gridPitch - snap.scrollCanvasPx) / snap.dpr,
+  };
+}
+
+/** Convert a cell-count span to CSS pixels. */
+export function cellSpanToCssPx(cellCount: number, snap: CoordSnapshot): number {
+  return cellCount * snap.gridPitch / snap.dpr;
+}
+
 export function cellToBitAddress(
   cx: number,
   cy: number,

@@ -15,9 +15,10 @@ export interface HiResRegion {
 
 export interface HiResStoragePayload {
   version: number;
-  region: HiResRegion | null;
+  regions: HiResRegion[];
 }
 
 export const HIRES_MULTIPLIER = 4;
-export const HIRES_STORAGE_VERSION = 1;
-export const HIRES_STORAGE_KEY = `gol.hires.v${HIRES_STORAGE_VERSION}`;
+export const MAX_HIRES_REGIONS = 8;
+export const HIRES_STORAGE_VERSION = 2;
+export const HIRES_STORAGE_KEY = 'gol.hires';

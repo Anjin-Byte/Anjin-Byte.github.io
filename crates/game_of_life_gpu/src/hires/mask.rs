@@ -35,13 +35,13 @@ impl RegionMask {
         &self.buf
     }
 
-    /// Rebuild the mask for a single region rect, then upload to GPU.
+    /// Rebuild the mask for multiple region rects, then upload to GPU.
     ///
-    /// Pass `None` to clear (no region active).
-    pub fn rebuild(&mut self, queue: &wgpu::Queue, rect: Option<[i32; 4]>) {
+    /// Pass an empty slice to clear (no regions active).
+    pub fn rebuild(&mut self, queue: &wgpu::Queue, rects: &[[i32; 4]]) {
         self.data.fill(0);
 
-        if let Some(r) = rect {
+        for r in rects {
             let x1 = r[0].max(0) as u32;
             let y1 = r[1].max(0) as u32;
             let x2 = r[2].max(0) as u32;

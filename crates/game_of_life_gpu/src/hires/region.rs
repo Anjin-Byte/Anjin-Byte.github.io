@@ -3,6 +3,7 @@
 /// Each region owns an independent pair of bitpacked cell buffers
 /// (ping-pong) at `multiplier` × the base grid resolution.
 pub struct HiResRegion {
+    pub id: u32,                  // unique identifier for CRUD
     pub rect: [i32; 4],           // [x1, y1, x2, y2] base cell-space (inclusive)
     pub multiplier: u32,          // 4 (Phase 1)
     pub buf_a: wgpu::Buffer,      // fine cells (even frames)
@@ -12,6 +13,11 @@ pub struct HiResRegion {
     pub words_per_row: u32,       // fine grid words per row (power of 2 / 32)
     pub padded_rows: u32,         // fine grid padded rows (power of 2)
     pub frame: u32,               // ping-pong counter
+    pub show_grid: bool,
+    pub show_base_grid: bool,
+    pub show_border: bool,
+    pub paused: bool,
+    pub frozen_buf: Option<wgpu::Buffer>,
 }
 
 impl HiResRegion {
@@ -19,9 +25,13 @@ impl HiResRegion {
     pub fn new(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
+        id: u32,
         rect: [i32; 4],
         multiplier: u32,
         sim_frame: u32,
+        show_grid: bool,
+        show_base_grid: bool,
+        show_border: bool,
     ) -> Self {
         let base_w = (rect[2] - rect[0] + 1) as u32;
         let base_h = (rect[3] - rect[1] + 1) as u32;
@@ -59,6 +69,7 @@ impl HiResRegion {
         queue.submit([encoder.finish()]);
 
         HiResRegion {
+            id,
             rect,
             multiplier,
             buf_a,
@@ -68,6 +79,11 @@ impl HiResRegion {
             words_per_row,
             padded_rows,
             frame: sim_frame,
+            show_grid,
+            show_base_grid,
+            show_border,
+            paused: false,
+            frozen_buf: None,
         }
     }
 
@@ -119,6 +135,41 @@ impl HiResRegion {
     /// Base-cell height of the region.
     pub fn base_height(&self) -> u32 {
         (self.rect[3] - self.rect[1] + 1) as u32
+    }
+
+    /// Create or update the frozen cell buffer from bitpacked data.
+    pub fn set_frozen(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, data: &[u32]) {
+        let expected = self.total_words() as usize;
+        let buf_data = if data.len() >= expected {
+            &data[..expected]
+        } else {
+            // Pad with zeros if data is shorter
+            let mut padded = vec![0u32; expected];
+            padded[..data.len()].copy_from_slice(data);
+            self.frozen_buf = Some(device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("hires_frozen"),
+                contents: bytemuck::cast_slice(&padded),
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            }));
+            return;
+        };
+        match self.frozen_buf {
+            Some(ref buf) if buf.size() == (expected * 4) as u64 => {
+                queue.write_buffer(buf, 0, bytemuck::cast_slice(buf_data));
+            }
+            _ => {
+                self.frozen_buf = Some(device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("hires_frozen"),
+                    contents: bytemuck::cast_slice(buf_data),
+                    usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                }));
+            }
+        }
+    }
+
+    /// Clear the frozen cell buffer.
+    pub fn clear_frozen(&mut self) {
+        self.frozen_buf = None;
     }
 }
 

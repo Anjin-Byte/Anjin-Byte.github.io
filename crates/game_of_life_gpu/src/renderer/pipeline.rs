@@ -15,6 +15,7 @@ use super::noise::make_noise_texture;
 use super::types::{
     HiResGlobalMetaGpu, HiResRegionMetaGpu, MAX_HIRES_REGIONS,
     PaperParams, RenderUniforms, SdfTextMetaGpu,
+    TextGlyphGpu, MAX_TEXT_GLYPHS,
 };
 
 pub struct GpuRenderer {
@@ -60,118 +61,56 @@ impl GpuRenderer {
         buf_b: &wgpu::Buffer,
     ) -> Self {
         let caps = surface.get_capabilities(adapter);
-        let format = caps
-            .formats
-            .iter()
-            .copied()
-            .find(|f| !f.is_srgb())
-            .unwrap_or(caps.formats[0]);
-
+        let format = caps.formats.iter().copied().find(|f| !f.is_srgb()).unwrap_or(caps.formats[0]);
         let surface_config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format,
-            width: grid.canvas_width,
-            height: grid.canvas_height,
-            present_mode: wgpu::PresentMode::AutoVsync,
-            alpha_mode: caps.alpha_modes[0],
-            view_formats: vec![],
-            desired_maximum_frame_latency: 2,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT, format,
+            width: grid.canvas_width, height: grid.canvas_height,
+            present_mode: wgpu::PresentMode::AutoVsync, alpha_mode: caps.alpha_modes[0],
+            view_formats: vec![], desired_maximum_frame_latency: 2,
         };
         surface.configure(device, &surface_config);
 
-        let uniform_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("render_uniforms"),
-            contents: bytes_of(&RenderUniforms::from_grid(grid)),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        let mk_uniform = |l, c: &[u8]| device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some(l), contents: c, usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
+        let mk_storage = |l, sz| device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some(l), size: sz, usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let uniform_buf = mk_uniform("render_uniforms", bytes_of(&RenderUniforms::from_grid(grid)));
+        let paper_buf = mk_uniform("paper_params", bytes_of(&PaperParams::for_pitch(grid_pitch)));
+        let prev_visible_buf = mk_storage("prev_visible_cells", grid.buffer_bytes());
+        let zone_meta_buf = mk_uniform("blank_zone_meta", bytes_of(&ZoneMetaGpu::default()));
+        let zone_buf = mk_storage("blank_zone_entries", (MAX_BLANK_ZONES * std::mem::size_of::<ZoneEntryGpu>()) as u64);
+        let decal_meta_buf = mk_uniform("decal_meta", bytes_of(&DecalMetaGpu::default()));
+        let decal_buf = mk_storage("decal_entries", (MAX_DECALS * std::mem::size_of::<DecalEntryGpu>()) as u64);
 
-        let paper_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("paper_params"),
-            contents: bytes_of(&PaperParams::for_pitch(grid_pitch)),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-
-        let prev_visible_buf = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("prev_visible_cells"),
-            size: grid.buffer_bytes(),
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let zone_meta_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("blank_zone_meta"),
-            contents: bytes_of(&ZoneMetaGpu::default()),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-        let zone_buf = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("blank_zone_entries"),
-            size: (MAX_BLANK_ZONES * std::mem::size_of::<ZoneEntryGpu>()) as u64,
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let decal_meta_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("decal_meta"),
-            contents: bytes_of(&DecalMetaGpu::default()),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-        let decal_buf = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("decal_entries"),
-            size: (MAX_DECALS * std::mem::size_of::<DecalEntryGpu>()) as u64,
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-
-        // SDF text placeholders (bindings 10-13)
-        let sdf_meta_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("sdf_text_meta_placeholder"),
-            contents: bytes_of(&SdfTextMetaGpu::default()),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-        let sdf_glyphs_buf = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("sdf_glyphs_placeholder"),
-            size: 4,
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        // SDF text (bindings 10-13)
+        let sdf_meta_buf = mk_uniform("sdf_text_meta", bytes_of(&SdfTextMetaGpu::default()));
+        let sdf_glyphs_buf = mk_storage("sdf_glyphs", (MAX_TEXT_GLYPHS * std::mem::size_of::<TextGlyphGpu>()) as u64);
         let sdf_atlas_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("sdf_atlas_placeholder"),
+            label: Some("sdf_atlas"),
             size: wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::R8Unorm,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });
         let sdf_atlas_view = sdf_atlas_texture.create_view(&wgpu::TextureViewDescriptor::default());
         let sdf_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("sdf_sampler_placeholder"),
+            label: Some("sdf_sampler"),
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Linear,
             ..Default::default()
         });
 
-        // Hi-res region placeholders (bindings 14-16)
-        let hires_meta_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("hires_meta_placeholder"),
-            contents: bytes_of(&HiResGlobalMetaGpu::default()),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-        let hires_regions_buf = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("hires_regions_placeholder"),
-            size: (MAX_HIRES_REGIONS * std::mem::size_of::<HiResRegionMetaGpu>()) as u64,
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let hires_cells_buf = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("hires_cells_placeholder"), size: 4,
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let hires_cells_prev_buf = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("hires_cells_prev_placeholder"), size: 4,
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        // Hi-res region (bindings 14-17)
+        let hires_meta_buf = mk_uniform("hires_meta", bytes_of(&HiResGlobalMetaGpu::default()));
+        let hires_regions_buf = mk_storage("hires_regions", (MAX_HIRES_REGIONS * std::mem::size_of::<HiResRegionMetaGpu>()) as u64);
+        let hires_cells_buf = mk_storage("hires_cells", 4);
+        let hires_cells_prev_buf = mk_storage("hires_cells_prev", 4);
 
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("seed_prev_visible_cells"),
@@ -433,6 +372,58 @@ impl GpuRenderer {
 
     pub fn clear_decals(&self, queue: &wgpu::Queue) {
         self.set_decals(queue, &[]);
+    }
+
+    pub fn set_text_glyphs(&self, queue: &wgpu::Queue, glyphs: &[TextGlyphGpu]) {
+        let count = glyphs.len().min(MAX_TEXT_GLYPHS);
+        let meta = SdfTextMetaGpu { glyph_count: count as u32, ..Default::default() };
+        queue.write_buffer(&self.sdf_meta_buf, 0, bytes_of(&meta));
+        if count > 0 {
+            queue.write_buffer(&self.sdf_glyphs_buf, 0, cast_slice(&glyphs[..count]));
+        }
+    }
+
+    pub fn clear_text_glyphs(&self, queue: &wgpu::Queue) {
+        self.set_text_glyphs(queue, &[]);
+    }
+
+    pub fn upload_text_atlas(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        simulation: &Simulation,
+        data: &[u8],
+        width: u32,
+        height: u32,
+    ) {
+        let tex = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("sdf_atlas"),
+            size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::R8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        queue.write_texture(
+            wgpu::ImageCopyTexture {
+                texture: &tex,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            data,
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: Some(width),
+                rows_per_image: Some(height),
+            },
+            wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+        );
+        self._sdf_atlas_texture = tex;
+        self.sdf_atlas_view = self._sdf_atlas_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        self.rebuild_bind_groups(device, &simulation.buf_a, &simulation.buf_b);
     }
 
     pub fn hires_cells_buf(&self) -> &wgpu::Buffer { &self.hires_cells_buf }

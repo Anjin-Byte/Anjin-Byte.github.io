@@ -83,13 +83,9 @@ impl BoundaryState {
         }
     }
 
-    /// Zero both ring buffers before a new frame's boundary extraction.
-    pub fn clear(&self, queue: &wgpu::Queue) {
-        let outward_words = (self.layout.outward_count + 31) / 32;
-        let inward_words = (self.layout.inward_count + 31) / 32;
-        let outward_zeros = vec![0u32; outward_words.max(1) as usize];
-        let inward_zeros = vec![0u32; inward_words.max(1) as usize];
-        queue.write_buffer(&self.outward_buf, 0, bytemuck::cast_slice(&outward_zeros));
-        queue.write_buffer(&self.inward_buf, 0, bytemuck::cast_slice(&inward_zeros));
+    /// Zero both ring buffers via command encoder (GPU-side, no heap allocation).
+    pub fn clear_enc(&self, encoder: &mut wgpu::CommandEncoder) {
+        encoder.clear_buffer(&self.outward_buf, 0, None);
+        encoder.clear_buffer(&self.inward_buf, 0, None);
     }
 }

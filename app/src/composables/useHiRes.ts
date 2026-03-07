@@ -1,48 +1,69 @@
 import { ref, type Ref } from 'vue';
 
 import type { HiResRegion } from '../types/hiresRegion';
-import { normalizeRegion } from '../utils/hiresNormalization';
-import { clearRegionStorage, loadRegion, saveRegion } from '../utils/hiresStorage';
+import { normalizeRegion, normalizeRegions } from '../utils/hiresNormalization';
+import { clearRegionsStorage, loadRegions, saveRegions } from '../utils/hiresStorage';
 
 export interface UseHiRes {
-  region: Ref<HiResRegion | null>;
-  setRegion(region: HiResRegion): void;
-  clearRegion(): void;
-  syncFromWorker(region: HiResRegion | null): void;
+  regions: Ref<HiResRegion[]>;
+  addRegion(region: HiResRegion): void;
+  updateRegion(region: HiResRegion): void;
+  removeRegion(id: string): void;
+  clearRegions(): void;
+  syncFromWorker(regions: HiResRegion[]): void;
 }
 
 export interface UseHiResOptions {
-  onSetRegion?: (region: HiResRegion) => void;
-  onClearRegion?: () => void;
+  onSetRegions?: (regions: HiResRegion[]) => void;
+  onAddRegion?: (region: HiResRegion) => void;
+  onUpdateRegion?: (region: HiResRegion) => void;
+  onRemoveRegion?: (id: string) => void;
+  onClearRegions?: () => void;
 }
 
 export function useHiRes(options: UseHiResOptions = {}): UseHiRes {
-  const region = ref<HiResRegion | null>(loadRegion());
+  const regions = ref<HiResRegion[]>(loadRegions());
 
-  function commit(next: HiResRegion | null): HiResRegion | null {
-    const normalized = next ? normalizeRegion(next) : null;
-    region.value = normalized;
-    saveRegion(normalized);
-    return normalized;
+  function commit(next: HiResRegion[]): void {
+    const normalized = normalizeRegions(next);
+    regions.value = normalized;
+    saveRegions(normalized);
   }
 
-  function setRegion(r: HiResRegion): void {
+  function addRegion(r: HiResRegion): void {
     const normalized = normalizeRegion(r);
     if (!normalized) return;
-    commit(normalized);
-    options.onSetRegion?.(normalized);
+    commit([...regions.value.filter((e) => e.id !== normalized.id), normalized]);
+    options.onAddRegion?.(normalized);
   }
 
-  function clearRegion(): void {
-    if (!region.value) return;
-    region.value = null;
-    clearRegionStorage();
-    options.onClearRegion?.();
+  function updateRegion(r: HiResRegion): void {
+    const normalized = normalizeRegion(r);
+    if (!normalized) return;
+    const idx = regions.value.findIndex((e) => e.id === normalized.id);
+    if (idx < 0) return;
+    const updated = regions.value.slice();
+    updated[idx] = normalized;
+    commit(updated);
+    options.onUpdateRegion?.(normalized);
   }
 
-  function syncFromWorker(next: HiResRegion | null): void {
+  function removeRegion(id: string): void {
+    if (!regions.value.some((r) => r.id === id)) return;
+    commit(regions.value.filter((r) => r.id !== id));
+    options.onRemoveRegion?.(id);
+  }
+
+  function clearRegions(): void {
+    if (regions.value.length === 0) return;
+    regions.value = [];
+    clearRegionsStorage();
+    options.onClearRegions?.();
+  }
+
+  function syncFromWorker(next: HiResRegion[]): void {
     commit(next);
   }
 
-  return { region, setRegion, clearRegion, syncFromWorker };
+  return { regions, addRegion, updateRegion, removeRegion, clearRegions, syncFromWorker };
 }

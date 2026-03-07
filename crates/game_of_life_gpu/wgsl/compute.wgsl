@@ -19,6 +19,7 @@ struct Uniforms {
 @group(0) @binding(2) var<storage, read_write> dst: array<u32>;
 @group(0) @binding(3) var<storage, read>      region_mask: array<u32>;
 @group(0) @binding(4) var<storage, read>      inward_boundary: array<u32>;
+@group(0) @binding(5) var<storage, read>      frozen: array<u32>;
 
 // Half-adder: returns (sum, carry).
 fn ha(a: u32, b: u32) -> vec2<u32> {
@@ -113,5 +114,6 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     // region_mask is bound but unused — keep a dead read so naga does not
     // strip the binding and cause a bind-group layout mismatch.
     let _keep_mask = region_mask[0];
-    dst[idx] = raw;
+    // Frozen cells forced alive: one OR per word, branch-free.
+    dst[idx] = raw | frozen[idx];
 }

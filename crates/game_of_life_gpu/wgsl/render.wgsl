@@ -75,7 +75,7 @@ struct DecalEntry {
     tint:   vec4f,  // RGBA linear sRGB — multiplied into pattern output
 }
 
-// ── SDF text placeholder (reserved, not yet implemented) ──────────────────────
+// ── SDF text ──────────────────────────────────────────────────────────────────
 
 struct SdfTextMeta {
     glyph_count: u32,
@@ -85,7 +85,9 @@ struct SdfTextMeta {
 }
 
 struct SdfGlyph {
-    placeholder: vec4f,
+    cell_pos: vec4f,  // [cell_x, cell_y, cell_w, cell_h]
+    atlas_uv: vec4f,  // [uv_x, uv_y, uv_w, uv_h]
+    color:    vec4f,   // [r, g, b, pad] — sRGB ink color
 }
 
 // ── Hi-res region metadata ───────────────────────────────────────────────────
@@ -121,7 +123,7 @@ struct HiResRegionMeta {
 @group(0) @binding(7)  var<storage, read> zones:          array<ZoneEntry>;
 @group(0) @binding(8)  var<uniform>       decal_meta:     DecalMeta;
 @group(0) @binding(9)  var<storage, read> decals:         array<DecalEntry>;
-// SDF text (reserved placeholders)
+// SDF text
 @group(0) @binding(10) var<uniform>       sdf_text_meta:  SdfTextMeta;
 @group(0) @binding(11) var<storage, read> sdf_glyphs:     array<SdfGlyph>;
 @group(0) @binding(12) var                sdf_atlas:      texture_2d<f32>;
@@ -180,6 +182,13 @@ fn linear_to_oklab(c: vec3f) -> vec3f {
 // Mix two linear-sRGB colors along a perceptually uniform path through OKLab.
 fn oklab_mix(a: vec3f, b: vec3f, t: f32) -> vec3f {
     return oklab_to_linear(mix(linear_to_oklab(a), linear_to_oklab(b), t));
+}
+
+// sRGB → Linear sRGB (IEC 61966-2-1).
+fn srgb_to_linear(c: vec3f) -> vec3f {
+    let lo = c / 12.92;
+    let hi = pow((c + 0.055) / 1.055, vec3f(2.4));
+    return select(hi, lo, c < vec3f(0.04045));
 }
 
 // Linear sRGB → sRGB (IEC 61966-2-1). Applied at output for non-sRGB surfaces.
@@ -538,6 +547,41 @@ fn zone_bold_major_edge_cov(px: f32, world_y: f32, pitch_minor: f32, half_px: f3
 // Returns coverage in [0, ~1.5].  Caller multiplies by f32(cell_alive).
 // Computed unconditionally so all fwidth calls are in uniform control flow.
 
+// ── SDF text coverage ─────────────────────────────────────────────────────────
+// Returns smooth coverage from SDF glyph atlas. select-weighted, no
+// continue/break — preserves wave coherence (matches decal loop pattern).
+
+fn text_coverage(fx: f32, fy: f32) -> vec4f {
+    var cov = 0.0;
+    var ink = vec3f(0.1, 0.1, 0.18);
+
+    for (var i: u32 = 0u; i < sdf_text_meta.glyph_count; i = i + 1u) {
+        let g = sdf_glyphs[i];
+
+        // Cell-space hit test: (fx,fy) relative to glyph bounding box.
+        let local_x = (fx - g.cell_pos.x) / g.cell_pos.z;
+        let local_y = (fy - g.cell_pos.y) / g.cell_pos.w;
+        let in_rect = select(0.0, 1.0,
+            local_x >= 0.0 && local_x <= 1.0
+            && local_y >= 0.0 && local_y <= 1.0);
+
+        // Sample SDF atlas (bilinear filtered).
+        let uv = vec2f(
+            g.atlas_uv.x + local_x * g.atlas_uv.z,
+            g.atlas_uv.y + local_y * g.atlas_uv.w,
+        );
+        let dist = textureSampleLevel(sdf_atlas, sdf_smp, uv, 0.0).r;
+
+        // SDF threshold: 0.5 = edge, smoothstep provides anti-aliasing.
+        let edge = smoothstep(0.45, 0.55, dist);
+        let glyph_cov = edge * in_rect;
+        // Winner-takes-all: strongest glyph determines ink color.
+        ink = select(ink, g.color.rgb, glyph_cov > cov);
+        cov = max(cov, glyph_cov);
+    }
+    return vec4f(ink, cov);
+}
+
 fn sponge_stamp(pCell: vec2f, cellId: vec2f) -> f32 {
     // ── Per-cell stroke direction — right-handed motor bias ──────────────────
     // A human filling small cells doesn't choose angles uniformly.
@@ -874,7 +918,11 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
         cell_suppress = max(cell_suppress, f32(dd.flags.z) * in_rect);
     }
 
-    let coverage   = raw_cov * alive_mix * content_mask * zone_mask.w * (1.0 - cell_suppress);
+    let cell_cov   = raw_cov * alive_mix * content_mask * zone_mask.w * (1.0 - cell_suppress);
+    // SDF text overlay: smooth glyph coverage merged with cell ink.
+    let sdf_result = text_coverage(px / pitch_minor, world_y / pitch_minor);
+    let sdf_cov    = sdf_result.w;
+    let coverage   = max(cell_cov, sdf_cov);
 
     // ── 7. Ink shading: anisotropic graphite specular + Beer-Lambert mix ────────
     //
@@ -904,10 +952,15 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     // Slightly cool grey — graphite's metallic-tinted specular.
     let graphite_col = vec3f(0.50, 0.52, 0.56);
 
-    let ink_albedo = oklab_to_linear(vec3f(0.15, 0.003, -0.012));
-    let ink_lit    = ink_albedo * (diffuse * mix(0.88, 1.0, ns.r))   // dark diffuse body
+    let cell_ink   = oklab_to_linear(vec3f(0.15, 0.003, -0.012));
+    let cell_lit   = cell_ink * (diffuse * mix(0.88, 1.0, ns.r))     // dark diffuse body
                    + graphite_col * graphite_hi                       // anisotropic sheen
                    + vec3f(spec * 0.08);                              // residual fiber spec
+    // When SDF text wins, use per-glyph sRGB color (convert to linear).
+    let text_ink   = srgb_to_linear(sdf_result.rgb);
+    let text_lit   = text_ink * (diffuse * mix(0.88, 1.0, ns.r));
+    let sdf_wins   = select(0.0, 1.0, sdf_cov > cell_cov);
+    let ink_lit    = mix(cell_lit, text_lit, sdf_wins);
     let transmit   = exp(-paper.ink_od * coverage);
     // Mix in OKLab: perceptual uniformity across the paper→ink transition.
     // At t=0 (transmit=1, no ink): paper color.

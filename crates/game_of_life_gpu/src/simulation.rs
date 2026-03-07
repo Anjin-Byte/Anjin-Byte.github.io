@@ -36,6 +36,7 @@ impl ComputeUniforms {
 pub struct Simulation {
     pub buf_a: wgpu::Buffer,
     pub buf_b: wgpu::Buffer,
+    pub frozen_buf: wgpu::Buffer,
     bind_group_a: wgpu::BindGroup, // a=read, b=write
     bind_group_b: wgpu::BindGroup, // b=read, a=write
     pipeline: wgpu::ComputePipeline,
@@ -78,6 +79,13 @@ impl Simulation {
             source: wgpu::ShaderSource::Wgsl(shaders::COMPUTE.into()),
         });
 
+        let frozen_buf = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("frozen_cells"),
+            size: grid.buffer_bytes(),
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
         let bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("sim_bgl"),
             entries: &[
@@ -86,6 +94,7 @@ impl Simulation {
                 bgl_entry(2, wgpu::BufferBindingType::Storage { read_only: false }, false),
                 bgl_entry(3, wgpu::BufferBindingType::Storage { read_only: true }, false),
                 bgl_entry(4, wgpu::BufferBindingType::Storage { read_only: true }, false),
+                bgl_entry(5, wgpu::BufferBindingType::Storage { read_only: true }, false),
             ],
         });
 
@@ -105,15 +114,16 @@ impl Simulation {
         });
 
         let bind_group_a = make_bind_group(
-            device, &bgl, &uniform_buf, &buf_a, &buf_b, mask_buf, inward_buf, "bg_a",
+            device, &bgl, &uniform_buf, &buf_a, &buf_b, mask_buf, inward_buf, &frozen_buf, "bg_a",
         );
         let bind_group_b = make_bind_group(
-            device, &bgl, &uniform_buf, &buf_b, &buf_a, mask_buf, inward_buf, "bg_b",
+            device, &bgl, &uniform_buf, &buf_b, &buf_a, mask_buf, inward_buf, &frozen_buf, "bg_b",
         );
 
         Simulation {
             buf_a,
             buf_b,
+            frozen_buf,
             bind_group_a,
             bind_group_b,
             pipeline,
@@ -158,11 +168,17 @@ impl Simulation {
             bytes_of(&ComputeUniforms::from_grid(grid)),
         );
         let (buf_a, buf_b) = make_cell_buffers(device, queue, grid);
+        self.frozen_buf = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("frozen_cells"),
+            size: grid.buffer_bytes(),
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
         self.bind_group_a = make_bind_group(
-            device, &self.bgl, &self.uniform_buf, &buf_a, &buf_b, mask_buf, inward_buf, "bg_a",
+            device, &self.bgl, &self.uniform_buf, &buf_a, &buf_b, mask_buf, inward_buf, &self.frozen_buf, "bg_a",
         );
         self.bind_group_b = make_bind_group(
-            device, &self.bgl, &self.uniform_buf, &buf_b, &buf_a, mask_buf, inward_buf, "bg_b",
+            device, &self.bgl, &self.uniform_buf, &buf_b, &buf_a, mask_buf, inward_buf, &self.frozen_buf, "bg_b",
         );
         self.buf_a = buf_a;
         self.buf_b = buf_b;
@@ -179,11 +195,11 @@ impl Simulation {
     ) {
         self.bind_group_a = make_bind_group(
             device, &self.bgl, &self.uniform_buf, &self.buf_a, &self.buf_b,
-            mask_buf, inward_buf, "bg_a",
+            mask_buf, inward_buf, &self.frozen_buf, "bg_a",
         );
         self.bind_group_b = make_bind_group(
             device, &self.bgl, &self.uniform_buf, &self.buf_b, &self.buf_a,
-            mask_buf, inward_buf, "bg_b",
+            mask_buf, inward_buf, &self.frozen_buf, "bg_b",
         );
     }
 
@@ -419,6 +435,7 @@ fn make_bind_group(
     write_buf: &wgpu::Buffer,
     mask_buf: &wgpu::Buffer,
     inward_buf: &wgpu::Buffer,
+    frozen_buf: &wgpu::Buffer,
     label: &str,
 ) -> wgpu::BindGroup {
     device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -430,6 +447,7 @@ fn make_bind_group(
             wgpu::BindGroupEntry { binding: 2, resource: write_buf.as_entire_binding() },
             wgpu::BindGroupEntry { binding: 3, resource: mask_buf.as_entire_binding() },
             wgpu::BindGroupEntry { binding: 4, resource: inward_buf.as_entire_binding() },
+            wgpu::BindGroupEntry { binding: 5, resource: frozen_buf.as_entire_binding() },
         ],
     })
 }

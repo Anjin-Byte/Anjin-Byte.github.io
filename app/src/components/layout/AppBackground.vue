@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { nextTick, ref, toRaw, onMounted, onUnmounted } from 'vue';
 import { createLogger } from '../../logger';
 import type { WorkerOutMsg, GridInfo } from '../../workers/rendererProtocol';
-import { alignedPitch, screenToCell, wrapCell, type CellCoord, type CoordSnapshot } from '../../utils/gridCoords';
+import { alignedPitch, screenToCell, wrapCell, cellToScreen, cellSpanToCssPx, type CellCoord, type CoordSnapshot } from '../../utils/gridCoords';
 import { useBlankZones } from '../../composables/useBlankZones';
 import type { BlankZone, BlankZoneDraft, BlankZoneRect } from '../../types/blankZones';
 import { useDecals } from '../../composables/useDecals';
@@ -10,7 +10,11 @@ import type { Decal } from '../../types/decals';
 import { useHiRes } from '../../composables/useHiRes';
 import type { HiResRegion } from '../../types/hiresRegion';
 import { HIRES_MULTIPLIER } from '../../types/hiresRegion';
+import { useText } from '../../composables/useText';
+import type { TextBlock, TextRenderMode } from '../../types/text';
+import { DEFAULT_FONT, DEFAULT_TEXT_COLOR } from '../../types/text';
 import GridBlankZonePanel from './GridBlankZonePanel.vue';
+import type { HiResTextToolPayload } from './GridHiResTextTab.vue';
 
 const log = createLogger('AppBackground');
 
@@ -90,8 +94,17 @@ const decals = useDecals({
   onClearDecals: () => postToWorker({ type: 'clear_decals' }),
 });
 const hiRes = useHiRes({
-  onSetRegion: (r) => postToWorker({ type: 'set_hires', region: { ...r } }),
-  onClearRegion: () => postToWorker({ type: 'clear_hires' }),
+  onAddRegion: (r) => postToWorker({ type: 'add_hires', region: { ...r } }),
+  onUpdateRegion: (r) => postToWorker({ type: 'update_hires', region: { ...r } }),
+  onRemoveRegion: (id) => postToWorker({ type: 'remove_hires', id }),
+  onClearRegions: () => postToWorker({ type: 'clear_hires' }),
+});
+const textBlocks = useText({
+  onSetBlocks: (blocks) => postToWorker({ type: 'set_text', blocks }),
+  onAddBlock: (block) => postToWorker({ type: 'add_text', block }),
+  onUpdateBlock: (block) => postToWorker({ type: 'update_text', block }),
+  onRemoveBlock: (id) => postToWorker({ type: 'remove_text', id }),
+  onClearBlocks: () => postToWorker({ type: 'clear_text' }),
 });
 const zoneToolEnabled = ref(false);
 const zoneSnapMajor = ref(false);
@@ -102,10 +115,29 @@ const zoneDraft = ref<BlankZoneDraft>({
 const decalToolEnabled = ref(false);
 const decalSnapMajor = ref(false);
 const hiresToolEnabled = ref(false);
+const textToolEnabled = ref(false);
+const textToolFont = ref(DEFAULT_FONT);
+const textToolRenderMode = ref<TextRenderMode>('cells');
+const textToolColor = ref(DEFAULT_TEXT_COLOR);
+const textInputVisible = ref(false);
+const textInputValue = ref('');
+const textInputStyle = ref<Record<string, string>>({});
+const textInputRef = ref<HTMLTextAreaElement | null>(null);
+let textPlacementAnchor: CellCoord | null = null;
+let textPlacementCellsWide = 0;
+let textPlacementCellsHigh = 0;
+const MIN_TEXT_CELLS_WIDE = 10;
+const hiresTextToolEnabled = ref(false);
+const hiresTextFont = ref(DEFAULT_FONT);
+const hiresTextRenderMode = ref<TextRenderMode>('cells');
+const hiresTextColor = ref(DEFAULT_TEXT_COLOR);
+const hiresTextShowGrid = ref(true);
+const hiresTextShowBaseGrid = ref(true);
+const hiresTextShowBorder = ref(true);
 const zonePreviewRect = ref<BlankZoneRect | null>(null);
 const zonePreviewStyle = ref<Record<string, string> | null>(null);
 let dragAnchor: CellCoord | null = null;
-let activeDragTool: 'zone' | 'decal' | 'hires' | null = null;
+let activeDragTool: 'zone' | 'decal' | 'hires' | 'text' | 'hires-text' | null = null;
 let paintBounds: BlankZoneRect | null = null;
 
 function onAddZone(zone: BlankZone): void {
@@ -167,8 +199,165 @@ function onAddDecal(decal: Decal): void { decals.addDecal(decal); }
 function onUpdateDecal(decal: Decal): void { decals.updateDecal(decal); }
 function onRemoveDecal(id: string): void { decals.removeDecal(id); }
 function onClearDecals(): void { decals.clearDecals(); }
-function onSetHiResRegion(region: HiResRegion): void { hiRes.setRegion(region); }
-function onClearHiResRegion(): void { hiRes.clearRegion(); }
+function onAddHiResRegion(region: HiResRegion): void { hiRes.addRegion(region); }
+function onUpdateHiResRegion(region: HiResRegion): void { hiRes.updateRegion(region); }
+function onRemoveHiResRegion(id: string): void { hiRes.removeRegion(id); }
+function onClearHiResRegions(): void { hiRes.clearRegions(); }
+function onAddText(block: TextBlock): void { textBlocks.addBlock(block); }
+function onUpdateText(block: TextBlock): void { textBlocks.updateBlock(block); }
+function onRemoveText(id: string): void { textBlocks.removeBlock(id); }
+function onClearText(): void { textBlocks.clearBlocks(); }
+
+function onTextToolChange(payload: { enabled: boolean; font: string; renderMode: TextRenderMode; color: string }): void {
+  textToolEnabled.value = payload.enabled;
+  textToolFont.value = payload.font;
+  textToolRenderMode.value = payload.renderMode;
+  textToolColor.value = payload.color;
+  if (!payload.enabled) {
+    if (activeDragTool === 'text') {
+      dragAnchor = null;
+      activeDragTool = null;
+      zonePreviewRect.value = null;
+      zonePreviewStyle.value = null;
+    }
+    cancelTextPlacement();
+  }
+}
+
+function updateTextInputStyle(snap?: CoordSnapshot | null): void {
+  if (!textPlacementAnchor || !textPlacementCellsWide) {
+    textInputStyle.value = {};
+    return;
+  }
+  const s = snap ?? makeSnapshot();
+  if (!s) return;
+  const pos = cellToScreen(textPlacementAnchor.cx, textPlacementAnchor.cy, s);
+  const widthPx = cellSpanToCssPx(textPlacementCellsWide, s);
+  textInputStyle.value = {
+    position: 'fixed',
+    left: `${pos.cssX}px`,
+    top: `${pos.cssY}px`,
+    width: `${widthPx}px`,
+    'min-height': '2em',
+    'z-index': '25',
+  };
+}
+
+function commitTextPlacement(): void {
+  if (!textPlacementAnchor || !textInputValue.value.trim()) {
+    cancelTextPlacement();
+    return;
+  }
+  const now = Date.now();
+  textBlocks.addBlock({
+    id: crypto.randomUUID(),
+    text: textInputValue.value.trim(),
+    font: textToolFont.value,
+    cellX: textPlacementAnchor.cx,
+    cellY: textPlacementAnchor.cy,
+    cellsWide: textPlacementCellsWide,
+    renderMode: textToolRenderMode.value,
+    color: textToolColor.value,
+    enabled: true,
+    createdAt: now,
+    updatedAt: now,
+  });
+  cleanupTextPlacement();
+}
+
+function cancelTextPlacement(): void {
+  cleanupTextPlacement();
+}
+
+function cleanupTextPlacement(): void {
+  textInputVisible.value = false;
+  textInputValue.value = '';
+  textPlacementAnchor = null;
+  textPlacementCellsWide = 0;
+  textPlacementCellsHigh = 0;
+  dragAnchor = null;
+  activeDragTool = null;
+  zonePreviewRect.value = null;
+  zonePreviewStyle.value = null;
+}
+
+function onTextInputKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    if (hiresTextToolEnabled.value) {
+      commitHiResTextPlacement();
+    } else {
+      commitTextPlacement();
+    }
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    cancelTextPlacement();
+  }
+}
+
+function onHiResTextToolChange(payload: HiResTextToolPayload): void {
+  hiresTextToolEnabled.value = payload.enabled;
+  hiresTextFont.value = payload.font;
+  hiresTextRenderMode.value = payload.renderMode;
+  hiresTextColor.value = payload.color;
+  hiresTextShowGrid.value = payload.showGrid;
+  hiresTextShowBaseGrid.value = payload.showBaseGrid;
+  hiresTextShowBorder.value = payload.showBorder;
+  if (!payload.enabled) {
+    if (activeDragTool === 'hires-text') {
+      dragAnchor = null;
+      activeDragTool = null;
+      zonePreviewRect.value = null;
+      zonePreviewStyle.value = null;
+    }
+    cancelTextPlacement();
+  }
+}
+
+function commitHiResTextPlacement(): void {
+  if (!textPlacementAnchor) {
+    cancelTextPlacement();
+    return;
+  }
+  const now = Date.now();
+  const anchor = textPlacementAnchor;
+  const cellsWide = textPlacementCellsWide;
+  const cellsHigh = Math.max(1, textPlacementCellsHigh);
+  const text = textInputValue.value.trim();
+
+  hiRes.addRegion({
+    id: crypto.randomUUID(),
+    x1: anchor.cx,
+    y1: anchor.cy,
+    x2: anchor.cx + cellsWide - 1,
+    y2: anchor.cy + cellsHigh - 1,
+    multiplier: HIRES_MULTIPLIER,
+    enabled: true,
+    showGrid: hiresTextShowGrid.value,
+    showBaseGrid: hiresTextShowBaseGrid.value,
+    showBorder: hiresTextShowBorder.value,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  if (text) {
+    textBlocks.addBlock({
+      id: crypto.randomUUID(),
+      text,
+      font: hiresTextFont.value,
+      cellX: anchor.cx,
+      cellY: anchor.cy,
+      cellsWide,
+      renderMode: hiresTextRenderMode.value,
+      color: hiresTextColor.value,
+      enabled: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  cleanupTextPlacement();
+}
 
 /** Build a CoordSnapshot from the latest cached values. */
 function makeSnapshot(): CoordSnapshot | null {
@@ -289,10 +478,11 @@ function updateZonePreviewStyle(): void {
     return;
   }
 
-  const left = rect.x1 * snap.gridPitch / snap.dpr;
-  const top = (rect.y1 * snap.gridPitch - snap.scrollCanvasPx) / snap.dpr;
-  const width = (rect.x2 - rect.x1 + 1) * snap.gridPitch / snap.dpr;
-  const height = (rect.y2 - rect.y1 + 1) * snap.gridPitch / snap.dpr;
+  const pos = cellToScreen(rect.x1, rect.y1, snap);
+  const left = pos.cssX;
+  const top = pos.cssY;
+  const width = cellSpanToCssPx(rect.x2 - rect.x1 + 1, snap);
+  const height = cellSpanToCssPx(rect.y2 - rect.y1 + 1, snap);
   zonePreviewStyle.value = {
     left: `${left}px`,
     top: `${top}px`,
@@ -302,7 +492,8 @@ function updateZonePreviewStyle(): void {
 }
 
 function anyToolEnabled(): boolean {
-  return zoneToolEnabled.value || decalToolEnabled.value || hiresToolEnabled.value;
+  return zoneToolEnabled.value || decalToolEnabled.value || hiresToolEnabled.value
+    || textToolEnabled.value || hiresTextToolEnabled.value;
 }
 
 function activeSnapMajor(): boolean {
@@ -311,6 +502,20 @@ function activeSnapMajor(): boolean {
 }
 
 function onDocumentPointerDown(event: PointerEvent): void {
+  // If the floating text input is visible and user clicks outside it, commit or cancel.
+  if (textInputVisible.value) {
+    const ta = textInputRef.value;
+    if (event.target !== ta && !(ta?.contains(event.target as Node))) {
+      if (hiresTextToolEnabled.value) {
+        commitHiResTextPlacement();
+      } else if (textInputValue.value.trim()) {
+        commitTextPlacement();
+      } else {
+        cancelTextPlacement();
+      }
+      return;
+    }
+  }
   if (!anyToolEnabled() || event.button !== 0 || isInteractiveTarget(event.target)) {
     return;
   }
@@ -318,7 +523,11 @@ function onDocumentPointerDown(event: PointerEvent): void {
   if (!start) {
     return;
   }
-  activeDragTool = hiresToolEnabled.value ? 'hires' : decalToolEnabled.value ? 'decal' : 'zone';
+  activeDragTool = hiresTextToolEnabled.value ? 'hires-text'
+    : hiresToolEnabled.value ? 'hires'
+    : decalToolEnabled.value ? 'decal'
+    : textToolEnabled.value ? 'text'
+    : 'zone';
   dragAnchor = start;
   const initRect = { x1: start.cx, y1: start.cy, x2: start.cx, y2: start.cy };
   if (activeDragTool === 'decal') {
@@ -365,10 +574,25 @@ function onDocumentPointerUp(event: PointerEvent): void {
   }
   const next = worldZoneCellFromPointer(event);
   const snap = makeSnapshot();
-  if (activeDragTool === 'hires' && next) {
+  if (activeDragTool === 'hires-text' && next) {
+    const rawRect = normalizeRect(dragAnchor, next);
+    const cellsWide = Math.max(MIN_TEXT_CELLS_WIDE, rawRect.x2 - rawRect.x1 + 1);
+    textPlacementAnchor = { cx: rawRect.x1, cy: rawRect.y1 };
+    textPlacementCellsWide = cellsWide;
+    textPlacementCellsHigh = Math.max(1, rawRect.y2 - rawRect.y1 + 1);
+    textInputValue.value = '';
+    textInputVisible.value = true;
+    // Clear drag state so subsequent pointer events (clicking in the textarea,
+    // mouse movement) don't re-trigger placement or move the preview.
+    dragAnchor = null;
+    activeDragTool = null;
+    updateTextInputStyle(makeSnapshot());
+    nextTick(() => textInputRef.value?.focus());
+    return;
+  } else if (activeDragTool === 'hires' && next) {
     const rawRect = normalizeRect(dragAnchor, next);
     const now = Date.now();
-    hiRes.setRegion({
+    hiRes.addRegion({
       id: crypto.randomUUID(),
       x1: rawRect.x1,
       y1: rawRect.y1,
@@ -382,8 +606,20 @@ function onDocumentPointerUp(event: PointerEvent): void {
       createdAt: now,
       updatedAt: now,
     });
-    // Auto-disable draw tool after placing the region.
-    hiresToolEnabled.value = false;
+  } else if (activeDragTool === 'text' && next) {
+    const rawRect = normalizeRect(dragAnchor, next);
+    const cellsWide = Math.max(MIN_TEXT_CELLS_WIDE, rawRect.x2 - rawRect.x1 + 1);
+    textPlacementAnchor = { cx: rawRect.x1, cy: rawRect.y1 };
+    textPlacementCellsWide = cellsWide;
+    textInputValue.value = '';
+    textInputVisible.value = true;
+    // Clear drag state so subsequent pointer events don't re-trigger placement.
+    dragAnchor = null;
+    activeDragTool = null;
+    const snap2 = makeSnapshot();
+    updateTextInputStyle(snap2);
+    nextTick(() => textInputRef.value?.focus());
+    return;
   } else if (activeDragTool === 'decal' && paintBounds) {
     // Include the final cell in the paint bounds.
     if (next) {
@@ -455,7 +691,8 @@ onMounted(() => {
         currentGridInfo.value = e.data.gridInfo;
         postToWorker({ type: 'set_zones', zones: toWorkerZones(blankZones.zones.value) });
         postToWorker({ type: 'set_decals', decals: toWorkerDecals(decals.decals.value) });
-        if (hiRes.region.value) postToWorker({ type: 'set_hires', region: { ...hiRes.region.value } });
+        if (hiRes.regions.value.length > 0) postToWorker({ type: 'set_hires_regions', regions: hiRes.regions.value.map((r) => ({ ...r })) });
+        if (textBlocks.blocks.value.length > 0) postToWorker({ type: 'set_text', blocks: toRaw(textBlocks.blocks.value).map((b) => ({ ...toRaw(b) })) });
         updateZonePreviewStyle();
         break;
       case 'grid_info':
@@ -475,7 +712,13 @@ onMounted(() => {
         log.error('Decal update rejected:', e.data.message);
         break;
       case 'hires_state':
-        hiRes.syncFromWorker(e.data.region);
+        hiRes.syncFromWorker(e.data.regions);
+        break;
+      case 'text_state':
+        textBlocks.syncFromWorker(e.data.blocks);
+        break;
+      case 'text_error':
+        log.error('Text update rejected:', e.data.message);
         break;
       case 'error':
         // gpu-init failures are expected on browsers without WebGPU; log at debug.
@@ -531,6 +774,7 @@ onMounted(() => {
       currentScrollCanvasPx.value = rawPx * devicePixelRatio;
       postToWorker({ type: 'scroll', scrollY: currentScrollCanvasPx.value });
       updateZonePreviewStyle();
+      updateTextInputStyle();
     }
 
     animFrameId = requestAnimationFrame(loop);
@@ -552,6 +796,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  if (textInputVisible.value) cancelTextPlacement();
   cancelAnimationFrame(animFrameId);
   resizeObserver?.disconnect();
   document.removeEventListener('click', onDocumentClick);
@@ -568,11 +813,21 @@ onUnmounted(() => {
 <template>
   <canvas ref="canvasRef" class="app-bg" />
   <div v-if="zonePreviewStyle" class="zone-preview-overlay" :style="zonePreviewStyle" />
+  <textarea
+    v-if="textInputVisible"
+    ref="textInputRef"
+    v-model="textInputValue"
+    class="text-placement-input"
+    :style="textInputStyle"
+    placeholder="Type text..."
+    @keydown="onTextInputKeydown"
+  />
   <GridBlankZonePanel
     :zones="blankZones.zones.value"
     :preview-rect="zonePreviewRect"
     :decals="decals.decals.value"
-    :hires-region="hiRes.region.value"
+    :hires-regions="hiRes.regions.value"
+    :text-blocks="textBlocks.blocks.value"
     @add-zone="onAddZone"
     @update-zone="onUpdateZone"
     @remove-zone="onRemoveZone"
@@ -584,9 +839,17 @@ onUnmounted(() => {
     @remove-decal="onRemoveDecal"
     @clear-decals="onClearDecals"
     @decal-tool-change="onDecalToolChange"
-    @set-hires-region="onSetHiResRegion"
-    @clear-hires-region="onClearHiResRegion"
+    @add-hires-region="onAddHiResRegion"
+    @update-hires-region="onUpdateHiResRegion"
+    @remove-hires-region="onRemoveHiResRegion"
+    @clear-hires-regions="onClearHiResRegions"
     @hires-tool-change="onHiResToolChange"
+    @add-text="onAddText"
+    @update-text="onUpdateText"
+    @remove-text="onRemoveText"
+    @clear-text="onClearText"
+    @text-tool-change="onTextToolChange"
+    @hires-text-tool-change="onHiResTextToolChange"
   />
 </template>
 
@@ -608,5 +871,20 @@ onUnmounted(() => {
   border: 2px dashed rgba(20, 120, 250, 0.92);
   background: rgba(20, 120, 250, 0.15);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55) inset;
+}
+
+.text-placement-input {
+  position: fixed;
+  z-index: 25;
+  background: rgba(255, 255, 255, 0.92);
+  border: 2px solid rgba(20, 120, 250, 0.8);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-family: monospace;
+  font-size: 14px;
+  color: #1a1a2e;
+  resize: vertical;
+  outline: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 </style>

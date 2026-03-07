@@ -1,5 +1,5 @@
 import type { HiResRegion } from '../types/hiresRegion';
-import { HIRES_MULTIPLIER } from '../types/hiresRegion';
+import { HIRES_MULTIPLIER, MAX_HIRES_REGIONS } from '../types/hiresRegion';
 
 function asInteger(value: unknown): number | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null;
@@ -41,4 +41,22 @@ export function normalizeRegion(region: unknown, now = Date.now()): HiResRegion 
     createdAt: normalizeTimestamp(source.createdAt, now),
     updatedAt: normalizeTimestamp(source.updatedAt, now),
   };
+}
+
+function rectsOverlap(a: HiResRegion, b: HiResRegion): boolean {
+  return a.x1 <= b.x2 && a.x2 >= b.x1 && a.y1 <= b.y2 && a.y2 >= b.y1;
+}
+
+export function normalizeRegions(input: unknown, now = Date.now()): HiResRegion[] {
+  if (!Array.isArray(input)) return [];
+  const out: HiResRegion[] = [];
+  for (const raw of input) {
+    if (out.length >= MAX_HIRES_REGIONS) break;
+    const r = normalizeRegion(raw, now);
+    if (!r) continue;
+    const overlaps = out.some((existing) => rectsOverlap(existing, r));
+    if (overlaps) continue;
+    out.push(r);
+  }
+  return out;
 }

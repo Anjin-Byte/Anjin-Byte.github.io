@@ -3,6 +3,7 @@
 import type { BlankZone } from '../types/blankZones';
 import type { Decal } from '../types/decals';
 import type { HiResRegion } from '../types/hiresRegion';
+import type { TextBlock } from '../types/text';
 import type { FrameStats } from '../perf';
 
 export type RendererBackend = 'gpu' | 'cpu';
@@ -35,8 +36,16 @@ export type WorkerInMsg =
   | { type: 'update_decal'; decal:  Decal   }
   | { type: 'remove_decal'; id:     string  }
   | { type: 'clear_decals' }
-  | { type: 'set_hires';   region: HiResRegion }
+  | { type: 'set_hires_regions'; regions: HiResRegion[] }
+  | { type: 'add_hires';        region: HiResRegion }
+  | { type: 'update_hires';     region: HiResRegion }
+  | { type: 'remove_hires';     id: string }
   | { type: 'clear_hires' }
+  | { type: 'set_text';    blocks: TextBlock[] }
+  | { type: 'add_text';    block:  TextBlock   }
+  | { type: 'update_text'; block:  TextBlock   }
+  | { type: 'remove_text'; id:     string      }
+  | { type: 'clear_text' }
   | { type: 'perf_snapshot' }
   | { type: 'stop' };
 
@@ -48,7 +57,9 @@ export type WorkerOutMsg =
   | { type: 'zones_error';  message: string }
   | { type: 'decals_state'; decals: Decal[] }
   | { type: 'decals_error'; message: string }
-  | { type: 'hires_state';  region: HiResRegion | null }
+  | { type: 'hires_state';  regions: HiResRegion[] }
+  | { type: 'text_state';   blocks: TextBlock[] }
+  | { type: 'text_error';   message: string }
   | { type: 'perf_snapshot'; stats: FrameStats[] }
   // Non-fatal diagnostic: the named phase failed and a fallback was (or was not) attempted.
   | { type: 'error'; phase: string; message: string };

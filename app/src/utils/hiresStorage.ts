@@ -4,35 +4,47 @@ import {
   type HiResRegion,
   type HiResStoragePayload,
 } from '../types/hiresRegion';
-import { normalizeRegion } from './hiresNormalization';
+import { normalizeRegion, normalizeRegions } from './hiresNormalization';
 
 function storageAvailable(): boolean {
   return typeof localStorage !== 'undefined';
 }
 
-export function loadRegion(): HiResRegion | null {
-  if (!storageAvailable()) return null;
+const V1_KEY = 'gol.hires.v1';
+
+export function loadRegions(): HiResRegion[] {
+  if (!storageAvailable()) return [];
   try {
-    const raw = localStorage.getItem(HIRES_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<HiResStoragePayload>;
-    if (parsed.version !== HIRES_STORAGE_VERSION) return null;
-    return normalizeRegion(parsed.region);
+    let raw = localStorage.getItem(HIRES_STORAGE_KEY);
+    // Try v1 key if current key has no data
+    if (!raw) {
+      raw = localStorage.getItem(V1_KEY);
+      if (raw) localStorage.removeItem(V1_KEY);
+    }
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (typeof parsed.version !== 'number' || parsed.version > HIRES_STORAGE_VERSION) return [];
+    // v1 migration: single `region` → `regions` array
+    if (parsed.version === 1 && parsed.region) {
+      const r = normalizeRegion(parsed.region);
+      return r ? [r] : [];
+    }
+    return normalizeRegions(parsed.regions);
   } catch {
-    return null;
+    return [];
   }
 }
 
-export function saveRegion(region: HiResRegion | null): void {
+export function saveRegions(regions: HiResRegion[]): void {
   if (!storageAvailable()) return;
   const payload: HiResStoragePayload = {
     version: HIRES_STORAGE_VERSION,
-    region: region ? normalizeRegion(region) : null,
+    regions: normalizeRegions(regions),
   };
   localStorage.setItem(HIRES_STORAGE_KEY, JSON.stringify(payload));
 }
 
-export function clearRegionStorage(): void {
+export function clearRegionsStorage(): void {
   if (!storageAvailable()) return;
   localStorage.removeItem(HIRES_STORAGE_KEY);
 }
