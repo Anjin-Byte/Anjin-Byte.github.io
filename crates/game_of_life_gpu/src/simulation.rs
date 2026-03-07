@@ -39,6 +39,7 @@ pub struct Simulation {
     bind_group_a: wgpu::BindGroup, // a=read, b=write
     bind_group_b: wgpu::BindGroup, // b=read, a=write
     pipeline: wgpu::ComputePipeline,
+    bgl: wgpu::BindGroupLayout,
     pub uniform_buf: wgpu::Buffer,
     pub frame: u32,
     /// Pending cell edits: each entry is a (word_index, xor_mask) pair.
@@ -57,7 +58,13 @@ pub struct Simulation {
 }
 
 impl Simulation {
-    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, grid: &Grid) -> Self {
+    pub fn new(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        grid: &Grid,
+        mask_buf: &wgpu::Buffer,
+        inward_buf: &wgpu::Buffer,
+    ) -> Self {
         let uniform_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("sim_uniforms"),
             contents: bytes_of(&ComputeUniforms::from_grid(grid)),
@@ -75,16 +82,10 @@ impl Simulation {
             label: Some("sim_bgl"),
             entries: &[
                 bgl_entry(0, wgpu::BufferBindingType::Uniform, false),
-                bgl_entry(
-                    1,
-                    wgpu::BufferBindingType::Storage { read_only: true },
-                    false,
-                ),
-                bgl_entry(
-                    2,
-                    wgpu::BufferBindingType::Storage { read_only: false },
-                    false,
-                ),
+                bgl_entry(1, wgpu::BufferBindingType::Storage { read_only: true }, false),
+                bgl_entry(2, wgpu::BufferBindingType::Storage { read_only: false }, false),
+                bgl_entry(3, wgpu::BufferBindingType::Storage { read_only: true }, false),
+                bgl_entry(4, wgpu::BufferBindingType::Storage { read_only: true }, false),
             ],
         });
 
@@ -103,8 +104,12 @@ impl Simulation {
             cache: None,
         });
 
-        let bind_group_a = make_bind_group(device, &bgl, &uniform_buf, &buf_a, &buf_b, "bg_a");
-        let bind_group_b = make_bind_group(device, &bgl, &uniform_buf, &buf_b, &buf_a, "bg_b");
+        let bind_group_a = make_bind_group(
+            device, &bgl, &uniform_buf, &buf_a, &buf_b, mask_buf, inward_buf, "bg_a",
+        );
+        let bind_group_b = make_bind_group(
+            device, &bgl, &uniform_buf, &buf_b, &buf_a, mask_buf, inward_buf, "bg_b",
+        );
 
         Simulation {
             buf_a,
@@ -112,6 +117,7 @@ impl Simulation {
             bind_group_a,
             bind_group_b,
             pipeline,
+            bgl,
             uniform_buf,
             frame: 0,
             pending_edits: Vec::new(),
@@ -138,23 +144,47 @@ impl Simulation {
     }
 
     /// Rebuilds cell buffers for a new grid size, preserving the pipeline.
-    pub fn resize(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, grid: &Grid) {
-        let bgl = self.pipeline.get_bind_group_layout(0);
+    pub fn resize(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        grid: &Grid,
+        mask_buf: &wgpu::Buffer,
+        inward_buf: &wgpu::Buffer,
+    ) {
         queue.write_buffer(
             &self.uniform_buf,
             0,
             bytes_of(&ComputeUniforms::from_grid(grid)),
         );
         let (buf_a, buf_b) = make_cell_buffers(device, queue, grid);
-        self.bind_group_a =
-            make_bind_group(device, &bgl, &self.uniform_buf, &buf_a, &buf_b, "bg_a");
-        self.bind_group_b =
-            make_bind_group(device, &bgl, &self.uniform_buf, &buf_b, &buf_a, "bg_b");
+        self.bind_group_a = make_bind_group(
+            device, &self.bgl, &self.uniform_buf, &buf_a, &buf_b, mask_buf, inward_buf, "bg_a",
+        );
+        self.bind_group_b = make_bind_group(
+            device, &self.bgl, &self.uniform_buf, &buf_b, &buf_a, mask_buf, inward_buf, "bg_b",
+        );
         self.buf_a = buf_a;
         self.buf_b = buf_b;
         self.frame = 0;
-        // Grid changed — any pending edits targeted the old buffer layout.
         self.pending_edits.clear();
+    }
+
+    /// Rebuild bind groups with updated hires buffers (e.g. after region create/destroy).
+    pub fn rebuild_bind_groups(
+        &mut self,
+        device: &wgpu::Device,
+        mask_buf: &wgpu::Buffer,
+        inward_buf: &wgpu::Buffer,
+    ) {
+        self.bind_group_a = make_bind_group(
+            device, &self.bgl, &self.uniform_buf, &self.buf_a, &self.buf_b,
+            mask_buf, inward_buf, "bg_a",
+        );
+        self.bind_group_b = make_bind_group(
+            device, &self.bgl, &self.uniform_buf, &self.buf_b, &self.buf_a,
+            mask_buf, inward_buf, "bg_b",
+        );
     }
 
     /// Queue a cell toggle.  `cx` and `cy` must be pre-wrapped into
@@ -387,24 +417,19 @@ fn make_bind_group(
     uniform_buf: &wgpu::Buffer,
     read_buf: &wgpu::Buffer,
     write_buf: &wgpu::Buffer,
+    mask_buf: &wgpu::Buffer,
+    inward_buf: &wgpu::Buffer,
     label: &str,
 ) -> wgpu::BindGroup {
     device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some(label),
         layout: bgl,
         entries: &[
-            wgpu::BindGroupEntry {
-                binding: 0,
-                resource: uniform_buf.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
-                resource: read_buf.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 2,
-                resource: write_buf.as_entire_binding(),
-            },
+            wgpu::BindGroupEntry { binding: 0, resource: uniform_buf.as_entire_binding() },
+            wgpu::BindGroupEntry { binding: 1, resource: read_buf.as_entire_binding() },
+            wgpu::BindGroupEntry { binding: 2, resource: write_buf.as_entire_binding() },
+            wgpu::BindGroupEntry { binding: 3, resource: mask_buf.as_entire_binding() },
+            wgpu::BindGroupEntry { binding: 4, resource: inward_buf.as_entire_binding() },
         ],
     })
 }

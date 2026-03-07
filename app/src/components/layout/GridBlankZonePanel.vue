@@ -1,16 +1,20 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
-import type { BlankZone, BlankMode, EdgeStyle, BlankZoneDraft, BlankZoneRect } from '../../types/blankZones';
-import type { Decal, DecalKind, DecalBlendMode } from '../../types/decals';
-import { DECAL_DEFAULT_TINT } from '../../types/decals';
+import { ref } from 'vue';
+import type { BlankZone, BlankZoneDraft, BlankZoneRect } from '../../types/blankZones';
+import type { Decal } from '../../types/decals';
+import type { HiResRegion } from '../../types/hiresRegion';
+import GridZoneTab from './GridZoneTab.vue';
+import GridDecalTab from './GridDecalTab.vue';
+import GridHiResTab from './GridHiResTab.vue';
 
-const props = defineProps<{
+defineProps<{
   zones: BlankZone[];
   previewRect?: BlankZoneRect | null;
   decals: Decal[];
+  hiresRegion?: HiResRegion | null;
 }>();
 
-const emit = defineEmits<{
+defineEmits<{
   (e: 'add-zone', zone: BlankZone): void;
   (e: 'update-zone', zone: BlankZone): void;
   (e: 'remove-zone', id: string): void;
@@ -22,438 +26,64 @@ const emit = defineEmits<{
   (e: 'remove-decal', id: string): void;
   (e: 'clear-decals'): void;
   (e: 'decal-tool-change', payload: { enabled: boolean; snapMajor: boolean }): void;
+  (e: 'set-hires-region', region: HiResRegion): void;
+  (e: 'clear-hires-region'): void;
+  (e: 'hires-tool-change', payload: { enabled: boolean }): void;
 }>();
 
-const toolEnabled = ref(false);
-const snapMajor = ref(false);
+const activeTab = ref('zones');
 const collapsed = ref(false);
-const x1 = ref(0);
-const y1 = ref(0);
-const x2 = ref(4);
-const y2 = ref(4);
-const mode = ref<BlankMode>('both');
-const edgeStyle = ref<EdgeStyle>('none');
-const edgeWidth = ref(1);
-const edgeOpacity = ref(1);
-const fadeStrength = ref(0.6);
-const notePitch = ref(2);
-const hideInteriorBorder = ref(false);
-
-const safeZones = computed<BlankZone[]>(() =>
-  props.zones.filter((zone): zone is BlankZone => (
-    !!zone
-    && typeof zone.id === 'string'
-    && zone.id.length > 0
-    && typeof zone.x1 === 'number'
-    && typeof zone.y1 === 'number'
-    && typeof zone.x2 === 'number'
-    && typeof zone.y2 === 'number'
-    && typeof zone.mode === 'string'
-    && !!zone.edge
-    && typeof zone.edge.style === 'string'
-  )),
-);
-
-function zoneShortId(zone: BlankZone): string {
-  return zone.id.slice(0, 6);
-}
-
-function edgeFromInputs() {
-  return {
-    style: edgeStyle.value,
-    widthCells: Math.max(1, Math.min(4, Math.trunc(edgeWidth.value))),
-    opacity: Math.max(0, Math.min(1, edgeOpacity.value)),
-    fadeStrength: edgeStyle.value === 'fade'
-      ? Math.max(0, Math.min(1, fadeStrength.value))
-      : undefined,
-    notePitchCells: edgeStyle.value === 'noted'
-      ? Math.max(1, Math.trunc(notePitch.value))
-      : undefined,
-    hideInteriorBorder: (edgeStyle.value === 'bold-major' || edgeStyle.value === 'noted')
-      ? hideInteriorBorder.value
-      : undefined,
-  };
-}
-
-const modeItems = [
-  { title: 'Both', value: 'both' },
-  { title: 'Minor only', value: 'minor' },
-  { title: 'Major only', value: 'major' },
-];
-
-const edgeItems = [
-  { title: 'None', value: 'none' },
-  { title: 'Bold Major', value: 'bold-major' },
-  { title: 'Fade', value: 'fade' },
-  { title: 'Noted', value: 'noted' },
-];
-
-function zoneId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `zone-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
-function submitZone(): void {
-  const now = Date.now();
-  emit('add-zone', {
-    id: zoneId(),
-    x1: Math.min(Math.trunc(x1.value), Math.trunc(x2.value)),
-    y1: Math.min(Math.trunc(y1.value), Math.trunc(y2.value)),
-    x2: Math.max(Math.trunc(x1.value), Math.trunc(x2.value)),
-    y2: Math.max(Math.trunc(y1.value), Math.trunc(y2.value)),
-    mode: mode.value,
-    edge: edgeFromInputs(),
-    enabled: true,
-    createdAt: now,
-    updatedAt: now,
-  });
-}
-
-function toggleZone(zone: BlankZone): void {
-  emit('update-zone', {
-    ...zone,
-    enabled: !zone.enabled,
-    updatedAt: Date.now(),
-  });
-}
-
-function emitTool(): void {
-  emit('tool-change', {
-    enabled: toolEnabled.value,
-    snapMajor: snapMajor.value,
-  });
-}
-
-function emitDraft(): void {
-  emit('draft-change', {
-    mode: mode.value,
-    edge: edgeFromInputs(),
-  });
-}
-
-watch(toolEnabled, emitTool, { immediate: true });
-watch(snapMajor, emitTool, { immediate: true });
-watch([mode, edgeStyle, edgeWidth, edgeOpacity, fadeStrength, notePitch, hideInteriorBorder], emitDraft, { immediate: true });
-
-// ── Decals ────────────────────────────────────────────────────────────────────
-const decalsExpanded = ref(false);
-const decalToolEnabled = ref(false);
-const decalSnapMajor = ref(false);
-const decalKind = ref<DecalKind>('solid');
-const decalBlendMode = ref<DecalBlendMode>('alpha');
-const decalSuppressCells = ref(false);
-const decalTintR = ref(DECAL_DEFAULT_TINT[0]);
-const decalTintG = ref(DECAL_DEFAULT_TINT[1]);
-const decalTintB = ref(DECAL_DEFAULT_TINT[2]);
-const decalTintA = ref(DECAL_DEFAULT_TINT[3]);
-const decalCoverage = ref(1.0);
-const decalSolidR = ref(DECAL_DEFAULT_TINT[0]);
-const decalSolidG = ref(DECAL_DEFAULT_TINT[1]);
-const decalSolidB = ref(DECAL_DEFAULT_TINT[2]);
-const decalCellSize = ref(2);
-const decalPitchCells = ref(4);
-const decalDotRadius = ref(0.4);
-const decalDotSpacing = ref(3);
-const decalX1 = ref(0);
-const decalY1 = ref(0);
-const decalX2 = ref(4);
-const decalY2 = ref(4);
-
-const kindItems = [
-  { title: 'Solid', value: 'solid' },
-  { title: 'Checkerboard', value: 'checkerboard' },
-  { title: 'Stripes', value: 'stripes' },
-  { title: 'Dots', value: 'dots' },
-];
-
-const blendModeItems = [
-  { title: 'Alpha', value: 'alpha' },
-  { title: 'Multiply', value: 'multiply' },
-  { title: 'Screen', value: 'screen' },
-];
-
-const safeDecals = computed<Decal[]>(() =>
-  props.decals.filter((d): d is Decal => (
-    !!d
-    && typeof d.id === 'string'
-    && d.id.length > 0
-    && typeof d.x1 === 'number'
-    && typeof d.y1 === 'number'
-    && typeof d.x2 === 'number'
-    && typeof d.y2 === 'number'
-    && !!d.pattern
-    && typeof d.pattern.kind === 'string'
-  )),
-);
-
-function decalShortId(decal: Decal): string {
-  return decal.id.slice(0, 6);
-}
-
-function buildDecalPattern() {
-  const kind = decalKind.value;
-  if (kind === 'solid') {
-    return {
-      kind,
-      coverage: Math.max(0, Math.min(1, decalCoverage.value)),
-      solidR: Math.max(0, Math.min(1, decalSolidR.value)),
-      solidG: Math.max(0, Math.min(1, decalSolidG.value)),
-      solidB: Math.max(0, Math.min(1, decalSolidB.value)),
-    };
-  }
-  if (kind === 'checkerboard') return { kind, cellSize: Math.max(1, decalCellSize.value) };
-  if (kind === 'stripes') return { kind, pitchCells: Math.max(2, decalPitchCells.value) };
-  if (kind === 'dots') return { kind, dotRadius: Math.max(0.1, decalDotRadius.value), dotSpacing: Math.max(2, decalDotSpacing.value) };
-  return { kind };
-}
-
-function decalGenId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `decal-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
-function submitDecal(): void {
-  const now = Date.now();
-  emit('add-decal', {
-    id: decalGenId(),
-    x1: Math.min(Math.trunc(decalX1.value), Math.trunc(decalX2.value)),
-    y1: Math.min(Math.trunc(decalY1.value), Math.trunc(decalY2.value)),
-    x2: Math.max(Math.trunc(decalX1.value), Math.trunc(decalX2.value)),
-    y2: Math.max(Math.trunc(decalY1.value), Math.trunc(decalY2.value)),
-    pattern: buildDecalPattern(),
-    tint: [
-      Math.max(0, Math.min(1, decalTintR.value)),
-      Math.max(0, Math.min(1, decalTintG.value)),
-      Math.max(0, Math.min(1, decalTintB.value)),
-      Math.max(0, Math.min(1, decalTintA.value)),
-    ],
-    blendMode: decalBlendMode.value,
-    suppressCells: decalSuppressCells.value,
-    enabled: true,
-    createdAt: now,
-    updatedAt: now,
-  });
-}
-
-function toggleDecal(decal: Decal): void {
-  emit('update-decal', { ...decal, enabled: !decal.enabled, updatedAt: Date.now() });
-}
-
-function emitDecalTool(): void {
-  emit('decal-tool-change', { enabled: decalToolEnabled.value, snapMajor: decalSnapMajor.value });
-}
-
-watch(decalToolEnabled, emitDecalTool, { immediate: true });
-watch(decalSnapMajor, emitDecalTool, { immediate: true });
 </script>
 
 <template>
   <aside class="zone-panel" :class="{ 'is-collapsed': collapsed }" data-grid-ignore-click="true">
-    <v-card v-if="!collapsed" elevation="6" rounded="lg">
+    <v-card v-if="!collapsed" elevation="6" rounded="lg" class="zone-card">
       <v-card-title class="zone-title">
-        <span class="text-subtitle-1">Blank Zones</span>
+        <span class="text-subtitle-1">Grid Tools</span>
         <v-btn size="x-small" variant="text" @click="collapsed = true">Collapse</v-btn>
       </v-card-title>
+
+      <v-tabs v-model="activeTab" density="compact" grow>
+        <v-tab value="zones">Zones</v-tab>
+        <v-tab value="decals">Decals</v-tab>
+        <v-tab value="hires">Hi-Res</v-tab>
+      </v-tabs>
+
       <v-card-text class="pt-2">
-        <v-switch
-          v-model="toolEnabled"
-          inset
-          density="compact"
-          color="primary"
-          hide-details
-          label="Zone Tool (drag on page)"
-        />
-        <v-switch
-          v-model="snapMajor"
-          class="mt-1"
-          inset
-          density="compact"
-          hide-details
-          label="Snap to major blocks (5x5)"
-        />
-
-        <div v-if="props.previewRect" class="zone-preview-text">
-          Preview: ({{ props.previewRect.x1 }},{{ props.previewRect.y1 }}) → ({{ props.previewRect.x2 }},{{ props.previewRect.y2 }})
-        </div>
-
-        <v-row dense>
-          <v-col cols="3"><v-text-field v-model.number="x1" label="x1" type="number" density="compact" hide-details /></v-col>
-          <v-col cols="3"><v-text-field v-model.number="y1" label="y1" type="number" density="compact" hide-details /></v-col>
-          <v-col cols="3"><v-text-field v-model.number="x2" label="x2" type="number" density="compact" hide-details /></v-col>
-          <v-col cols="3"><v-text-field v-model.number="y2" label="y2" type="number" density="compact" hide-details /></v-col>
-        </v-row>
-
-        <v-row dense class="mt-2">
-          <v-col cols="6">
-            <v-select v-model="mode" :items="modeItems" item-title="title" item-value="value" label="Mode" density="compact" hide-details />
-          </v-col>
-          <v-col cols="6">
-            <v-select v-model="edgeStyle" :items="edgeItems" item-title="title" item-value="value" label="Edge" density="compact" hide-details />
-          </v-col>
-        </v-row>
-
-        <v-row dense class="mt-2">
-          <v-col cols="6"><v-text-field v-model.number="edgeWidth" label="Edge width" type="number" min="1" max="4" density="compact" hide-details /></v-col>
-          <v-col cols="6"><v-text-field v-model.number="edgeOpacity" label="Opacity (0-1)" type="number" min="0" max="1" step="0.1" density="compact" hide-details /></v-col>
-        </v-row>
-
-        <v-row v-if="edgeStyle === 'fade'" dense class="mt-2">
-          <v-col cols="12"><v-text-field v-model.number="fadeStrength" label="Fade strength (0-1)" type="number" min="0" max="1" step="0.1" density="compact" hide-details /></v-col>
-        </v-row>
-
-        <v-row v-if="edgeStyle === 'noted'" dense class="mt-2">
-          <v-col cols="12"><v-text-field v-model.number="notePitch" label="Note pitch cells" type="number" min="1" density="compact" hide-details /></v-col>
-        </v-row>
-
-        <v-row v-if="edgeStyle === 'bold-major' || edgeStyle === 'noted'" dense class="mt-1">
-          <v-col cols="12">
-            <v-switch
-              v-model="hideInteriorBorder"
-              inset
-              density="compact"
-              hide-details
-              label="Hide borders inside adjacent zones"
+        <v-tabs-window v-model="activeTab">
+          <v-tabs-window-item value="zones">
+            <GridZoneTab
+              :zones="zones"
+              :preview-rect="previewRect"
+              @add-zone="$emit('add-zone', $event)"
+              @update-zone="$emit('update-zone', $event)"
+              @remove-zone="$emit('remove-zone', $event)"
+              @clear-zones="$emit('clear-zones')"
+              @tool-change="$emit('tool-change', $event)"
+              @draft-change="$emit('draft-change', $event)"
             />
-          </v-col>
-        </v-row>
+          </v-tabs-window-item>
 
-        <v-btn class="mt-3" size="small" color="primary" variant="tonal" @click="submitZone">
-          Add Zone
-        </v-btn>
+          <v-tabs-window-item value="decals">
+            <GridDecalTab
+              :decals="decals"
+              @add-decal="$emit('add-decal', $event)"
+              @update-decal="$emit('update-decal', $event)"
+              @remove-decal="$emit('remove-decal', $event)"
+              @clear-decals="$emit('clear-decals')"
+              @decal-tool-change="$emit('decal-tool-change', $event)"
+            />
+          </v-tabs-window-item>
 
-        <v-divider class="my-3" />
-
-        <div class="zone-list">
-          <div v-for="zone in safeZones" :key="zone.id" class="zone-row">
-            <div class="zone-text">
-              <div>#{{ zoneShortId(zone) }} · {{ zone.mode }} · {{ zone.edge.style }}</div>
-              <div class="zone-coords">({{ zone.x1 }},{{ zone.y1 }}) → ({{ zone.x2 }},{{ zone.y2 }})</div>
-            </div>
-            <div class="zone-actions">
-              <v-btn size="x-small" variant="text" @click="toggleZone(zone)">{{ zone.enabled ? 'Disable' : 'Enable' }}</v-btn>
-              <v-btn size="x-small" variant="text" color="error" @click="emit('remove-zone', zone.id)">Delete</v-btn>
-            </div>
-          </div>
-          <div v-if="safeZones.length === 0" class="zone-empty">No zones.</div>
-        </div>
-
-        <v-btn class="mt-3" size="small" color="error" variant="text" :disabled="safeZones.length === 0" @click="emit('clear-zones')">
-          Clear All
-        </v-btn>
-
-        <v-divider class="my-3" />
-
-        <!-- ── Decals accordion ──────────────────────────────────────────── -->
-        <div class="decal-header" @click="decalsExpanded = !decalsExpanded">
-          <span class="text-subtitle-2">Decals</span>
-          <v-btn size="x-small" variant="text">{{ decalsExpanded ? 'Collapse' : 'Expand' }}</v-btn>
-        </div>
-
-        <div v-if="decalsExpanded">
-          <v-switch
-            v-model="decalToolEnabled"
-            class="mt-2"
-            inset
-            density="compact"
-            color="primary"
-            hide-details
-            label="Decal Tool (drag on page)"
-          />
-          <v-switch
-            v-model="decalSnapMajor"
-            class="mt-1"
-            inset
-            density="compact"
-            hide-details
-            label="Snap to major blocks (5x5)"
-          />
-
-          <v-row dense class="mt-2">
-            <v-col cols="6">
-              <v-select v-model="decalKind" :items="kindItems" item-title="title" item-value="value" label="Kind" density="compact" hide-details />
-            </v-col>
-            <v-col cols="6">
-              <v-select v-model="decalBlendMode" :items="blendModeItems" item-title="title" item-value="value" label="Blend" density="compact" hide-details />
-            </v-col>
-          </v-row>
-
-          <template v-if="decalKind === 'solid'">
-            <v-row dense class="mt-2">
-              <v-col cols="12"><v-text-field v-model.number="decalCoverage" label="Coverage (0–1)" type="number" min="0" max="1" step="0.1" density="compact" hide-details /></v-col>
-            </v-row>
-            <v-row dense class="mt-1">
-              <v-col cols="4"><v-text-field v-model.number="decalSolidR" label="R" type="number" min="0" max="1" step="0.05" density="compact" hide-details /></v-col>
-              <v-col cols="4"><v-text-field v-model.number="decalSolidG" label="G" type="number" min="0" max="1" step="0.05" density="compact" hide-details /></v-col>
-              <v-col cols="4"><v-text-field v-model.number="decalSolidB" label="B" type="number" min="0" max="1" step="0.05" density="compact" hide-details /></v-col>
-            </v-row>
-          </template>
-
-          <v-row v-else-if="decalKind === 'checkerboard'" dense class="mt-2">
-            <v-col cols="12"><v-text-field v-model.number="decalCellSize" label="Cell size (≥1)" type="number" min="1" density="compact" hide-details /></v-col>
-          </v-row>
-
-          <v-row v-else-if="decalKind === 'stripes'" dense class="mt-2">
-            <v-col cols="12"><v-text-field v-model.number="decalPitchCells" label="Pitch cells (≥2)" type="number" min="2" density="compact" hide-details /></v-col>
-          </v-row>
-
-          <template v-else-if="decalKind === 'dots'">
-            <v-row dense class="mt-2">
-              <v-col cols="6"><v-text-field v-model.number="decalDotRadius" label="Radius (≥0.1)" type="number" min="0.1" step="0.1" density="compact" hide-details /></v-col>
-              <v-col cols="6"><v-text-field v-model.number="decalDotSpacing" label="Spacing (≥2)" type="number" min="2" density="compact" hide-details /></v-col>
-            </v-row>
-          </template>
-
-          <v-row dense class="mt-2">
-            <v-col cols="3"><v-text-field v-model.number="decalTintR" label="TR" type="number" min="0" max="1" step="0.05" density="compact" hide-details /></v-col>
-            <v-col cols="3"><v-text-field v-model.number="decalTintG" label="TG" type="number" min="0" max="1" step="0.05" density="compact" hide-details /></v-col>
-            <v-col cols="3"><v-text-field v-model.number="decalTintB" label="TB" type="number" min="0" max="1" step="0.05" density="compact" hide-details /></v-col>
-            <v-col cols="3"><v-text-field v-model.number="decalTintA" label="TA" type="number" min="0" max="1" step="0.05" density="compact" hide-details /></v-col>
-          </v-row>
-
-          <v-switch
-            v-model="decalSuppressCells"
-            class="mt-1"
-            inset
-            density="compact"
-            hide-details
-            label="Suppress cells"
-          />
-
-          <v-row dense class="mt-2">
-            <v-col cols="3"><v-text-field v-model.number="decalX1" label="x1" type="number" density="compact" hide-details /></v-col>
-            <v-col cols="3"><v-text-field v-model.number="decalY1" label="y1" type="number" density="compact" hide-details /></v-col>
-            <v-col cols="3"><v-text-field v-model.number="decalX2" label="x2" type="number" density="compact" hide-details /></v-col>
-            <v-col cols="3"><v-text-field v-model.number="decalY2" label="y2" type="number" density="compact" hide-details /></v-col>
-          </v-row>
-
-          <v-btn class="mt-3" size="small" color="primary" variant="tonal" @click="submitDecal">
-            Add Decal
-          </v-btn>
-
-          <v-divider class="my-3" />
-
-          <div class="zone-list">
-            <div v-for="decal in safeDecals" :key="decal.id" class="zone-row">
-              <div class="zone-text">
-                <div>#{{ decalShortId(decal) }} · {{ decal.pattern.kind }} · {{ decal.blendMode }}</div>
-                <div class="zone-coords">({{ decal.x1 }},{{ decal.y1 }}) → ({{ decal.x2 }},{{ decal.y2 }})</div>
-              </div>
-              <div class="zone-actions">
-                <v-btn size="x-small" variant="text" @click="toggleDecal(decal)">{{ decal.enabled ? 'Disable' : 'Enable' }}</v-btn>
-                <v-btn size="x-small" variant="text" color="error" @click="emit('remove-decal', decal.id)">Delete</v-btn>
-              </div>
-            </div>
-            <div v-if="safeDecals.length === 0" class="zone-empty">No decals.</div>
-          </div>
-
-          <v-btn class="mt-3" size="small" color="error" variant="text" :disabled="safeDecals.length === 0" @click="emit('clear-decals')">
-            Clear All
-          </v-btn>
-        </div>
+          <v-tabs-window-item value="hires">
+            <GridHiResTab
+              :region="hiresRegion ?? null"
+              @set-region="$emit('set-hires-region', $event)"
+              @clear-region="$emit('clear-hires-region')"
+              @hires-tool-change="$emit('hires-tool-change', $event)"
+            />
+          </v-tabs-window-item>
+        </v-tabs-window>
       </v-card-text>
     </v-card>
     <v-btn
@@ -464,7 +94,7 @@ watch(decalSnapMajor, emitDecalTool, { immediate: true });
       variant="tonal"
       @click="collapsed = false"
     >
-      Blank Zones
+      Grid Tools
     </v-btn>
   </aside>
 </template>
@@ -479,6 +109,17 @@ watch(decalSnapMajor, emitDecalTool, { immediate: true });
   pointer-events: auto;
 }
 
+.zone-card {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 64px - 24px);
+}
+
+.zone-card :deep(.v-card-text) {
+  overflow-y: auto;
+  min-height: 0;
+}
+
 .zone-panel.is-collapsed {
   width: auto;
 }
@@ -491,56 +132,5 @@ watch(decalSnapMajor, emitDecalTool, { immediate: true });
 
 .zone-expand-btn {
   height: 36px;
-}
-
-.zone-list {
-  max-height: 240px;
-  overflow: auto;
-}
-
-.zone-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 0;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-}
-
-.zone-text {
-  min-width: 0;
-  font-size: 0.76rem;
-  line-height: 1.2;
-}
-
-.zone-coords {
-  opacity: 0.72;
-}
-
-.zone-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-}
-
-.zone-empty {
-  font-size: 0.8rem;
-  opacity: 0.7;
-  padding: 6px 0;
-}
-
-.zone-preview-text {
-  margin-bottom: 8px;
-  font-size: 0.75rem;
-  opacity: 0.75;
-}
-
-.decal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  cursor: pointer;
-  user-select: none;
-  padding: 2px 0;
 }
 </style>

@@ -2,6 +2,8 @@
 
 import type { BlankZone } from '../types/blankZones';
 import type { Decal } from '../types/decals';
+import type { HiResRegion } from '../types/hiresRegion';
+import type { FrameStats } from '../perf';
 
 export type RendererBackend = 'gpu' | 'cpu';
 
@@ -33,6 +35,9 @@ export type WorkerInMsg =
   | { type: 'update_decal'; decal:  Decal   }
   | { type: 'remove_decal'; id:     string  }
   | { type: 'clear_decals' }
+  | { type: 'set_hires';   region: HiResRegion }
+  | { type: 'clear_hires' }
+  | { type: 'perf_snapshot' }
   | { type: 'stop' };
 
 export type WorkerOutMsg =
@@ -43,5 +48,7 @@ export type WorkerOutMsg =
   | { type: 'zones_error';  message: string }
   | { type: 'decals_state'; decals: Decal[] }
   | { type: 'decals_error'; message: string }
+  | { type: 'hires_state';  region: HiResRegion | null }
+  | { type: 'perf_snapshot'; stats: FrameStats[] }
   // Non-fatal diagnostic: the named phase failed and a fallback was (or was not) attempted.
   | { type: 'error'; phase: string; message: string };

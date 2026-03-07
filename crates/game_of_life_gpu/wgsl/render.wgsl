@@ -75,16 +75,62 @@ struct DecalEntry {
     tint:   vec4f,  // RGBA linear sRGB — multiplied into pattern output
 }
 
-@group(0) @binding(0) var<uniform>       uniforms: RenderUniforms;
-@group(0) @binding(1) var<storage, read> current_cells: array<u32>;
-@group(0) @binding(2) var<storage, read> previous_cells: array<u32>;
-@group(0) @binding(3) var<uniform>       paper:         PaperParams;
-@group(0) @binding(4) var                noise_tex:     texture_2d<f32>;
-@group(0) @binding(5) var                noise_smp:     sampler;
-@group(0) @binding(6) var<uniform>       zone_meta:     ZoneMeta;
-@group(0) @binding(7) var<storage, read> zones:         array<ZoneEntry>;
-@group(0) @binding(8) var<uniform>       decal_meta:    DecalMeta;
-@group(0) @binding(9) var<storage, read> decals:        array<DecalEntry>;
+// ── SDF text placeholder (reserved, not yet implemented) ──────────────────────
+
+struct SdfTextMeta {
+    glyph_count: u32,
+    pad0:        u32,
+    pad1:        u32,
+    pad2:        u32,
+}
+
+struct SdfGlyph {
+    placeholder: vec4f,
+}
+
+// ── Hi-res region metadata ───────────────────────────────────────────────────
+
+struct HiResGlobalMeta {
+    region_count: u32,
+    pad0:         u32,
+    pad1:         u32,
+    pad2:         u32,
+}
+
+struct HiResRegionMeta {
+    rect:          vec4i,  // [x1, y1, x2, y2] base cell-space
+    multiplier:    u32,
+    buffer_offset: u32,    // word offset into hires_cells
+    cols:          u32,
+    wpr:           u32,    // fine-grid words per row (padded)
+    flags:         u32,    // bit 0: show_grid
+    pad0:          u32,
+    pad1:          u32,
+    pad2:          u32,
+}
+
+// ── Bindings ─────────────────────────────────────────────────────────────────
+
+@group(0) @binding(0)  var<uniform>       uniforms:       RenderUniforms;
+@group(0) @binding(1)  var<storage, read> current_cells:  array<u32>;
+@group(0) @binding(2)  var<storage, read> previous_cells: array<u32>;
+@group(0) @binding(3)  var<uniform>       paper:          PaperParams;
+@group(0) @binding(4)  var                noise_tex:      texture_2d<f32>;
+@group(0) @binding(5)  var                noise_smp:      sampler;
+@group(0) @binding(6)  var<uniform>       zone_meta:      ZoneMeta;
+@group(0) @binding(7)  var<storage, read> zones:          array<ZoneEntry>;
+@group(0) @binding(8)  var<uniform>       decal_meta:     DecalMeta;
+@group(0) @binding(9)  var<storage, read> decals:         array<DecalEntry>;
+// SDF text (reserved placeholders)
+@group(0) @binding(10) var<uniform>       sdf_text_meta:  SdfTextMeta;
+@group(0) @binding(11) var<storage, read> sdf_glyphs:     array<SdfGlyph>;
+@group(0) @binding(12) var                sdf_atlas:      texture_2d<f32>;
+@group(0) @binding(13) var                sdf_smp:        sampler;
+// Hi-res regions
+@group(0) @binding(14) var<uniform>       hires_meta:     HiResGlobalMeta;
+@group(0) @binding(15) var<storage, read> hires_regions:  array<HiResRegionMeta>;
+@group(0) @binding(16) var<storage, read> hires_cells:      array<u32>;
+@group(0) @binding(17) var<storage, read> hires_cells_prev: array<u32>;
 
 // ── Vertex ────────────────────────────────────────────────────────────────────
 
@@ -247,6 +293,72 @@ fn cell_alive_prev(cx: u32, cy: u32) -> u32 {
     let word_idx = cy_w * uniforms.words_per_row + cx_w / 32u;
     let safe_idx = word_idx & (uniforms.words_per_row * uniforms.padded_rows - 1u);
     return (previous_cells[safe_idx] >> (cx_w & 31u)) & 1u;
+}
+
+// ── Hi-res cell lookup ───────────────────────────────────────────────────
+// Returns vec2f(alive, in_hires).  x = fine cell alive (0 or 1),
+// y = 1.0 if the fragment falls inside a hi-res region, else 0.0.
+
+// Returns vec3f(curr_alive, prev_alive, in_hires).
+fn read_hires_cell(px: f32, world_y: f32, gp: f32) -> vec3f {
+    for (var ri: u32 = 0u; ri < hires_meta.region_count; ri = ri + 1u) {
+        let reg = hires_regions[ri];
+        // Unwrapped cell coords — hi-res regions appear only at their canonical position.
+        let gcx = i32(floor(px / gp));
+        let gcy = i32(floor(world_y / gp));
+        if gcx >= reg.rect.x && gcx <= reg.rect.z
+           && gcy >= reg.rect.y && gcy <= reg.rect.w {
+            let m  = reg.multiplier;
+            let fm = f32(m);
+            let lfx = u32(floor(fract(px / gp) * fm));
+            let lfy = u32(floor(fract(world_y / gp) * fm));
+            let fx = u32(gcx - reg.rect.x) * m + lfx;
+            let fy = u32(gcy - reg.rect.y) * m + lfy;
+            let wi = reg.buffer_offset + fy * reg.wpr + (fx >> 5u);
+            let bit = fx & 31u;
+            let curr = f32((hires_cells[wi] >> bit) & 1u);
+            let prev = f32((hires_cells_prev[wi] >> bit) & 1u);
+            return vec3f(curr, prev, 1.0);
+        }
+    }
+    return vec3f(0.0, 0.0, 0.0);
+}
+
+// Returns vec4f(in_region, fine_pitch, flags, 0).
+// If not in a region, .x = 0. No toroidal wrap — regions appear once.
+fn hires_region_grid(px: f32, world_y: f32, gp: f32) -> vec4f {
+    for (var ri: u32 = 0u; ri < hires_meta.region_count; ri = ri + 1u) {
+        let reg = hires_regions[ri];
+        let gcx = i32(floor(px / gp));
+        let gcy = i32(floor(world_y / gp));
+        if gcx >= reg.rect.x && gcx <= reg.rect.z
+           && gcy >= reg.rect.y && gcy <= reg.rect.w {
+            let fp = gp / f32(reg.multiplier);
+            return vec4f(1.0, fp, f32(reg.flags), 0.0);
+        }
+    }
+    return vec4f(0.0, 0.0, 0.0, 0.0);
+}
+
+// Compute the region border coverage for a bold-major-style rectangle.
+// No toroidal wrap — border appears only at the canonical region position.
+fn hires_border_cov(px: f32, world_y: f32, gp: f32, half_w: f32) -> f32 {
+    var cov = 0.0;
+    for (var ri: u32 = 0u; ri < hires_meta.region_count; ri = ri + 1u) {
+        let reg = hires_regions[ri];
+        let lx = f32(reg.rect.x) * gp;
+        let ty = f32(reg.rect.y) * gp;
+        let rx = f32(reg.rect.z + 1) * gp;
+        let by = f32(reg.rect.w + 1) * gp;
+        let dl = 1.0 - aastep(half_w, abs(px - lx));
+        let dr = 1.0 - aastep(half_w, abs(px - rx));
+        let dt = 1.0 - aastep(half_w, abs(world_y - ty));
+        let db = 1.0 - aastep(half_w, abs(world_y - by));
+        let in_y = step(ty - half_w, world_y) * (1.0 - step(by + half_w, world_y));
+        let in_x = step(lx - half_w, px) * (1.0 - step(rx + half_w, px));
+        cov = max(cov, max(max(dl, dr) * in_y, max(dt, db) * in_x));
+    }
+    return cov;
 }
 
 // ── Blank-zone helpers ───────────────────────────────────────────────────────
@@ -655,7 +767,12 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
 
     let zone_cx = u32(floor(px / pitch_minor)) % uniforms.screen_cols;
     let zone_world_row = i32(floor(world_y / pitch_minor));
-    let zone_mask = zone_mask_for_cell(zone_cx, zone_world_row);
+    let zone_mask_raw = zone_mask_for_cell(zone_cx, zone_world_row);
+    // Hi-res regions override zone suppression — check early so we can bypass.
+    // flags bit 1: show_base_grid — when clear, suppress minor+major base lines inside region.
+    let hr_pre = hires_region_grid(px, world_y, pitch_minor);
+    let hr_base_grid = select(1.0, f32((u32(hr_pre.z) >> 1u) & 1u), hr_pre.x > 0.5);
+    let zone_mask = select(zone_mask_raw, vec4f(hr_base_grid, hr_base_grid, 0.0, 1.0), hr_pre.x > 0.5);
     minor_cov *= zone_mask.x;
     // Zone edge overlays share the same factory roller fade profile as regular
     // major grid lines.
@@ -668,6 +785,27 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     );
     let edge_major_cov = max(zone_mask.z, bold_major_edge_cov) * major_roller_fade * content_mask;
     major_cov = max(major_cov * zone_mask.y, edge_major_cov);
+
+    // ── 4b. Hi-res region grid overlay ───────────────────────────────────────
+    let hr = hr_pre;
+    let hr_flags = u32(hr.z);
+    let hr_show_grid   = (hr_flags & 1u) != 0u;  // bit 0
+    let hr_show_border = (hr_flags & 4u) != 0u;  // bit 2
+    if hr.x > 0.5 && hr_show_grid {
+        let fine_pitch = hr.y;
+        let fine_half = fine_pitch * 0.015 + fiber_bleed;
+        let fine_x = grid_line_aa(px,      fine_pitch, fine_half) * print_fade_x;
+        let fine_y = grid_line_aa(world_y, fine_pitch, fine_half) * print_fade_y;
+        let fine_cov = max(fine_x, fine_y) * content_mask;
+        minor_cov = max(minor_cov, fine_cov);
+    }
+    // Region border — bold rectangle around the hi-res area.
+    if hr_show_border {
+        let hr_bdr_half = paper.major_half_px * 2.0 + fiber_bleed;
+        let hr_bdr = hires_border_cov(px, world_y, pitch_minor, hr_bdr_half)
+                   * max(major_fade_x, major_fade_y) * content_mask;
+        major_cov = max(major_cov, hr_bdr);
+    }
 
     // Transmittance (linear sRGB): (R, G, B) = fraction transmitted per channel.
     // Minor: (0.52, 0.82, 0.92) — faint teal tint.
@@ -695,14 +833,22 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     // Computed unconditionally so all fwidth calls inside are in uniform flow.
     // Use paper.grid_pitch_px (float) so stamps stay phase-aligned with grid lines.
     let gp     = paper.grid_pitch_px;
-    let cx     = u32(floor(px      / gp));
-    let cy     = u32(floor(world_y / gp));
-    let pCell  = vec2f(fract(px / gp) - 0.5, fract(world_y / gp) - 0.5);
+    // Inside hi-res regions the stamp runs at fine-cell pitch (gp / multiplier),
+    // so each sub-cell gets its own ink blob.  hr was computed in §4b.
+    let in_hires = hr.x > 0.5;
+    let eff_gp = select(gp, hr.y, in_hires);
+    let cx     = u32(floor(px      / eff_gp));
+    let cy     = u32(floor(world_y / eff_gp));
+    let pCell  = vec2f(fract(px / eff_gp) - 0.5, fract(world_y / eff_gp) - 0.5);
     let cellId = vec2f(f32(cx), f32(cy));
 
-    let raw_cov    = sponge_stamp(pCell, cellId);
-    let prev_state = cell_alive_prev(cx, cy);
-    let curr_state = cell_alive_current(cx, cy);
+    let raw_cov = sponge_stamp(pCell, cellId);
+    // Hi-res cell lookup — vec3f(curr, prev, in_hires).
+    let hires    = read_hires_cell(px, world_y, gp);
+    let base_cx  = u32(floor(px      / gp));
+    let base_cy  = u32(floor(world_y / gp));
+    let prev_state = select(cell_alive_prev(base_cx, base_cy), u32(hires.y), in_hires);
+    let curr_state = select(cell_alive_current(base_cx, base_cy), u32(hires.x), in_hires);
     let prev_alive = f32(prev_state);
     let curr_alive = f32(curr_state);
     let t          = smoothstep(0.0, 1.0, uniforms.transition_t);

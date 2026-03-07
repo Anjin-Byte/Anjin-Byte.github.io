@@ -17,6 +17,8 @@ struct Uniforms {
 @group(0) @binding(0) var<uniform>            uniforms: Uniforms;
 @group(0) @binding(1) var<storage, read>      src: array<u32>;
 @group(0) @binding(2) var<storage, read_write> dst: array<u32>;
+@group(0) @binding(3) var<storage, read>      region_mask: array<u32>;
+@group(0) @binding(4) var<storage, read>      inward_boundary: array<u32>;
 
 // Half-adder: returns (sum, carry).
 fn ha(a: u32, b: u32) -> vec2<u32> {
@@ -75,17 +77,18 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let wy_n = (wy - 1u) & mask_y;
     let wy_s = (wy + 1u) & mask_y;
 
-    // Load the 3×3 word neighbourhood.
+    // Load the 3×3 word neighbourhood, OR-ing with the grid-aligned inward
+    // boundary so region-edge cells present aggregated fine-cell state.
     let wpr = uniforms.words_per_row;
-    let nw = src[wy_n * wpr + wx_l];
-    let n  = src[wy_n * wpr + wx  ];
-    let ne = src[wy_n * wpr + wx_r];
-    let w  = src[wy   * wpr + wx_l];
-    let c  = src[wy   * wpr + wx  ];
-    let e  = src[wy   * wpr + wx_r];
-    let sw = src[wy_s * wpr + wx_l];
-    let s  = src[wy_s * wpr + wx  ];
-    let se = src[wy_s * wpr + wx_r];
+    let i_nw = wy_n * wpr + wx_l; let nw = src[i_nw] | inward_boundary[i_nw];
+    let i_n  = wy_n * wpr + wx;   let n  = src[i_n]  | inward_boundary[i_n];
+    let i_ne = wy_n * wpr + wx_r; let ne = src[i_ne] | inward_boundary[i_ne];
+    let i_w  = wy   * wpr + wx_l; let w  = src[i_w]  | inward_boundary[i_w];
+    let i_c  = wy   * wpr + wx;   let c  = src[i_c]  | inward_boundary[i_c];
+    let i_e  = wy   * wpr + wx_r; let e  = src[i_e]  | inward_boundary[i_e];
+    let i_sw = wy_s * wpr + wx_l; let sw = src[i_sw] | inward_boundary[i_sw];
+    let i_s  = wy_s * wpr + wx;   let s  = src[i_s]  | inward_boundary[i_s];
+    let i_se = wy_s * wpr + wx_r; let se = src[i_se] | inward_boundary[i_se];
 
     // Build 8 neighbor bitfields (bit i = neighbor state for cell at bit i of word wx,wy).
     let b_n  = n;
@@ -105,5 +108,10 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     //   count == 2  (0b0010): keep current
     let count3 = ~bits.w & ~bits.z &  bits.y &  bits.x;
     let count2 = ~bits.w & ~bits.z &  bits.y & ~bits.x;
-    dst[wy * wpr + wx] = count3 | (count2 & c);
+    let raw = count3 | (count2 & c);
+    let idx = wy * wpr + wx;
+    // region_mask is bound but unused — keep a dead read so naga does not
+    // strip the binding and cause a bind-group layout mismatch.
+    let _keep_mask = region_mask[0];
+    dst[idx] = raw;
 }

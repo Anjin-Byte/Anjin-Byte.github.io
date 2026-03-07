@@ -503,9 +503,14 @@ pub fn clear_decals(&self, queue: &wgpu::Queue) { self.set_decals(queue, &[]); }
 ```wgsl
 // In render.wgsl, alongside ZoneMeta / ZoneEntry:
 
+// IMPORTANT: Use scalar padding, NOT vec3u. vec3u has 16-byte alignment in
+// uniform buffers, creating a 32-byte struct that doesn't match Rust's 16-byte
+// #[repr(C)] layout. See architecture-overview.md §5 for details.
 struct DecalMeta {
     decal_count: u32,
-    pad:         vec3u,
+    pad0:        u32,
+    pad1:        u32,
+    pad2:        u32,
 }
 
 struct DecalEntry {

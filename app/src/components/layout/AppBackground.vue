@@ -7,6 +7,9 @@ import { useBlankZones } from '../../composables/useBlankZones';
 import type { BlankZone, BlankZoneDraft, BlankZoneRect } from '../../types/blankZones';
 import { useDecals } from '../../composables/useDecals';
 import type { Decal } from '../../types/decals';
+import { useHiRes } from '../../composables/useHiRes';
+import type { HiResRegion } from '../../types/hiresRegion';
+import { HIRES_MULTIPLIER } from '../../types/hiresRegion';
 import GridBlankZonePanel from './GridBlankZonePanel.vue';
 
 const log = createLogger('AppBackground');
@@ -86,15 +89,24 @@ const decals = useDecals({
   onRemoveDecal: (id) => postToWorker({ type: 'remove_decal', id }),
   onClearDecals: () => postToWorker({ type: 'clear_decals' }),
 });
+const hiRes = useHiRes({
+  onSetRegion: (r) => postToWorker({ type: 'set_hires', region: { ...r } }),
+  onClearRegion: () => postToWorker({ type: 'clear_hires' }),
+});
 const zoneToolEnabled = ref(false);
 const zoneSnapMajor = ref(false);
 const zoneDraft = ref<BlankZoneDraft>({
   mode: 'both',
   edge: { style: 'none', widthCells: 1, opacity: 1 },
 });
+const decalToolEnabled = ref(false);
+const decalSnapMajor = ref(false);
+const hiresToolEnabled = ref(false);
 const zonePreviewRect = ref<BlankZoneRect | null>(null);
 const zonePreviewStyle = ref<Record<string, string> | null>(null);
 let dragAnchor: CellCoord | null = null;
+let activeDragTool: 'zone' | 'decal' | 'hires' | null = null;
+let paintBounds: BlankZoneRect | null = null;
 
 function onAddZone(zone: BlankZone): void {
   blankZones.addZone(zone);
@@ -115,8 +127,9 @@ function onClearZones(): void {
 function onToolChange(payload: { enabled: boolean; snapMajor: boolean }): void {
   zoneToolEnabled.value = payload.enabled;
   zoneSnapMajor.value = payload.snapMajor;
-  if (!payload.enabled) {
+  if (!payload.enabled && activeDragTool === 'zone') {
     dragAnchor = null;
+    activeDragTool = null;
     zonePreviewRect.value = null;
     zonePreviewStyle.value = null;
   }
@@ -126,10 +139,36 @@ function onDraftChange(draft: BlankZoneDraft): void {
   zoneDraft.value = draft;
 }
 
+function onDecalToolChange(payload: { enabled: boolean; snapMajor: boolean }): void {
+  decalToolEnabled.value = payload.enabled;
+  decalSnapMajor.value = payload.snapMajor;
+  if (!payload.enabled) {
+    if (activeDragTool === 'decal') {
+      dragAnchor = null;
+      activeDragTool = null;
+      paintBounds = null;
+      zonePreviewRect.value = null;
+      zonePreviewStyle.value = null;
+    }
+  }
+}
+
+function onHiResToolChange(payload: { enabled: boolean }): void {
+  hiresToolEnabled.value = payload.enabled;
+  if (!payload.enabled && activeDragTool === 'hires') {
+    dragAnchor = null;
+    activeDragTool = null;
+    zonePreviewRect.value = null;
+    zonePreviewStyle.value = null;
+  }
+}
+
 function onAddDecal(decal: Decal): void { decals.addDecal(decal); }
 function onUpdateDecal(decal: Decal): void { decals.updateDecal(decal); }
 function onRemoveDecal(id: string): void { decals.removeDecal(id); }
 function onClearDecals(): void { decals.clearDecals(); }
+function onSetHiResRegion(region: HiResRegion): void { hiRes.setRegion(region); }
+function onClearHiResRegion(): void { hiRes.clearRegion(); }
 
 /** Build a CoordSnapshot from the latest cached values. */
 function makeSnapshot(): CoordSnapshot | null {
@@ -222,6 +261,26 @@ function makeZoneFromRect(rect: BlankZoneRect): BlankZone {
   };
 }
 
+function makeDecalFromRect(rect: BlankZoneRect): Decal {
+  const now = Date.now();
+  return {
+    id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `decal-${now}-${Math.random().toString(36).slice(2, 9)}`,
+    x1: rect.x1,
+    y1: rect.y1,
+    x2: rect.x2,
+    y2: rect.y2,
+    pattern: { kind: 'solid', coverage: 1.0, solidR: 0.49, solidG: 0.30, solidB: 1.0 },
+    tint: [1, 1, 1, 1],
+    blendMode: 'alpha',
+    suppressCells: false,
+    enabled: true,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 function updateZonePreviewStyle(): void {
   const rect = zonePreviewRect.value;
   const snap = makeSnapshot();
@@ -242,19 +301,31 @@ function updateZonePreviewStyle(): void {
   };
 }
 
+function anyToolEnabled(): boolean {
+  return zoneToolEnabled.value || decalToolEnabled.value || hiresToolEnabled.value;
+}
+
+function activeSnapMajor(): boolean {
+  if (activeDragTool === 'decal') return decalSnapMajor.value;
+  return zoneSnapMajor.value;
+}
+
 function onDocumentPointerDown(event: PointerEvent): void {
-  if (!zoneToolEnabled.value || event.button !== 0 || isInteractiveTarget(event.target)) {
+  if (!anyToolEnabled() || event.button !== 0 || isInteractiveTarget(event.target)) {
     return;
   }
   const start = worldZoneCellFromPointer(event);
   if (!start) {
     return;
   }
+  activeDragTool = hiresToolEnabled.value ? 'hires' : decalToolEnabled.value ? 'decal' : 'zone';
   dragAnchor = start;
-  zonePreviewRect.value = { x1: start.cx, y1: start.cy, x2: start.cx, y2: start.cy };
+  const initRect = { x1: start.cx, y1: start.cy, x2: start.cx, y2: start.cy };
+  if (activeDragTool === 'decal') {
+    paintBounds = { ...initRect };
+  }
+  zonePreviewRect.value = initRect;
   updateZonePreviewStyle();
-  // Capture the pointer so pointermove/pointerup keep firing even if the cursor
-  // leaves the browser window mid-drag.
   if (event.target instanceof Element) {
     event.target.setPointerCapture(event.pointerId);
   }
@@ -262,7 +333,7 @@ function onDocumentPointerDown(event: PointerEvent): void {
 }
 
 function onDocumentPointerMove(event: PointerEvent): void {
-  if (!zoneToolEnabled.value || !dragAnchor) {
+  if (!activeDragTool || !dragAnchor) {
     return;
   }
   const next = worldZoneCellFromPointer(event);
@@ -270,13 +341,23 @@ function onDocumentPointerMove(event: PointerEvent): void {
   if (!next || !snap) {
     return;
   }
-  const rawRect = normalizeRect(dragAnchor, next);
-  zonePreviewRect.value = zoneSnapMajor.value ? snapRectToMajor(rawRect, snap) : rawRect;
+  if (activeDragTool === 'decal' && paintBounds) {
+    // Paint mode: expand bounding box to include every traversed cell.
+    paintBounds.x1 = Math.min(paintBounds.x1, next.cx);
+    paintBounds.y1 = Math.min(paintBounds.y1, next.cy);
+    paintBounds.x2 = Math.max(paintBounds.x2, next.cx);
+    paintBounds.y2 = Math.max(paintBounds.y2, next.cy);
+    zonePreviewRect.value = { ...paintBounds };
+  } else {
+    // Zone mode: corner-to-corner rectangle.
+    const rawRect = normalizeRect(dragAnchor, next);
+    zonePreviewRect.value = activeSnapMajor() ? snapRectToMajor(rawRect, snap) : rawRect;
+  }
   updateZonePreviewStyle();
 }
 
 function onDocumentPointerUp(event: PointerEvent): void {
-  if (!zoneToolEnabled.value || !dragAnchor || event.button !== 0) {
+  if (!activeDragTool || !dragAnchor || event.button !== 0) {
     return;
   }
   if (event.target instanceof Element && event.target.hasPointerCapture(event.pointerId)) {
@@ -284,12 +365,42 @@ function onDocumentPointerUp(event: PointerEvent): void {
   }
   const next = worldZoneCellFromPointer(event);
   const snap = makeSnapshot();
-  if (next && snap) {
+  if (activeDragTool === 'hires' && next) {
     const rawRect = normalizeRect(dragAnchor, next);
-    const finalRect = zoneSnapMajor.value ? snapRectToMajor(rawRect, snap) : rawRect;
+    const now = Date.now();
+    hiRes.setRegion({
+      id: crypto.randomUUID(),
+      x1: rawRect.x1,
+      y1: rawRect.y1,
+      x2: rawRect.x2,
+      y2: rawRect.y2,
+      multiplier: HIRES_MULTIPLIER,
+      enabled: true,
+      showGrid: true,
+      showBaseGrid: true,
+      showBorder: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+    // Auto-disable draw tool after placing the region.
+    hiresToolEnabled.value = false;
+  } else if (activeDragTool === 'decal' && paintBounds) {
+    // Include the final cell in the paint bounds.
+    if (next) {
+      paintBounds.x1 = Math.min(paintBounds.x1, next.cx);
+      paintBounds.y1 = Math.min(paintBounds.y1, next.cy);
+      paintBounds.x2 = Math.max(paintBounds.x2, next.cx);
+      paintBounds.y2 = Math.max(paintBounds.y2, next.cy);
+    }
+    decals.addDecal(makeDecalFromRect(paintBounds));
+  } else if (next && snap) {
+    const rawRect = normalizeRect(dragAnchor, next);
+    const finalRect = activeSnapMajor() ? snapRectToMajor(rawRect, snap) : rawRect;
     blankZones.addZone(makeZoneFromRect(finalRect));
   }
   dragAnchor = null;
+  activeDragTool = null;
+  paintBounds = null;
   zonePreviewRect.value = null;
   zonePreviewStyle.value = null;
 }
@@ -301,7 +412,7 @@ function onDocumentPointerUp(event: PointerEvent): void {
  *  that land on interactive elements (buttons, links, inputs).
  */
 function onDocumentClick(event: MouseEvent): void {
-  if (zoneToolEnabled.value || dragAnchor || isInteractiveTarget(event.target)) {
+  if (anyToolEnabled() || dragAnchor || isInteractiveTarget(event.target)) {
     return;
   }
 
@@ -344,6 +455,7 @@ onMounted(() => {
         currentGridInfo.value = e.data.gridInfo;
         postToWorker({ type: 'set_zones', zones: toWorkerZones(blankZones.zones.value) });
         postToWorker({ type: 'set_decals', decals: toWorkerDecals(decals.decals.value) });
+        if (hiRes.region.value) postToWorker({ type: 'set_hires', region: { ...hiRes.region.value } });
         updateZonePreviewStyle();
         break;
       case 'grid_info':
@@ -361,6 +473,9 @@ onMounted(() => {
         break;
       case 'decals_error':
         log.error('Decal update rejected:', e.data.message);
+        break;
+      case 'hires_state':
+        hiRes.syncFromWorker(e.data.region);
         break;
       case 'error':
         // gpu-init failures are expected on browsers without WebGPU; log at debug.
@@ -457,6 +572,7 @@ onUnmounted(() => {
     :zones="blankZones.zones.value"
     :preview-rect="zonePreviewRect"
     :decals="decals.decals.value"
+    :hires-region="hiRes.region.value"
     @add-zone="onAddZone"
     @update-zone="onUpdateZone"
     @remove-zone="onRemoveZone"
@@ -467,6 +583,10 @@ onUnmounted(() => {
     @update-decal="onUpdateDecal"
     @remove-decal="onRemoveDecal"
     @clear-decals="onClearDecals"
+    @decal-tool-change="onDecalToolChange"
+    @set-hires-region="onSetHiResRegion"
+    @clear-hires-region="onClearHiResRegion"
+    @hires-tool-change="onHiResToolChange"
   />
 </template>
 

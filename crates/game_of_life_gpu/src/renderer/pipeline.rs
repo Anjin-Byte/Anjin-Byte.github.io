@@ -9,9 +9,13 @@ use crate::zones::{ZoneEntryGpu, ZoneMetaGpu, MAX_BLANK_ZONES};
 
 use super::bindings::{
     make_bind_group, sampler_bgl_entry, storage_bgl_entry, texture_bgl_entry, uniform_bgl_entry,
+    BindGroupResources,
 };
 use super::noise::make_noise_texture;
-use super::types::{PaperParams, RenderUniforms};
+use super::types::{
+    HiResGlobalMetaGpu, HiResRegionMetaGpu, MAX_HIRES_REGIONS,
+    PaperParams, RenderUniforms, SdfTextMetaGpu,
+};
 
 pub struct GpuRenderer {
     pub surface: wgpu::Surface<'static>,
@@ -24,12 +28,23 @@ pub struct GpuRenderer {
     zone_buf: wgpu::Buffer,
     decal_meta_buf: wgpu::Buffer,
     decal_buf: wgpu::Buffer,
-    grid_pitch: f32, // stored so resize can recompute PaperParams
+    // SDF text placeholders (bindings 10-13)
+    sdf_meta_buf: wgpu::Buffer,
+    sdf_glyphs_buf: wgpu::Buffer,
+    _sdf_atlas_texture: wgpu::Texture,
+    sdf_atlas_view: wgpu::TextureView,
+    sdf_sampler: wgpu::Sampler,
+    // Hi-res region (bindings 14-16)
+    hires_meta_buf: wgpu::Buffer,
+    hires_regions_buf: wgpu::Buffer,
+    hires_cells_buf: wgpu::Buffer,
+    hires_cells_prev_buf: wgpu::Buffer,
+    grid_pitch: f32,
     _noise_texture: wgpu::Texture,
     noise_view: wgpu::TextureView,
     noise_sampler: wgpu::Sampler,
-    bind_group_a: wgpu::BindGroup, // render reads buf_a (frame even)
-    bind_group_b: wgpu::BindGroup, // render reads buf_b (frame odd)
+    bind_group_a: wgpu::BindGroup,
+    bind_group_b: wgpu::BindGroup,
     bgl: wgpu::BindGroupLayout,
 }
 
@@ -105,6 +120,59 @@ impl GpuRenderer {
             mapped_at_creation: false,
         });
 
+        // SDF text placeholders (bindings 10-13)
+        let sdf_meta_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("sdf_text_meta_placeholder"),
+            contents: bytes_of(&SdfTextMetaGpu::default()),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+        let sdf_glyphs_buf = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("sdf_glyphs_placeholder"),
+            size: 4,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let sdf_atlas_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("sdf_atlas_placeholder"),
+            size: wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::R8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+        let sdf_atlas_view = sdf_atlas_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let sdf_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("sdf_sampler_placeholder"),
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+
+        // Hi-res region placeholders (bindings 14-16)
+        let hires_meta_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("hires_meta_placeholder"),
+            contents: bytes_of(&HiResGlobalMetaGpu::default()),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+        let hires_regions_buf = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("hires_regions_placeholder"),
+            size: (MAX_HIRES_REGIONS * std::mem::size_of::<HiResRegionMetaGpu>()) as u64,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let hires_cells_buf = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("hires_cells_placeholder"), size: 4,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let hires_cells_prev_buf = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("hires_cells_prev_placeholder"), size: 4,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("seed_prev_visible_cells"),
         });
@@ -116,49 +184,49 @@ impl GpuRenderer {
         let bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("render_bgl"),
             entries: &[
-                uniform_bgl_entry(0),
-                storage_bgl_entry(1),
-                storage_bgl_entry(2),
-                uniform_bgl_entry(3),
-                texture_bgl_entry(4),
-                sampler_bgl_entry(5),
-                uniform_bgl_entry(6),
-                storage_bgl_entry(7),
-                uniform_bgl_entry(8),
-                storage_bgl_entry(9),
+                uniform_bgl_entry(0),   // RenderUniforms
+                storage_bgl_entry(1),   // current_cells
+                storage_bgl_entry(2),   // previous_cells
+                uniform_bgl_entry(3),   // PaperParams
+                texture_bgl_entry(4),   // noise_tex
+                sampler_bgl_entry(5),   // noise_smp
+                uniform_bgl_entry(6),   // zone_meta
+                storage_bgl_entry(7),   // zones
+                uniform_bgl_entry(8),   // decal_meta
+                storage_bgl_entry(9),   // decals
+                // SDF text (reserved)
+                uniform_bgl_entry(10),  // sdf_text_meta
+                storage_bgl_entry(11),  // sdf_glyphs
+                texture_bgl_entry(12),  // sdf_atlas
+                sampler_bgl_entry(13),  // sdf_sampler
+                // Hi-res regions
+                uniform_bgl_entry(14),  // hires_meta
+                storage_bgl_entry(15),  // hires_regions
+                storage_bgl_entry(16),  // hires_cells
+                storage_bgl_entry(17),  // hires_cells_prev
             ],
         });
 
-        let bind_group_a = make_bind_group(
-            device,
-            &bgl,
-            &uniform_buf,
-            buf_a,
-            &prev_visible_buf,
-            &paper_buf,
-            &noise_view,
-            &noise_sampler,
-            &zone_meta_buf,
-            &zone_buf,
-            &decal_meta_buf,
-            &decal_buf,
-            "rbg_a",
-        );
-        let bind_group_b = make_bind_group(
-            device,
-            &bgl,
-            &uniform_buf,
-            buf_b,
-            &prev_visible_buf,
-            &paper_buf,
-            &noise_view,
-            &noise_sampler,
-            &zone_meta_buf,
-            &zone_buf,
-            &decal_meta_buf,
-            &decal_buf,
-            "rbg_b",
-        );
+        let bind_group_a = make_bind_group(device, &bgl, &BindGroupResources {
+            uniform_buf: &uniform_buf, current_buf: buf_a, previous_buf: &prev_visible_buf,
+            paper_buf: &paper_buf, noise_view: &noise_view, noise_sampler: &noise_sampler,
+            zone_meta_buf: &zone_meta_buf, zone_buf: &zone_buf,
+            decal_meta_buf: &decal_meta_buf, decal_buf: &decal_buf,
+            sdf_meta_buf: &sdf_meta_buf, sdf_glyphs_buf: &sdf_glyphs_buf,
+            sdf_atlas_view: &sdf_atlas_view, sdf_sampler: &sdf_sampler,
+            hires_meta_buf: &hires_meta_buf, hires_regions_buf: &hires_regions_buf,
+            hires_cells_buf: &hires_cells_buf, hires_cells_prev_buf: &hires_cells_prev_buf,
+        }, "rbg_a");
+        let bind_group_b = make_bind_group(device, &bgl, &BindGroupResources {
+            uniform_buf: &uniform_buf, current_buf: buf_b, previous_buf: &prev_visible_buf,
+            paper_buf: &paper_buf, noise_view: &noise_view, noise_sampler: &noise_sampler,
+            zone_meta_buf: &zone_meta_buf, zone_buf: &zone_buf,
+            decal_meta_buf: &decal_meta_buf, decal_buf: &decal_buf,
+            sdf_meta_buf: &sdf_meta_buf, sdf_glyphs_buf: &sdf_glyphs_buf,
+            sdf_atlas_view: &sdf_atlas_view, sdf_sampler: &sdf_sampler,
+            hires_meta_buf: &hires_meta_buf, hires_regions_buf: &hires_regions_buf,
+            hires_cells_buf: &hires_cells_buf, hires_cells_prev_buf: &hires_cells_prev_buf,
+        }, "rbg_b");
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("render_shader"),
@@ -208,6 +276,15 @@ impl GpuRenderer {
             zone_buf,
             decal_meta_buf,
             decal_buf,
+            sdf_meta_buf,
+            sdf_glyphs_buf,
+            _sdf_atlas_texture: sdf_atlas_texture,
+            sdf_atlas_view,
+            sdf_sampler,
+            hires_meta_buf,
+            hires_regions_buf,
+            hires_cells_buf,
+            hires_cells_prev_buf,
             grid_pitch,
             _noise_texture: noise_texture,
             noise_view,
@@ -318,36 +395,7 @@ impl GpuRenderer {
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        self.bind_group_a = make_bind_group(
-            device,
-            &self.bgl,
-            &self.uniform_buf,
-            &simulation.buf_a,
-            &self.prev_visible_buf,
-            &self.paper_buf,
-            &self.noise_view,
-            &self.noise_sampler,
-            &self.zone_meta_buf,
-            &self.zone_buf,
-            &self.decal_meta_buf,
-            &self.decal_buf,
-            "rbg_a",
-        );
-        self.bind_group_b = make_bind_group(
-            device,
-            &self.bgl,
-            &self.uniform_buf,
-            &simulation.buf_b,
-            &self.prev_visible_buf,
-            &self.paper_buf,
-            &self.noise_view,
-            &self.noise_sampler,
-            &self.zone_meta_buf,
-            &self.zone_buf,
-            &self.decal_meta_buf,
-            &self.decal_buf,
-            "rbg_b",
-        );
+        self.rebuild_bind_groups(device, &simulation.buf_a, &simulation.buf_b);
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("resize_prev_visible_cells"),
         });
@@ -385,5 +433,59 @@ impl GpuRenderer {
 
     pub fn clear_decals(&self, queue: &wgpu::Queue) {
         self.set_decals(queue, &[]);
+    }
+
+    pub fn hires_cells_buf(&self) -> &wgpu::Buffer { &self.hires_cells_buf }
+    pub fn hires_cells_prev_buf(&self) -> &wgpu::Buffer { &self.hires_cells_prev_buf }
+
+    pub fn set_hires(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        simulation: &Simulation,
+        meta: &HiResGlobalMetaGpu,
+        regions: &[HiResRegionMetaGpu],
+        cells_size: u64,
+    ) {
+        queue.write_buffer(&self.hires_meta_buf, 0, bytes_of(meta));
+        if !regions.is_empty() {
+            queue.write_buffer(&self.hires_regions_buf, 0, cast_slice(regions));
+        }
+        if cells_size > self.hires_cells_buf.size() {
+            let mk = |l| device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some(l), size: cells_size,
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+            self.hires_cells_buf = mk("hires_cells");
+            self.hires_cells_prev_buf = mk("hires_cells_prev");
+            self.rebuild_bind_groups(device, &simulation.buf_a, &simulation.buf_b);
+        }
+    }
+
+    pub fn clear_hires(&self, queue: &wgpu::Queue) {
+        queue.write_buffer(&self.hires_meta_buf, 0, bytes_of(&HiResGlobalMetaGpu::default()));
+    }
+
+    fn rebuild_bind_groups(
+        &mut self,
+        device: &wgpu::Device,
+        buf_a: &wgpu::Buffer,
+        buf_b: &wgpu::Buffer,
+    ) {
+        let res = BindGroupResources {
+            uniform_buf: &self.uniform_buf, current_buf: buf_a,
+            previous_buf: &self.prev_visible_buf, paper_buf: &self.paper_buf,
+            noise_view: &self.noise_view, noise_sampler: &self.noise_sampler,
+            zone_meta_buf: &self.zone_meta_buf, zone_buf: &self.zone_buf,
+            decal_meta_buf: &self.decal_meta_buf, decal_buf: &self.decal_buf,
+            sdf_meta_buf: &self.sdf_meta_buf, sdf_glyphs_buf: &self.sdf_glyphs_buf,
+            sdf_atlas_view: &self.sdf_atlas_view, sdf_sampler: &self.sdf_sampler,
+            hires_meta_buf: &self.hires_meta_buf, hires_regions_buf: &self.hires_regions_buf,
+            hires_cells_buf: &self.hires_cells_buf, hires_cells_prev_buf: &self.hires_cells_prev_buf,
+        };
+        self.bind_group_a = make_bind_group(device, &self.bgl, &res, "rbg_a");
+        let res_b = BindGroupResources { current_buf: buf_b, ..res };
+        self.bind_group_b = make_bind_group(device, &self.bgl, &res_b, "rbg_b");
     }
 }

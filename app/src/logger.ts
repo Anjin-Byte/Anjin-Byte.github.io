@@ -1,10 +1,12 @@
 // Structured, level-filtered logger. Works identically on the main thread and in Web Workers.
-// In production builds all levels below 'warn' are compiled out via import.meta.env.DEV.
+//
+// Production builds: debug() and info() are no-op functions. Vite's minifier
+// inlines the empty function bodies, eliminating the call overhead entirely.
+// Only warn() and error() survive in production output.
 
-type Level = 'debug' | 'info' | 'warn' | 'error';
+const IS_DEV: boolean = import.meta.env.DEV;
 
-const RANK: Record<Level, number> = { debug: 0, info: 1, warn: 2, error: 3 };
-const MIN_RANK: number = import.meta.env.DEV ? RANK.debug : RANK.warn;
+const noop = (): void => {};
 
 export interface Logger {
   debug(...args: unknown[]): void;
@@ -14,14 +16,11 @@ export interface Logger {
 }
 
 export function createLogger(tag: string): Logger {
-  const emit = (level: Level, args: unknown[]): void => {
-    if (RANK[level] < MIN_RANK) return;
-    console[level](`[${tag}]`, ...args);
-  };
+  const prefix = `[${tag}]`;
   return {
-    debug: (...args) => emit('debug', args),
-    info:  (...args) => emit('info',  args),
-    warn:  (...args) => emit('warn',  args),
-    error: (...args) => emit('error', args),
+    debug: IS_DEV ? (...args: unknown[]) => console.debug(prefix, ...args) : noop,
+    info:  IS_DEV ? (...args: unknown[]) => console.info(prefix, ...args)  : noop,
+    warn:  (...args: unknown[]) => console.warn(prefix, ...args),
+    error: (...args: unknown[]) => console.error(prefix, ...args),
   };
 }

@@ -3,14 +3,18 @@
 // Main thread sends 'frame' messages at requestAnimationFrame rate for vsync sync.
 
 import { createLogger } from '../logger';
+import { PERF_ENABLED, PerfSampler } from '../perf';
 import type { WorkerInMsg, WorkerOutMsg, GridInfo } from './rendererProtocol';
 import type { BlankZone } from '../types/blankZones';
 import type { Decal } from '../types/decals';
+import type { HiResRegion } from '../types/hiresRegion';
 import { BlankZoneState } from './BlankZoneState';
 import { DecalState } from './DecalState';
+import { HiResState } from './HiResState';
 
 const log = createLogger('Renderer');
 const ws  = self as unknown as DedicatedWorkerGlobalScope;
+const perf: PerfSampler | null = PERF_ENABLED ? new PerfSampler(log) : null;
 
 // ── Renderer interface ────────────────────────────────────────────────────────
 
@@ -23,6 +27,7 @@ interface Renderer {
   toggleCell?(cx: number, cy: number): void;
   setZones?(zones: BlankZone[]): void;
   setDecals?(decals: Decal[]): void;
+  setHiRes?(region: HiResRegion | null): void;
   gridInfo?(): GridInfo;
   free(): void;
 }
@@ -39,6 +44,7 @@ const TICK_EVERY = 210;
 let frameCount  = 0;
 const zoneState  = new BlankZoneState();
 const decalState = new DecalState();
+const hiresState = new HiResState();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -90,6 +96,9 @@ function setDecalsState(next: unknown): void {
   applyDecalsToRenderer();
   postDecalsState();
 }
+
+function postHiResState(): void { post({ type: 'hires_state', region: hiresState.get() }); }
+function applyHiResToRenderer(): void { renderer?.setHiRes?.(hiresState.get()); }
 
 // ── CPU fallback ──────────────────────────────────────────────────────────────
 
@@ -165,31 +174,51 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
           const gpu = await GpuGameOfLife.new_offscreen(canvas, cellPx);
           // Verify set_zones_json is present at init time so a future rename/removal
           // produces a visible warning rather than silently failing on every zone update.
-          const gpuWithZones = gpu as unknown as {
+          const gpuExt = gpu as unknown as {
             set_zones_json?: (zonesJson: string) => void;
             set_decals_json?: (decalsJson: string) => void;
+            set_hires_region?: (x1: number, y1: number, x2: number, y2: number, m: number, showGrid: boolean, showBaseGrid: boolean, showBorder: boolean) => void;
+            update_hires_flags?: (showGrid: boolean, showBaseGrid: boolean, showBorder: boolean) => void;
+            set_hires_paused?: (paused: boolean) => void;
+            clear_hires_region?: () => void;
           };
-          if (typeof gpuWithZones.set_zones_json !== 'function') {
-            log.warn('GPU: set_zones_json not found on GpuGameOfLife — blank zones disabled');
-          }
-          if (typeof gpuWithZones.set_decals_json !== 'function') {
-            log.warn('GPU: set_decals_json not found on GpuGameOfLife — decals disabled');
-          }
           const setZonesOnGpu = (zones: BlankZone[]): void => {
-            if (typeof gpuWithZones.set_zones_json !== 'function') return;
+            if (typeof gpuExt.set_zones_json !== 'function') return;
             try {
-              gpuWithZones.set_zones_json(JSON.stringify(zones));
+              gpuExt.set_zones_json(JSON.stringify(zones));
             } catch (err) {
               postZonesError(`GPU zone update failed: ${errorMessage(err)}`);
             }
           };
           const setDecalsOnGpu = (decals: Decal[]): void => {
-            if (typeof gpuWithZones.set_decals_json !== 'function') return;
+            if (typeof gpuExt.set_decals_json !== 'function') return;
             try {
-              gpuWithZones.set_decals_json(JSON.stringify(decals));
+              gpuExt.set_decals_json(JSON.stringify(decals));
             } catch (err) {
               postDecalsError(`GPU decal update failed: ${errorMessage(err)}`);
             }
+          };
+          // Track active region geometry so we can detect flag-only updates.
+          let activeHiResKey = '';
+          const hiresGeomKey = (r: HiResRegion): string =>
+            `${r.x1},${r.y1},${r.x2},${r.y2},${r.multiplier}`;
+          const setHiResOnGpu = (r: HiResRegion | null): void => {
+            if (!r) {
+              gpuExt.clear_hires_region?.();
+              activeHiResKey = '';
+              return;
+            }
+            const key = hiresGeomKey(r);
+            // Ensure region exists on GPU (create if geometry changed or new).
+            if (key !== activeHiResKey && gpuExt.set_hires_region) {
+              gpuExt.set_hires_region(r.x1, r.y1, r.x2, r.y2, r.multiplier, r.showGrid ?? true, r.showBaseGrid ?? true, r.showBorder ?? true);
+              activeHiResKey = key;
+            } else {
+              // Geometry unchanged — only update flags.
+              gpuExt.update_hires_flags?.(r.showGrid ?? true, r.showBaseGrid ?? true, r.showBorder ?? true);
+            }
+            // Pause/resume: keep region alive, just stop ticking.
+            gpuExt.set_hires_paused?.(!r.enabled);
           };
           const getGridInfo = (): GridInfo => ({
             screenCols:  gpu.screen_cols(),
@@ -208,6 +237,7 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
             toggleCell: (cx, cy) => { gpu.toggle_cell(cx, cy); gpu.flush_and_render(); },
             setZones:   (zones)  => setZonesOnGpu(zones),
             setDecals:  (decals) => setDecalsOnGpu(decals),
+            setHiRes:   (region) => setHiResOnGpu(region),
             gridInfo:   getGridInfo,
             free:       () => gpu.free(),
           };
@@ -217,6 +247,7 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
           renderer.setTransition?.(1);
           renderer.setZones?.(zoneState.getAll());
           renderer.setDecals?.(decalState.getAll());
+          renderer.setHiRes?.(hiresState.get());
           log.info('GPU renderer ready');
           post({ type: 'ready', backend: 'gpu', gridInfo: getGridInfo() });
           break;
@@ -237,6 +268,7 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
         renderer.setScroll?.(pendingScrollY);
         renderer.setZones?.(zoneState.getAll());
         renderer.setDecals?.(decalState.getAll());
+        renderer.setHiRes?.(hiresState.get());
         log.info('CPU renderer ready');
         // CPU renderer has no grid info; supply zeroed placeholder.
         post({ type: 'ready', backend: 'cpu', gridInfo: { screenCols: 0, screenRows: 0, paddedRows: 0, wordsPerRow: 0, gridPitch: 0 } });
@@ -249,14 +281,19 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
     }
 
     case 'frame':
+      if (!renderer) break;
+      perf?.beginFrame();
       frameCount++;
-      if (renderer?.renderOnly && frameCount % TICK_EVERY !== 0) {
+      if (renderer.renderOnly && frameCount % TICK_EVERY !== 0) {
         renderer.setTransition?.(easeTransition((frameCount % TICK_EVERY) / TICK_EVERY));
-        renderer.renderOnly();
+        if (perf) { perf.time('render', () => renderer!.renderOnly!()); }
+        else { renderer.renderOnly(); }
       } else {
-        renderer?.setTransition?.(0);
-        renderer?.tick();
+        renderer.setTransition?.(0);
+        if (perf) { perf.time('tick', () => renderer!.tick()); }
+        else { renderer.tick(); }
       }
+      perf?.endFrame();
       break;
 
     case 'resize':
@@ -267,6 +304,7 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
       renderer?.setTransition?.(1);
       renderer?.setZones?.(zoneState.getAll());
       renderer?.setDecals?.(decalState.getAll());
+      renderer?.setHiRes?.(hiresState.get());
       // Grid dimensions change on resize; notify main thread.
       if (renderer?.gridInfo) {
         post({ type: 'grid_info', gridInfo: renderer.gridInfo() });
@@ -357,6 +395,15 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
       decalState.clear();
       applyDecalsToRenderer();
       postDecalsState();
+      break;
+
+    case 'set_hires': hiresState.set(e.data.region); applyHiResToRenderer(); postHiResState(); break;
+    case 'clear_hires': hiresState.clear(); applyHiResToRenderer(); postHiResState(); break;
+
+    case 'perf_snapshot':
+      if (perf) {
+        post({ type: 'perf_snapshot', stats: perf.snapshot() });
+      }
       break;
 
     case 'stop':

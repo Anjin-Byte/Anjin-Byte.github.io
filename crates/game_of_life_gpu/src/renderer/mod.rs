@@ -1,6 +1,6 @@
 mod bindings;
 mod noise;
 mod pipeline;
-mod types;
+pub(crate) mod types;
 
 pub use pipeline::GpuRenderer;

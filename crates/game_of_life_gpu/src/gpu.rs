@@ -2,7 +2,9 @@ use wasm_bindgen::prelude::*;
 
 use crate::decals::parse_decal_entries_json;
 use crate::grid::Grid;
+use crate::hires::HiResManager;
 use crate::renderer::GpuRenderer;
+use crate::renderer::types::{HiResGlobalMetaGpu, HiResRegionMetaGpu};
 use crate::simulation::Simulation;
 use crate::zones::parse_zone_entries_json;
 
@@ -30,10 +32,15 @@ pub struct GpuGameOfLife {
     queue: wgpu::Queue,
     grid: Grid,
     simulation: Simulation,
+    hires: HiResManager,
     renderer: GpuRenderer,
     target_pitch: f32,   // stored as reference for resize recomputation
     zones_json: String,  // latest sanitized zone payload from the app
     decals_json: String, // latest sanitized decal payload from the app
+    hires_show_grid: bool,
+    hires_show_base_grid: bool,
+    hires_show_border: bool,
+    hires_paused: bool,
 }
 
 /// Shared init path: requests adapter + device, builds grid/simulation/renderer.
@@ -74,7 +81,10 @@ async fn from_surface(
     let cell_px = grid_pitch.round() as u32;
 
     let grid = Grid::new(width, height, cell_px);
-    let simulation = Simulation::new(&device, &queue, &grid);
+    let hires = HiResManager::new(&device, &grid);
+    let simulation = Simulation::new(
+        &device, &queue, &grid, hires.mask_buffer(), hires.inward_buffer(),
+    );
     let renderer = GpuRenderer::new(
         &device,
         &queue,
@@ -91,10 +101,15 @@ async fn from_surface(
         queue,
         grid,
         simulation,
+        hires,
         renderer,
         target_pitch,
         zones_json: String::new(),
         decals_json: String::new(),
+        hires_show_grid: true,
+        hires_show_base_grid: true,
+        hires_show_border: true,
+        hires_paused: false,
     })
 }
 
@@ -143,6 +158,7 @@ impl GpuGameOfLife {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("gol_render_only"),
             });
+        self.copy_hires_to_render(&mut encoder);
         match self
             .renderer
             .render(&mut encoder, self.simulation.current_visible_is_a())
@@ -178,7 +194,11 @@ impl GpuGameOfLife {
             self.simulation.current_visible_buffer(),
             &self.grid,
         );
+        if !self.hires_paused {
+            self.hires.tick(&mut encoder, &self.queue, self.simulation.frame);
+        }
         self.simulation.tick(&mut encoder, &self.grid);
+        self.copy_hires_to_render(&mut encoder);
 
         match self
             .renderer
@@ -213,8 +233,14 @@ impl GpuGameOfLife {
         let grid_pitch = aligned_pitch(width, self.target_pitch);
         let cell_px = grid_pitch.round() as u32;
         self.grid = Grid::new(width, height, cell_px);
-        self.simulation
-            .resize(&self.device, &self.queue, &self.grid);
+        self.hires.resize_mask(&self.device, &self.queue, &self.grid);
+        self.simulation.resize(
+            &self.device, &self.queue, &self.grid,
+            self.hires.mask_buffer(), self.hires.inward_buffer(),
+        );
+        self.hires.rebuild_boundary_for_resize(
+            &self.device, &self.grid, &self.simulation.buf_a, &self.simulation.buf_b,
+        );
         self.renderer.resize(
             &self.device,
             &self.queue,
@@ -231,6 +257,11 @@ impl GpuGameOfLife {
             self.renderer.clear_decals(&self.queue);
         } else if let Ok(entries) = parse_decal_entries_json(&self.decals_json, &self.grid) {
             self.renderer.set_decals(&self.queue, &entries);
+        }
+        if self.hires.is_active() {
+            self.sync_hires_to_renderer();
+        } else {
+            self.renderer.clear_hires(&self.queue);
         }
     }
 
@@ -292,5 +323,106 @@ impl GpuGameOfLife {
         self.decals_json.push_str(decals_json);
         self.renderer.set_decals(&self.queue, &entries);
         Ok(())
+    }
+
+    /// Sets a hi-res region from rect + multiplier. Phase 1: single region only.
+    pub fn set_hires_region(
+        &mut self, x1: i32, y1: i32, x2: i32, y2: i32, multiplier: u32,
+        show_grid: bool, show_base_grid: bool, show_border: bool,
+    ) {
+        self.hires_show_grid = show_grid;
+        self.hires_show_base_grid = show_base_grid;
+        self.hires_show_border = show_border;
+        let rect = [x1, y1, x2, y2];
+        self.hires.set_region(
+            &self.device, &self.queue, &self.grid, rect, multiplier,
+            &self.simulation.buf_a, &self.simulation.buf_b,
+            self.simulation.frame,
+        );
+        self.sync_hires_to_renderer();
+    }
+
+    /// Pause or resume the hi-res simulation without destroying the region.
+    ///
+    /// On pause: copies current → previous so the repeating transition_t
+    /// cycle produces no visual change while paused.
+    ///
+    /// On unpause: re-aligns the region's ping-pong frame counter to the
+    /// base simulation's frame so bind-group parity is correct, then copies
+    /// current → previous so the first resumed tick transitions cleanly.
+    pub fn set_hires_paused(&mut self, paused: bool) {
+        if paused == self.hires_paused { return; }
+        if let Some(ref mut region) = self.hires.region {
+            if !paused {
+                // Resync parity before the next hires.tick() uses sim_frame.
+                region.resync_frame(self.simulation.frame);
+            }
+            // In both directions: make prev == current so there's no stale
+            // diff for the transition shader to animate.
+            let src = region.current_visible_buffer() as *const wgpu::Buffer;
+            let dst = region.previous_visible_buffer() as *const wgpu::Buffer;
+            let size = region.buffer_bytes();
+            let mut encoder = self.device.create_command_encoder(
+                &wgpu::CommandEncoderDescriptor { label: Some("hires_pause_sync") },
+            );
+            // SAFETY: src and dst are different buffers (ping-pong pair).
+            unsafe {
+                encoder.copy_buffer_to_buffer(&*src, 0, &*dst, 0, size);
+            }
+            self.queue.submit([encoder.finish()]);
+        }
+        self.hires_paused = paused;
+    }
+
+    /// Update display flags without recreating the region.
+    pub fn update_hires_flags(&mut self, show_grid: bool, show_base_grid: bool, show_border: bool) {
+        self.hires_show_grid = show_grid;
+        self.hires_show_base_grid = show_base_grid;
+        self.hires_show_border = show_border;
+        if self.hires.is_active() {
+            self.sync_hires_to_renderer();
+        }
+    }
+
+    pub fn clear_hires_region(&mut self) {
+        self.hires.clear_region(&self.queue);
+        self.renderer.clear_hires(&self.queue);
+    }
+}
+
+// Private helpers (outside #[wasm_bindgen] impl block).
+impl GpuGameOfLife {
+    fn copy_hires_to_render(&self, encoder: &mut wgpu::CommandEncoder) {
+        if let Some((src, size)) = self.hires.visible_fine_buffer() {
+            let dst = self.renderer.hires_cells_buf();
+            if dst.size() >= size {
+                encoder.copy_buffer_to_buffer(src, 0, dst, 0, size);
+            }
+        }
+        if let Some((src, size)) = self.hires.previous_fine_buffer() {
+            let dst = self.renderer.hires_cells_prev_buf();
+            if dst.size() >= size {
+                encoder.copy_buffer_to_buffer(src, 0, dst, 0, size);
+            }
+        }
+    }
+
+    fn sync_hires_to_renderer(&mut self) {
+        if let Some((rect, mult, cols, wpr)) = self.hires.render_meta() {
+            let meta = HiResGlobalMetaGpu { region_count: 1, ..Default::default() };
+            let region = HiResRegionMetaGpu {
+                rect, multiplier: mult, buffer_offset: 0, cols, wpr,
+                flags: (if self.hires_show_grid { 1u32 } else { 0 })
+                     | (if self.hires_show_base_grid { 2u32 } else { 0 })
+                     | (if self.hires_show_border { 4u32 } else { 0 }),
+                pad0: 0, pad1: 0, pad2: 0,
+            };
+            let cells_size = self.hires.visible_fine_buffer()
+                .map(|(_, s)| s).unwrap_or(4);
+            self.renderer.set_hires(
+                &self.device, &self.queue, &self.simulation,
+                &meta, &[region], cells_size,
+            );
+        }
     }
 }
