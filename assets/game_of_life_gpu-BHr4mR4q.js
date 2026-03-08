@@ -1,7 +1,7 @@
 import { _ as O } from "./__vite-plugin-wasm-helper-oqf-7dtx.js";
 let B;
 let __tla = (async ()=>{
-    var E = "/assets/game_of_life_gpu_bg-HtEvFNx0.wasm";
+    var E = "/assets/game_of_life_gpu_bg-xNVl_myB.wasm";
     B = class {
         static __wrap(_) {
             _ = _ >>> 0;
@@ -16,8 +16,8 @@ let __tla = (async ()=>{
             const _ = this.__destroy_into_raw();
             c.__wbg_gpugameoflife_free(_, 0);
         }
-        add_hires_region(_, t, n, r, f, a, s, l, W) {
-            c.gpugameoflife_add_hires_region(this.__wbg_ptr, _, t, n, r, f, a, s, l, W);
+        add_hires_region(_, t, n, r, f, a, i, l, W) {
+            c.gpugameoflife_add_hires_region(this.__wbg_ptr, _, t, n, r, f, a, i, l, W);
         }
         clear_frozen_cells() {
             c.gpugameoflife_clear_frozen_cells(this.__wbg_ptr);
@@ -36,6 +36,12 @@ let __tla = (async ()=>{
         }
         grid_pitch() {
             return c.gpugameoflife_grid_pitch(this.__wbg_ptr);
+        }
+        hires_tick_and_render() {
+            c.gpugameoflife_hires_tick_and_render(this.__wbg_ptr);
+        }
+        max_hires_tick_multiplier() {
+            return c.gpugameoflife_max_hires_tick_multiplier(this.__wbg_ptr) >>> 0;
         }
         static new(_, t) {
             return c.gpugameoflife_new(_, t);
@@ -62,32 +68,35 @@ let __tla = (async ()=>{
             return c.gpugameoflife_screen_rows(this.__wbg_ptr) >>> 0;
         }
         set_decals_json(_) {
-            const t = g(_, c.__wbindgen_malloc, c.__wbindgen_realloc), n = i, r = c.gpugameoflife_set_decals_json(this.__wbg_ptr, t, n);
+            const t = g(_, c.__wbindgen_malloc, c.__wbindgen_realloc), n = s, r = c.gpugameoflife_set_decals_json(this.__wbg_ptr, t, n);
             if (r[1]) throw m(r[0]);
         }
         set_frozen_cells(_) {
-            const t = g(_, c.__wbindgen_malloc, c.__wbindgen_realloc), n = i, r = c.gpugameoflife_set_frozen_cells(this.__wbg_ptr, t, n);
+            const t = g(_, c.__wbindgen_malloc, c.__wbindgen_realloc), n = s, r = c.gpugameoflife_set_frozen_cells(this.__wbg_ptr, t, n);
             if (r[1]) throw m(r[0]);
         }
         set_hires_frozen_cells(_, t) {
-            const n = g(t, c.__wbindgen_malloc, c.__wbindgen_realloc), r = i, f = c.gpugameoflife_set_hires_frozen_cells(this.__wbg_ptr, _, n, r);
+            const n = g(t, c.__wbindgen_malloc, c.__wbindgen_realloc), r = s, f = c.gpugameoflife_set_hires_frozen_cells(this.__wbg_ptr, _, n, r);
             if (f[1]) throw m(f[0]);
         }
         set_hires_paused(_, t) {
             c.gpugameoflife_set_hires_paused(this.__wbg_ptr, _, t);
         }
+        set_hires_tick_multiplier(_, t) {
+            c.gpugameoflife_set_hires_tick_multiplier(this.__wbg_ptr, _, t);
+        }
         set_scroll(_) {
             c.gpugameoflife_set_scroll(this.__wbg_ptr, _);
         }
         set_text_glyphs(_) {
-            const t = g(_, c.__wbindgen_malloc, c.__wbindgen_realloc), n = i, r = c.gpugameoflife_set_text_glyphs(this.__wbg_ptr, t, n);
+            const t = g(_, c.__wbindgen_malloc, c.__wbindgen_realloc), n = s, r = c.gpugameoflife_set_text_glyphs(this.__wbg_ptr, t, n);
             if (r[1]) throw m(r[0]);
         }
         set_transition(_) {
             c.gpugameoflife_set_transition(this.__wbg_ptr, _);
         }
         set_zones_json(_) {
-            const t = g(_, c.__wbindgen_malloc, c.__wbindgen_realloc), n = i, r = c.gpugameoflife_set_zones_json(this.__wbg_ptr, t, n);
+            const t = g(_, c.__wbindgen_malloc, c.__wbindgen_realloc), n = s, r = c.gpugameoflife_set_zones_json(this.__wbg_ptr, t, n);
             if (r[1]) throw m(r[0]);
         }
         tick_and_render() {
@@ -100,7 +109,7 @@ let __tla = (async ()=>{
             c.gpugameoflife_update_hires_flags(this.__wbg_ptr, _, t, n, r);
         }
         upload_text_atlas(_, t, n) {
-            const r = Un(_, c.__wbindgen_malloc), f = i, a = c.gpugameoflife_upload_text_atlas(this.__wbg_ptr, r, f, t, n);
+            const r = Un(_, c.__wbindgen_malloc), f = s, a = c.gpugameoflife_upload_text_atlas(this.__wbg_ptr, r, f, t, n);
             if (a[1]) throw m(a[0]);
         }
         words_per_row() {
@@ -119,7 +128,7 @@ let __tla = (async ()=>{
         return u(t) ? 16777215 : t ? 1 : 0;
     }
     function M(e, _) {
-        const t = k(_), n = g(t, c.__wbindgen_malloc, c.__wbindgen_realloc), r = i;
+        const t = P(_), n = g(t, c.__wbindgen_malloc, c.__wbindgen_realloc), r = s;
         b().setInt32(e + 4, r, !0), b().setInt32(e + 0, n, !0);
     }
     function F(e) {
@@ -138,7 +147,7 @@ let __tla = (async ()=>{
     }
     function N(e, _) {
         const t = _, n = typeof t == "string" ? t : void 0;
-        var r = u(n) ? 0 : g(n, c.__wbindgen_malloc, c.__wbindgen_realloc), f = i;
+        var r = u(n) ? 0 : g(n, c.__wbindgen_malloc, c.__wbindgen_realloc), f = s;
         b().setInt32(e + 4, f, !0), b().setInt32(e + 0, r, !0);
     }
     function Q(e, _) {
@@ -150,10 +159,10 @@ let __tla = (async ()=>{
     function Y(e, _) {
         return e.beginComputePass(_);
     }
-    function H(e, _) {
+    function Z(e, _) {
         return e.beginRenderPass(_);
     }
-    function Z(e) {
+    function H(e) {
         return e.buffer;
     }
     function J() {
@@ -191,10 +200,10 @@ let __tla = (async ()=>{
     function ae(e, _) {
         return e.createBindGroup(_);
     }
-    function se(e, _) {
+    function ie(e, _) {
         return e.createBuffer(_);
     }
-    function ie(e, _) {
+    function se(e, _) {
         return e.createCommandEncoder(_);
     }
     function be(e, _) {
@@ -236,20 +245,20 @@ let __tla = (async ()=>{
     function Se(e, _, t) {
         e.dispatchWorkgroupsIndirect(_, t);
     }
-    function Ie(e, _, t, n) {
+    function ke(e, _, t, n) {
         e.dispatchWorkgroups(_ >>> 0, t >>> 0, n >>> 0);
     }
-    function Te(e) {
+    function Ie(e) {
         const _ = e.document;
         return u(_) ? 0 : d(_);
+    }
+    function Te(e, _, t) {
+        e.drawIndexedIndirect(_, t);
     }
     function ve(e, _, t) {
         e.drawIndexedIndirect(_, t);
     }
-    function Pe(e, _, t) {
-        e.drawIndexedIndirect(_, t);
-    }
-    function ke(e, _, t, n, r, f) {
+    function Pe(e, _, t, n, r, f) {
         e.drawIndexed(_ >>> 0, t >>> 0, n >>> 0, r, f >>> 0);
     }
     function Ce(e, _, t, n, r, f) {
@@ -323,13 +332,13 @@ let __tla = (async ()=>{
             return u(n) ? 0 : d(n);
         }, arguments);
     }
-    function He() {
+    function Ze() {
         return p(function(e, _, t) {
             const n = e.getContext(w(_, t));
             return u(n) ? 0 : d(n);
         }, arguments);
     }
-    function Ze(e) {
+    function He(e) {
         return e.getCurrentTexture();
     }
     function Je(e, _, t) {
@@ -375,7 +384,7 @@ let __tla = (async ()=>{
         }
         return _;
     }
-    function s_(e) {
+    function i_(e) {
         let _;
         try {
             _ = e instanceof GPUCanvasContext;
@@ -384,7 +393,7 @@ let __tla = (async ()=>{
         }
         return _;
     }
-    function i_(e) {
+    function s_(e) {
         let _;
         try {
             _ = e instanceof GPUDeviceLostInfo;
@@ -433,7 +442,7 @@ let __tla = (async ()=>{
         return Array.isArray(e);
     }
     function l_(e, _) {
-        const t = _.label, n = g(t, c.__wbindgen_malloc, c.__wbindgen_realloc), r = i;
+        const t = _.label, n = g(t, c.__wbindgen_malloc, c.__wbindgen_realloc), r = s;
         b().setInt32(e + 4, r, !0), b().setInt32(e + 0, n, !0);
     }
     function m_(e) {
@@ -457,19 +466,19 @@ let __tla = (async ()=>{
     function S_(e) {
         return e.lost;
     }
-    function I_(e, _, t, n) {
+    function k_(e, _, t, n) {
         return e.mapAsync(_ >>> 0, t, n);
     }
-    function T_(e) {
+    function I_(e) {
         return e.maxBindGroups;
     }
-    function v_(e) {
+    function T_(e) {
         return e.maxBindingsPerBindGroup;
     }
-    function P_(e) {
+    function v_(e) {
         return e.maxBufferSize;
     }
-    function k_(e) {
+    function P_(e) {
         return e.maxColorAttachmentBytesPerSample;
     }
     function C_(e) {
@@ -535,25 +544,25 @@ let __tla = (async ()=>{
     function Y_(e) {
         return e.maxUniformBuffersPerShaderStage;
     }
-    function H_(e) {
+    function Z_(e) {
         return e.maxVertexAttributes;
     }
-    function Z_(e) {
+    function H_(e) {
         return e.maxVertexBufferArrayStride;
     }
     function J_(e) {
         return e.maxVertexBuffers;
     }
     function K_(e, _) {
-        const t = _.message, n = g(t, c.__wbindgen_malloc, c.__wbindgen_realloc), r = i;
+        const t = _.message, n = g(t, c.__wbindgen_malloc, c.__wbindgen_realloc), r = s;
         b().setInt32(e + 4, r, !0), b().setInt32(e + 0, n, !0);
     }
     function et(e, _) {
-        const t = _.message, n = g(t, c.__wbindgen_malloc, c.__wbindgen_realloc), r = i;
+        const t = _.message, n = g(t, c.__wbindgen_malloc, c.__wbindgen_realloc), r = s;
         b().setInt32(e + 4, r, !0), b().setInt32(e + 0, n, !0);
     }
     function _t(e, _) {
-        const t = _.message, n = g(t, c.__wbindgen_malloc, c.__wbindgen_realloc), r = i;
+        const t = _.message, n = g(t, c.__wbindgen_malloc, c.__wbindgen_realloc), r = s;
         b().setInt32(e + 4, r, !0), b().setInt32(e + 0, n, !0);
     }
     function tt(e) {
@@ -577,21 +586,21 @@ let __tla = (async ()=>{
     function at() {
         return new Object;
     }
-    function st(e, _) {
+    function it(e, _) {
         return new Uint8Array(G(e, _));
     }
-    function it(e, _) {
+    function st(e, _) {
         try {
             var t = {
                 a: e,
                 b: _
             }, n = (f, a)=>{
-                const s = t.a;
+                const i = t.a;
                 t.a = 0;
                 try {
-                    return Dn(s, t.b, f, a);
+                    return Dn(i, t.b, f, a);
                 } finally{
-                    t.a = s;
+                    t.a = i;
                 }
             };
             return new Promise(n);
@@ -642,20 +651,20 @@ let __tla = (async ()=>{
     function St() {
         return Math.random();
     }
-    function It(e) {
+    function kt(e) {
         const _ = e.reason;
         return (Wn.indexOf(_) + 1 || 3) - 1;
     }
-    function Tt(e, _) {
+    function It(e, _) {
         return e.requestAdapter(_);
     }
-    function vt(e, _) {
+    function Tt(e, _) {
         return _?.requiredLimits && delete _.requiredLimits.maxInterStageShaderComponents, e.requestDevice(_);
     }
-    function Pt(e, _, t, n, r, f) {
+    function vt(e, _, t, n, r, f) {
         e.resolveQuerySet(_, t >>> 0, n >>> 0, r, f >>> 0);
     }
-    function kt(e) {
+    function Pt(e) {
         return Promise.resolve(e);
     }
     function Ct(e, _, t) {
@@ -680,16 +689,16 @@ let __tla = (async ()=>{
         e.setBlendConstant(_);
     }
     function Ot(e, _, t, n, r) {
-        e.setIndexBuffer(_, v[t], n, r);
+        e.setIndexBuffer(_, T[t], n, r);
     }
     function Et(e, _, t, n) {
-        e.setIndexBuffer(_, v[t], n);
+        e.setIndexBuffer(_, T[t], n);
     }
     function Vt(e, _, t, n) {
-        e.setIndexBuffer(_, v[t], n);
+        e.setIndexBuffer(_, T[t], n);
     }
     function Ut(e, _, t, n, r) {
-        e.setIndexBuffer(_, v[t], n, r);
+        e.setIndexBuffer(_, T[t], n, r);
     }
     function Rt(e, _) {
         e.setPipeline(_);
@@ -721,12 +730,12 @@ let __tla = (async ()=>{
     function Yt(e, _, t, n, r, f, a) {
         e.setViewport(_, t, n, r, f, a);
     }
-    function Ht() {
+    function Zt() {
         return p(function(e, _, t) {
             return Reflect.set(e, _, t);
         }, arguments);
     }
-    function Zt(e, _, t) {
+    function Ht(e, _, t) {
         e.set(_, t >>> 0);
     }
     function Jt(e, _) {
@@ -748,7 +757,7 @@ let __tla = (async ()=>{
         return e.size;
     }
     function rn(e, _) {
-        const t = _.stack, n = g(t, c.__wbindgen_malloc, c.__wbindgen_realloc), r = i;
+        const t = _.stack, n = g(t, c.__wbindgen_malloc, c.__wbindgen_realloc), r = s;
         b().setInt32(e + 4, r, !0), b().setInt32(e + 0, n, !0);
     }
     function cn() {
@@ -808,21 +817,21 @@ let __tla = (async ()=>{
         e.writeTexture(_, t, n, r);
     }
     function Sn(e, _) {
-        return A(e, _, c.wasm_bindgen__closure__destroy__h365128c9c23d36c4, Gn);
-    }
-    function In(e, _) {
-        return A(e, _, c.wasm_bindgen__closure__destroy__h365128c9c23d36c4, An);
-    }
-    function Tn(e, _) {
-        return A(e, _, c.wasm_bindgen__closure__destroy__h03eaf4e806a12d61, zn);
-    }
-    function vn(e) {
-        return e;
-    }
-    function Pn(e, _) {
-        return G(e, _);
+        return A(e, _, c.wasm_bindgen__closure__destroy__h38919d594d1637ba, Gn);
     }
     function kn(e, _) {
+        return A(e, _, c.wasm_bindgen__closure__destroy__h38919d594d1637ba, An);
+    }
+    function In(e, _) {
+        return A(e, _, c.wasm_bindgen__closure__destroy__h03eaf4e806a12d61, zn);
+    }
+    function Tn(e) {
+        return e;
+    }
+    function vn(e, _) {
+        return G(e, _);
+    }
+    function Pn(e, _) {
         return w(e, _);
     }
     function Cn() {
@@ -830,10 +839,10 @@ let __tla = (async ()=>{
         e.set(0, void 0), e.set(_ + 0, void 0), e.set(_ + 1, null), e.set(_ + 2, !0), e.set(_ + 3, !1);
     }
     function Gn(e, _, t) {
-        c.wasm_bindgen__convert__closures_____invoke__hd609b1af4891e568(e, _, t);
+        c.wasm_bindgen__convert__closures_____invoke__h552809390f1f128d(e, _, t);
     }
     function An(e, _, t) {
-        c.wasm_bindgen__convert__closures_____invoke__hd609b1af4891e568_1(e, _, t);
+        c.wasm_bindgen__convert__closures_____invoke__h552809390f1f128d_1(e, _, t);
     }
     function zn(e, _, t) {
         const n = c.wasm_bindgen__convert__closures_____invoke__h566144c69442e6ff(e, _, t);
@@ -853,7 +862,7 @@ let __tla = (async ()=>{
         "validation",
         "out-of-memory",
         "internal"
-    ], v = [
+    ], T = [
         "uint16",
         "uint32"
     ], En = [
@@ -964,7 +973,7 @@ let __tla = (async ()=>{
         register: ()=>{},
         unregister: ()=>{}
     } : new FinalizationRegistry((e)=>e.dtor(e.a, e.b));
-    function k(e) {
+    function P(e) {
         const _ = typeof e;
         if (_ == "number" || _ == "boolean" || e == null) return `${e}`;
         if (_ == "string") return `"${e}"`;
@@ -979,8 +988,8 @@ let __tla = (async ()=>{
         if (Array.isArray(e)) {
             const r = e.length;
             let f = "[";
-            r > 0 && (f += k(e[0]));
-            for(let a = 1; a < r; a++)f += ", " + k(e[a]);
+            r > 0 && (f += P(e[0]));
+            for(let a = 1; a < r; a++)f += ", " + P(e[a]);
             return f += "]", f;
         }
         const t = /\[object ([^\]]+)\]/.exec(toString.call(e));
@@ -1012,9 +1021,9 @@ ${e.stack}` : n;
     function Vn() {
         return (S === null || S.byteLength === 0) && (S = new Uint32Array(c.memory.buffer)), S;
     }
-    let I = null;
+    let k = null;
     function x() {
-        return (I === null || I.byteLength === 0) && (I = new Uint8Array(c.memory.buffer)), I;
+        return (k === null || k.byteLength === 0) && (k = new Uint8Array(c.memory.buffer)), k;
     }
     function p(e, _) {
         try {
@@ -1035,12 +1044,12 @@ ${e.stack}` : n;
             dtor: t
         }, f = (...a)=>{
             r.cnt++;
-            const s = r.a;
+            const i = r.a;
             r.a = 0;
             try {
-                return n(s, r.b, ...a);
+                return n(i, r.b, ...a);
             } finally{
-                r.a = s, f._wbg_cb_unref();
+                r.a = i, f._wbg_cb_unref();
             }
         };
         return f._wbg_cb_unref = ()=>{
@@ -1049,44 +1058,44 @@ ${e.stack}` : n;
     }
     function Un(e, _) {
         const t = _(e.length * 1, 1) >>> 0;
-        return x().set(e, t / 1), i = e.length, t;
+        return x().set(e, t / 1), s = e.length, t;
     }
     function g(e, _, t) {
         if (t === void 0) {
-            const s = y.encode(e), l = _(s.length, 1) >>> 0;
-            return x().subarray(l, l + s.length).set(s), i = s.length, l;
+            const i = y.encode(e), l = _(i.length, 1) >>> 0;
+            return x().subarray(l, l + i.length).set(i), s = i.length, l;
         }
         let n = e.length, r = _(n, 1) >>> 0;
         const f = x();
         let a = 0;
         for(; a < n; a++){
-            const s = e.charCodeAt(a);
-            if (s > 127) break;
-            f[r + a] = s;
+            const i = e.charCodeAt(a);
+            if (i > 127) break;
+            f[r + a] = i;
         }
         if (a !== n) {
             a !== 0 && (e = e.slice(a)), r = t(r, n, n = a + e.length * 3, 1) >>> 0;
-            const s = x().subarray(r + a, r + n), l = y.encodeInto(e, s);
+            const i = x().subarray(r + a, r + n), l = y.encodeInto(e, i);
             a += l.written, r = t(r, n, a, 1) >>> 0;
         }
-        return i = a, r;
+        return s = a, r;
     }
     function m(e) {
         const _ = c.__wbindgen_externrefs.get(e);
         return c.__externref_table_dealloc(e), _;
     }
-    let T = new TextDecoder("utf-8", {
+    let I = new TextDecoder("utf-8", {
         ignoreBOM: !0,
         fatal: !0
     });
-    T.decode();
+    I.decode();
     const Rn = 2146435072;
-    let P = 0;
+    let v = 0;
     function Mn(e, _) {
-        return P += _, P >= Rn && (T = new TextDecoder("utf-8", {
+        return v += _, v >= Rn && (I = new TextDecoder("utf-8", {
             ignoreBOM: !0,
             fatal: !0
-        }), T.decode(), P = _), T.decode(x().subarray(e, e + _));
+        }), I.decode(), v = _), I.decode(x().subarray(e, e + _));
     }
     const y = new TextEncoder;
     "encodeInto" in y || (y.encodeInto = function(e, _) {
@@ -1096,14 +1105,14 @@ ${e.stack}` : n;
             written: t.length
         };
     });
-    let i = 0, c;
+    let s = 0, c;
     function Fn(e) {
         c = e;
     }
     URL = globalThis.URL;
     const o = await O({
         "./game_of_life_gpu_bg.js": {
-            __wbg_new_typed_aaaeaf29cf802876: it,
+            __wbg_new_typed_aaaeaf29cf802876: st,
             __wbg_call_2d781c1f4d5c0ef8: J,
             __wbg_gpugameoflife_new: r_,
             __wbg_new_227d7c05414eb861: ft,
@@ -1114,7 +1123,7 @@ ${e.stack}` : n;
             __wbg_instanceof_GpuOutOfMemoryError_ad32cc08223bf570: b_,
             __wbg_offset_164492575e959c94: ut,
             __wbg_length_87e0297027dd7802: m_,
-            __wbg_instanceof_GpuDeviceLostInfo_9385c1b1d1700172: i_,
+            __wbg_instanceof_GpuDeviceLostInfo_9385c1b1d1700172: s_,
             __wbg_limits_5b3783fcc0d36428: x_,
             __wbg_limits_becc24c879d87717: y_,
             __wbg_destroy_50767c0458f7c8d1: xe,
@@ -1133,29 +1142,29 @@ ${e.stack}` : n;
             __wbg_setPipeline_481f34ae14c49d67: Rt,
             __wbg_drawIndirect_73df189881970a43: Ge,
             __wbg_draw_ce5e8b8ad56571cb: De,
-            __wbg_getCurrentTexture_6dc2cdde9bdc098d: Ze,
+            __wbg_getCurrentTexture_6dc2cdde9bdc098d: He,
             __wbg_setScissorRect_0578b1de90caf434: jt,
-            __wbg_dispatchWorkgroups_c122d0482fa3f389: Ie,
-            __wbg_resolveQuerySet_217f20ef3ebd6aed: Pt,
-            __wbg_drawIndexedIndirect_888ac46c4c23516f: ve,
+            __wbg_dispatchWorkgroups_c122d0482fa3f389: ke,
+            __wbg_resolveQuerySet_217f20ef3ebd6aed: vt,
+            __wbg_drawIndexedIndirect_888ac46c4c23516f: Te,
             __wbg_setStencilReference_7616273572b1075e: qt,
-            __wbg_drawIndexed_55f6bf3bda0212ad: ke,
+            __wbg_drawIndexed_55f6bf3bda0212ad: Pe,
             __wbg_setPipeline_723820e1c5cc61e7: Mt,
             __wbg_drawIndirect_a2f7c719957f8ec9: Ae,
             __wbg_copyBufferToBuffer_d52339f5d639af9b: te,
             __wbg_getBindGroupLayout_b9533489f3ee14df: Qe,
             __wbg_getBindGroupLayout_aba26df848b4322d: Ne,
             __wbg_dispatchWorkgroupsIndirect_64be0198a6df9be7: Se,
-            __wbg_drawIndexedIndirect_fcc6ecbd3d698094: Pe,
+            __wbg_drawIndexedIndirect_fcc6ecbd3d698094: ve,
             __wbg_error_2acb88afe0ad9a3e: Oe,
             __wbg_valueOf_5c6da6c9a85f34dc: pn,
-            __wbg_instanceof_GpuCanvasContext_8867fd6a49dfb80b: s_,
+            __wbg_instanceof_GpuCanvasContext_8867fd6a49dfb80b: i_,
             __wbg_maxTextureDimension1D_983c9a563c1855d9: $_,
             __wbg_maxTextureDimension2D_a0a2be37afbde706: N_,
             __wbg_maxTextureDimension3D_53aefd0d779b193e: Q_,
             __wbg_maxTextureArrayLayers_8503bb6fd0cdb150: q_,
-            __wbg_maxBindGroups_5d3409c14d2756b5: T_,
-            __wbg_maxBindingsPerBindGroup_512a63ba20ee714c: v_,
+            __wbg_maxBindGroups_5d3409c14d2756b5: I_,
+            __wbg_maxBindingsPerBindGroup_512a63ba20ee714c: T_,
             __wbg_maxDynamicUniformBuffersPerPipelineLayout_ade9d0536439985a: E_,
             __wbg_maxDynamicStorageBuffersPerPipelineLayout_6974d29539996dc2: O_,
             __wbg_maxSampledTexturesPerShaderStage_e560c5b5b6029c57: U_,
@@ -1166,14 +1175,14 @@ ${e.stack}` : n;
             __wbg_maxUniformBufferBindingSize_8fc7ea016caf650c: X_,
             __wbg_maxStorageBufferBindingSize_984825203efcccc6: M_,
             __wbg_maxVertexBuffers_e5cf174a3497d472: J_,
-            __wbg_maxBufferSize_8cef5a2e6fae09fa: P_,
-            __wbg_maxVertexAttributes_9c129ee44a6fa783: H_,
-            __wbg_maxVertexBufferArrayStride_1d0f177a1fdcdf3c: Z_,
+            __wbg_maxBufferSize_8cef5a2e6fae09fa: v_,
+            __wbg_maxVertexAttributes_9c129ee44a6fa783: Z_,
+            __wbg_maxVertexBufferArrayStride_1d0f177a1fdcdf3c: H_,
             __wbg_minUniformBufferOffsetAlignment_327ef98e308ca208: rt,
             __wbg_minStorageBufferOffsetAlignment_fe964dbc6a6d7ff3: nt,
             __wbg_maxInterStageShaderComponents_d6dbbdabbd40588b: V_,
             __wbg_maxColorAttachments_378f5fb1c453321d: C_,
-            __wbg_maxColorAttachmentBytesPerSample_54d9c60b6cdd092a: k_,
+            __wbg_maxColorAttachmentBytesPerSample_54d9c60b6cdd092a: P_,
             __wbg_maxComputeWorkgroupStorageSize_49c38f3e08b0f760: L_,
             __wbg_maxComputeInvocationsPerWorkgroup_d8877398fe435d24: G_,
             __wbg_maxComputeWorkgroupSizeX_b6f88bafac1581bf: A_,
@@ -1188,20 +1197,20 @@ ${e.stack}` : n;
             __wbg_WorkerGlobalScope_defda269b75e179a: U,
             __wbg_unmap_4aa38f8c5283cc1d: ln,
             __wbg_submit_60f2469dc00130cc: sn,
-            __wbg_mapAsync_8d0ffc031e86e9a0: I_,
+            __wbg_mapAsync_8d0ffc031e86e9a0: k_,
             __wbg_configure_6e1ccd3ac31b721c: _e,
             __wbg_writeBuffer_b5e6e8f3f93629bc: yn,
             __wbg_writeTexture_57e41dd94bac65c4: Bn,
             __wbg_createView_c227b9af7bd5f441: he,
-            __wbg_createBuffer_e3f8b2bd8b492498: se,
+            __wbg_createBuffer_e3f8b2bd8b492498: ie,
             __wbg_createSampler_cb4137c4e97c7098: le,
             __wbg_createTexture_1a3ebeb1ddd7a035: pe,
-            __wbg_requestDevice_6130c3ba10d633f9: vt,
+            __wbg_requestDevice_6130c3ba10d633f9: Tt,
             __wbg_finish_35be15c58b55a95b: Me,
             __wbg_finish_41491ca602373cde: Fe,
             __wbg_createQuerySet_6050df2adcb1f167: ue,
             __wbg_createBindGroup_876adbf7e329ce2e: ae,
-            __wbg_requestAdapter_e4b32f2647c66726: Tt,
+            __wbg_requestAdapter_e4b32f2647c66726: It,
             __wbg_set_onuncapturederror_729c2e42c36923f4: en,
             __wbg_setBindGroup_f4d552dcef65a491: Dt,
             __wbg_setBindGroup_f930832baeb4279b: Lt,
@@ -1220,7 +1229,7 @@ ${e.stack}` : n;
             __wbg_finish_ee515f526784acd5: qe,
             __wbg_setIndexBuffer_f0ab50b0e1d8658c: Ut,
             __wbg_setIndexBuffer_5eb14c0c19ab80c2: Et,
-            __wbg_createCommandEncoder_e617922978f8b4de: ie,
+            __wbg_createCommandEncoder_e617922978f8b4de: se,
             __wbg_createPipelineLayout_1a8ea1f550cfa5e7: ge,
             __wbg_createRenderPipeline_921034ccba195ffe: we,
             __wbg_setVertexBuffer_54536e0e73bfc91e: $t,
@@ -1230,7 +1239,7 @@ ${e.stack}` : n;
             __wbg_createBindGroupLayout_e37f9323c278f93f: fe,
             __wbg_lost_2c34651e3317be8b: S_,
             __wbg_then_1d7a5273811a5cea: gn,
-            __wbg_beginRenderPass_9a7bf53d588737dc: H,
+            __wbg_beginRenderPass_9a7bf53d588737dc: Z,
             __wbg_beginComputePass_5d05bddfd3eb7ba4: Y,
             __wbg_createRenderBundleEncoder_a98ecb1771e99ab3: de,
             __wbg_copyExternalImageToTexture_eebbba3aa85a0b95: re,
@@ -1249,39 +1258,39 @@ ${e.stack}` : n;
             __wbg_push_e87b0e732085a946: pt,
             __wbg_new_typed_bccac67128ed885a: bt,
             __wbg_then_9e335f6dd892bc11: un,
+            __wbg_getPreferredCanvasFormat_4314f4e4f5895771: Ke,
             __wbg_label_cdc2b7a875dc5123: l_,
             __wbg_message_f762db05c1294eca: _t,
-            __wbg_getPreferredCanvasFormat_4314f4e4f5895771: Ke,
-            __wbg_reason_d7f4ddcad86f8d99: It,
+            __wbg_reason_d7f4ddcad86f8d99: kt,
             __wbg_message_1b27ea1ad3998a9f: K_,
             __wbg_type_4b0a304ebc25e195: wn,
             __wbg_message_a77e1a9202609622: et,
             __wbg_then_098abe61755d12f6: bn,
             __wbg_queueMicrotask_a082d78ce798393e: yt,
             __wbg_queueMicrotask_0c399741342fb10f: xt,
-            __wbg_resolve_ae8d83246e5bcc12: kt,
+            __wbg_resolve_ae8d83246e5bcc12: Pt,
             __wbg_instanceof_Window_23e677d2c6843922: d_,
-            __wbg_document_c0320cd4183c6d9b: Te,
+            __wbg_document_c0320cd4183c6d9b: Ie,
             __wbg_navigator_9cebf56f28aa719b: ot,
             __wbg_querySelectorAll_ccbf0696a1c6fed8: ht,
             __wbg_navigator_583ffd4fc14c0f7a: ct,
-            __wbg_get_c7546417fb0bec10: t_,
-            __wbg_set_height_b6548a01bdcb689a: Kt,
-            __wbg_getContext_f04bf8f22dcb2d53: He,
-            __wbg_width_4d6fc7fecd877217: hn,
-            __wbg_height_6568c4427c3b889d: o_,
-            __wbg_set_width_c0fcaa2da53cd540: tn,
             __wbg_set_height_98a1a397672657e2: Jt,
             __wbg_getContext_a9236f98f1f7fe7c: Ye,
             __wbg_width_71d9d44b5e14c4b7: xn,
             __wbg_height_fb8c4164276f25fd: f_,
             __wbg_set_width_576343a4a7f2cf28: _n,
+            __wbg_get_c7546417fb0bec10: t_,
+            __wbg_set_height_b6548a01bdcb689a: Kt,
+            __wbg_getContext_f04bf8f22dcb2d53: Ze,
+            __wbg_width_4d6fc7fecd877217: hn,
+            __wbg_height_6568c4427c3b889d: o_,
+            __wbg_set_width_c0fcaa2da53cd540: tn,
             __wbg_new_ab79df5bd7c26067: at,
             __wbg_length_ea16607d7b61445b: h_,
-            __wbg_new_from_slice_22da9388ac046e50: st,
+            __wbg_new_from_slice_22da9388ac046e50: it,
             __wbg_new_with_byte_offset_and_length_b2ec5bf7b2f35743: gt,
-            __wbg_set_e80615d7a9a43981: Zt,
-            __wbg_buffer_60b8043cd926067d: Z,
+            __wbg_set_e80615d7a9a43981: Ht,
+            __wbg_buffer_60b8043cd926067d: H,
             __wbg_prototypesetcall_d62e5099504357e6: lt,
             __wbg_from_4bdf88943703fd48: $e,
             __wbg_isArray_33b91feb269ff46e: w_,
@@ -1292,7 +1301,7 @@ ${e.stack}` : n;
             __wbg_then_bc59d1943397ca4e: dn,
             __wbg_parse_e9eddd2a82c706eb: dt,
             __wbg_get_3ef1eba1850ade27: e_,
-            __wbg_set_7eaa4f96924fd6b3: Ht,
+            __wbg_set_7eaa4f96924fd6b3: Zt,
             __wbg_random_5bb86cae65a45bf6: St,
             __wbg___wbindgen_number_get_34bb9d9dcfa21373: $,
             __wbg___wbindgen_throw_6ddd609b62940d55: Q,
@@ -1305,61 +1314,64 @@ ${e.stack}` : n;
             __wbg__wbg_cb_unref_6b5b6b8576d35cb1: X,
             __wbindgen_init_externref_table: Cn,
             __wbindgen_cast_0000000000000001: Sn,
-            __wbindgen_cast_0000000000000002: In,
-            __wbindgen_cast_0000000000000003: Tn,
-            __wbindgen_cast_0000000000000004: vn,
-            __wbindgen_cast_0000000000000005: Pn,
-            __wbindgen_cast_0000000000000006: kn
+            __wbindgen_cast_0000000000000002: kn,
+            __wbindgen_cast_0000000000000003: In,
+            __wbindgen_cast_0000000000000004: Tn,
+            __wbindgen_cast_0000000000000005: vn,
+            __wbindgen_cast_0000000000000006: Pn
         }
-    }, E), jn = o.memory, qn = o.__wbg_gpugameoflife_free, $n = o.gpugameoflife_add_hires_region, Nn = o.gpugameoflife_clear_frozen_cells, Qn = o.gpugameoflife_clear_hires_frozen_cells, Xn = o.gpugameoflife_clear_hires_regions, Yn = o.gpugameoflife_clear_text_glyphs, Hn = o.gpugameoflife_flush_and_render, Zn = o.gpugameoflife_grid_pitch, Jn = o.gpugameoflife_new, Kn = o.gpugameoflife_new_offscreen, er = o.gpugameoflife_padded_rows, _r = o.gpugameoflife_remove_hires_region, tr = o.gpugameoflife_render_only, nr = o.gpugameoflife_resize, rr = o.gpugameoflife_screen_cols, cr = o.gpugameoflife_screen_rows, or = o.gpugameoflife_set_decals_json, fr = o.gpugameoflife_set_frozen_cells, ar = o.gpugameoflife_set_hires_frozen_cells, sr = o.gpugameoflife_set_hires_paused, ir = o.gpugameoflife_set_scroll, br = o.gpugameoflife_set_text_glyphs, gr = o.gpugameoflife_set_transition, ur = o.gpugameoflife_set_zones_json, dr = o.gpugameoflife_tick_and_render, wr = o.gpugameoflife_toggle_cell, lr = o.gpugameoflife_update_hires_flags, mr = o.gpugameoflife_upload_text_atlas, pr = o.gpugameoflife_words_per_row, hr = o.wasm_bindgen__closure__destroy__h365128c9c23d36c4, xr = o.wasm_bindgen__closure__destroy__h03eaf4e806a12d61, yr = o.wasm_bindgen__convert__closures_____invoke__h566144c69442e6ff, Br = o.wasm_bindgen__convert__closures_____invoke__h45a9c44561bd92e0, Sr = o.wasm_bindgen__convert__closures_____invoke__hd609b1af4891e568, Ir = o.wasm_bindgen__convert__closures_____invoke__hd609b1af4891e568_1, Tr = o.__wbindgen_malloc, vr = o.__wbindgen_realloc, Pr = o.__wbindgen_exn_store, kr = o.__externref_table_alloc, Cr = o.__wbindgen_externrefs, Gr = o.__wbindgen_free, Ar = o.__externref_table_dealloc, L = o.__wbindgen_start;
-    var zr = Object.freeze({
+    }, E), jn = o.memory, qn = o.__wbg_gpugameoflife_free, $n = o.gpugameoflife_add_hires_region, Nn = o.gpugameoflife_clear_frozen_cells, Qn = o.gpugameoflife_clear_hires_frozen_cells, Xn = o.gpugameoflife_clear_hires_regions, Yn = o.gpugameoflife_clear_text_glyphs, Zn = o.gpugameoflife_flush_and_render, Hn = o.gpugameoflife_grid_pitch, Jn = o.gpugameoflife_hires_tick_and_render, Kn = o.gpugameoflife_max_hires_tick_multiplier, er = o.gpugameoflife_new, _r = o.gpugameoflife_new_offscreen, tr = o.gpugameoflife_padded_rows, nr = o.gpugameoflife_remove_hires_region, rr = o.gpugameoflife_render_only, cr = o.gpugameoflife_resize, or = o.gpugameoflife_screen_cols, fr = o.gpugameoflife_screen_rows, ar = o.gpugameoflife_set_decals_json, ir = o.gpugameoflife_set_frozen_cells, sr = o.gpugameoflife_set_hires_frozen_cells, br = o.gpugameoflife_set_hires_paused, gr = o.gpugameoflife_set_hires_tick_multiplier, ur = o.gpugameoflife_set_scroll, dr = o.gpugameoflife_set_text_glyphs, wr = o.gpugameoflife_set_transition, lr = o.gpugameoflife_set_zones_json, mr = o.gpugameoflife_tick_and_render, pr = o.gpugameoflife_toggle_cell, hr = o.gpugameoflife_update_hires_flags, xr = o.gpugameoflife_upload_text_atlas, yr = o.gpugameoflife_words_per_row, Br = o.wasm_bindgen__closure__destroy__h38919d594d1637ba, Sr = o.wasm_bindgen__closure__destroy__h03eaf4e806a12d61, kr = o.wasm_bindgen__convert__closures_____invoke__h566144c69442e6ff, Ir = o.wasm_bindgen__convert__closures_____invoke__h45a9c44561bd92e0, Tr = o.wasm_bindgen__convert__closures_____invoke__h552809390f1f128d, vr = o.wasm_bindgen__convert__closures_____invoke__h552809390f1f128d_1, Pr = o.__wbindgen_malloc, Cr = o.__wbindgen_realloc, Gr = o.__wbindgen_exn_store, Ar = o.__externref_table_alloc, zr = o.__wbindgen_externrefs, Dr = o.__wbindgen_free, Lr = o.__externref_table_dealloc, L = o.__wbindgen_start;
+    var Wr = Object.freeze({
         __proto__: null,
-        __externref_table_alloc: kr,
-        __externref_table_dealloc: Ar,
+        __externref_table_alloc: Ar,
+        __externref_table_dealloc: Lr,
         __wbg_gpugameoflife_free: qn,
-        __wbindgen_exn_store: Pr,
-        __wbindgen_externrefs: Cr,
-        __wbindgen_free: Gr,
-        __wbindgen_malloc: Tr,
-        __wbindgen_realloc: vr,
+        __wbindgen_exn_store: Gr,
+        __wbindgen_externrefs: zr,
+        __wbindgen_free: Dr,
+        __wbindgen_malloc: Pr,
+        __wbindgen_realloc: Cr,
         __wbindgen_start: L,
         gpugameoflife_add_hires_region: $n,
         gpugameoflife_clear_frozen_cells: Nn,
         gpugameoflife_clear_hires_frozen_cells: Qn,
         gpugameoflife_clear_hires_regions: Xn,
         gpugameoflife_clear_text_glyphs: Yn,
-        gpugameoflife_flush_and_render: Hn,
-        gpugameoflife_grid_pitch: Zn,
-        gpugameoflife_new: Jn,
-        gpugameoflife_new_offscreen: Kn,
-        gpugameoflife_padded_rows: er,
-        gpugameoflife_remove_hires_region: _r,
-        gpugameoflife_render_only: tr,
-        gpugameoflife_resize: nr,
-        gpugameoflife_screen_cols: rr,
-        gpugameoflife_screen_rows: cr,
-        gpugameoflife_set_decals_json: or,
-        gpugameoflife_set_frozen_cells: fr,
-        gpugameoflife_set_hires_frozen_cells: ar,
-        gpugameoflife_set_hires_paused: sr,
-        gpugameoflife_set_scroll: ir,
-        gpugameoflife_set_text_glyphs: br,
-        gpugameoflife_set_transition: gr,
-        gpugameoflife_set_zones_json: ur,
-        gpugameoflife_tick_and_render: dr,
-        gpugameoflife_toggle_cell: wr,
-        gpugameoflife_update_hires_flags: lr,
-        gpugameoflife_upload_text_atlas: mr,
-        gpugameoflife_words_per_row: pr,
+        gpugameoflife_flush_and_render: Zn,
+        gpugameoflife_grid_pitch: Hn,
+        gpugameoflife_hires_tick_and_render: Jn,
+        gpugameoflife_max_hires_tick_multiplier: Kn,
+        gpugameoflife_new: er,
+        gpugameoflife_new_offscreen: _r,
+        gpugameoflife_padded_rows: tr,
+        gpugameoflife_remove_hires_region: nr,
+        gpugameoflife_render_only: rr,
+        gpugameoflife_resize: cr,
+        gpugameoflife_screen_cols: or,
+        gpugameoflife_screen_rows: fr,
+        gpugameoflife_set_decals_json: ar,
+        gpugameoflife_set_frozen_cells: ir,
+        gpugameoflife_set_hires_frozen_cells: sr,
+        gpugameoflife_set_hires_paused: br,
+        gpugameoflife_set_hires_tick_multiplier: gr,
+        gpugameoflife_set_scroll: ur,
+        gpugameoflife_set_text_glyphs: dr,
+        gpugameoflife_set_transition: wr,
+        gpugameoflife_set_zones_json: lr,
+        gpugameoflife_tick_and_render: mr,
+        gpugameoflife_toggle_cell: pr,
+        gpugameoflife_update_hires_flags: hr,
+        gpugameoflife_upload_text_atlas: xr,
+        gpugameoflife_words_per_row: yr,
         memory: jn,
-        wasm_bindgen__closure__destroy__h03eaf4e806a12d61: xr,
-        wasm_bindgen__closure__destroy__h365128c9c23d36c4: hr,
-        wasm_bindgen__convert__closures_____invoke__h45a9c44561bd92e0: Br,
-        wasm_bindgen__convert__closures_____invoke__h566144c69442e6ff: yr,
-        wasm_bindgen__convert__closures_____invoke__hd609b1af4891e568: Sr,
-        wasm_bindgen__convert__closures_____invoke__hd609b1af4891e568_1: Ir
+        wasm_bindgen__closure__destroy__h03eaf4e806a12d61: Sr,
+        wasm_bindgen__closure__destroy__h38919d594d1637ba: Br,
+        wasm_bindgen__convert__closures_____invoke__h45a9c44561bd92e0: Ir,
+        wasm_bindgen__convert__closures_____invoke__h552809390f1f128d: Tr,
+        wasm_bindgen__convert__closures_____invoke__h552809390f1f128d_1: vr,
+        wasm_bindgen__convert__closures_____invoke__h566144c69442e6ff: kr
     });
-    Fn(zr);
+    Fn(Wr);
     L();
 })();
 export { B as GpuGameOfLife, __tla };
