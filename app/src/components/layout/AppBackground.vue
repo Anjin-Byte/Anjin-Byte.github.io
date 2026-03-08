@@ -97,6 +97,7 @@ const hiresTextToolEnabled = ref(false);
 const hiresTextFont = ref(DEFAULT_FONT);
 const hiresTextRenderMode = ref<TextRenderMode>('cells');
 const hiresTextColor = ref(DEFAULT_TEXT_COLOR);
+const hiresTextMultiplier = ref(HIRES_MULTIPLIER);
 const hiresTextShowGrid = ref(true);
 const hiresTextShowBaseGrid = ref(true);
 const hiresTextShowBorder = ref(true);
@@ -203,7 +204,7 @@ function commitHiResTextPlacement(): void {
     id: crypto.randomUUID(),
     x1: anchor.cx, y1: anchor.cy,
     x2: anchor.cx + cellsWide - 1, y2: anchor.cy + cellsHigh - 1,
-    multiplier: HIRES_MULTIPLIER,
+    multiplier: hiresTextMultiplier.value,
     enabled: true,
     showGrid: hiresTextShowGrid.value,
     showBaseGrid: hiresTextShowBaseGrid.value,
@@ -331,6 +332,7 @@ function onHiResTextToolChange(payload: HiResTextToolPayload): void {
   hiresTextFont.value = payload.font;
   hiresTextRenderMode.value = payload.renderMode;
   hiresTextColor.value = payload.color;
+  hiresTextMultiplier.value = payload.multiplier;
   hiresTextShowGrid.value = payload.showGrid;
   hiresTextShowBaseGrid.value = payload.showBaseGrid;
   hiresTextShowBorder.value = payload.showBorder;

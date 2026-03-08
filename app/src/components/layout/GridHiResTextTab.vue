@@ -2,13 +2,14 @@
 import { ref, watch } from 'vue';
 import type { TextRenderMode } from '../../types/text';
 import { DEFAULT_FONT, DEFAULT_TEXT_COLOR } from '../../types/text';
-import { HIRES_MULTIPLIER } from '../../types/hiresRegion';
+import { HIRES_MULTIPLIER, MIN_HIRES_MULTIPLIER, MAX_HIRES_MULTIPLIER } from '../../types/hiresRegion';
 
 export interface HiResTextToolPayload {
   enabled: boolean;
   font: string;
   renderMode: TextRenderMode;
   color: string;
+  multiplier: number;
   showGrid: boolean;
   showBaseGrid: boolean;
   showBorder: boolean;
@@ -22,6 +23,7 @@ const drawEnabled = ref(false);
 const font = ref(DEFAULT_FONT);
 const renderMode = ref<TextRenderMode>('cells');
 const color = ref(DEFAULT_TEXT_COLOR);
+const multiplier = ref(HIRES_MULTIPLIER);
 const showGrid = ref(true);
 const showBaseGrid = ref(true);
 const showBorder = ref(true);
@@ -38,6 +40,7 @@ function currentPayload(): HiResTextToolPayload {
     font: font.value,
     renderMode: renderMode.value,
     color: color.value,
+    multiplier: multiplier.value,
     showGrid: showGrid.value,
     showBaseGrid: showBaseGrid.value,
     showBorder: showBorder.value,
@@ -49,7 +52,7 @@ function toggleDraw(): void {
   emit('hires-text-tool-change', currentPayload());
 }
 
-watch([font, renderMode, color, showGrid, showBaseGrid, showBorder], () => {
+watch([font, renderMode, color, multiplier, showGrid, showBaseGrid, showBorder], () => {
   if (drawEnabled.value) {
     emit('hires-text-tool-change', currentPayload());
   }
@@ -59,7 +62,7 @@ watch([font, renderMode, color, showGrid, showBaseGrid, showBorder], () => {
 <template>
   <div class="hires-text-tab">
     <p class="text-caption text-medium-emphasis mb-2">
-      {{ HIRES_MULTIPLIER }}x hi-res region with auto-fit text.
+      Hi-res region with auto-fit text.
       Draw a region, type text (or leave empty for hi-res only).
     </p>
 
@@ -100,6 +103,23 @@ watch([font, renderMode, color, showGrid, showBaseGrid, showBorder], () => {
         </div>
       </v-col>
     </v-row>
+
+    <div class="mt-3">
+      <div class="d-flex align-center justify-space-between">
+        <span class="text-caption text-medium-emphasis">Resolution</span>
+        <span class="text-caption text-medium-emphasis">{{ multiplier }}x</span>
+      </div>
+      <v-slider
+        v-model="multiplier"
+        :min="MIN_HIRES_MULTIPLIER"
+        :max="MAX_HIRES_MULTIPLIER"
+        :step="1"
+        density="compact"
+        hide-details
+        thumb-size="14"
+        track-size="3"
+      />
+    </div>
 
     <v-divider class="my-3" />
 

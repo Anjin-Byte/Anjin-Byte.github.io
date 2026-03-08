@@ -1,5 +1,5 @@
 import type { HiResRegion } from '../types/hiresRegion';
-import { HIRES_MULTIPLIER, MAX_HIRES_REGIONS } from '../types/hiresRegion';
+import { HIRES_MULTIPLIER, MIN_HIRES_MULTIPLIER, MAX_HIRES_MULTIPLIER, MAX_HIRES_REGIONS } from '../types/hiresRegion';
 
 function asInteger(value: unknown): number | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null;
@@ -33,7 +33,9 @@ export function normalizeRegion(region: unknown, now = Date.now()): HiResRegion 
     y1: Math.min(y1, y2),
     x2: Math.max(x1, x2),
     y2: Math.max(y1, y2),
-    multiplier: HIRES_MULTIPLIER,
+    multiplier: typeof source.multiplier === 'number' && Number.isFinite(source.multiplier)
+      ? Math.trunc(Math.max(MIN_HIRES_MULTIPLIER, Math.min(MAX_HIRES_MULTIPLIER, source.multiplier)))
+      : HIRES_MULTIPLIER,
     enabled: typeof source.enabled === 'boolean' ? source.enabled : true,
     showGrid: typeof source.showGrid === 'boolean' ? source.showGrid : true,
     showBaseGrid: typeof source.showBaseGrid === 'boolean' ? source.showBaseGrid : true,

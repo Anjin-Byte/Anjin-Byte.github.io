@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import type { HiResRegion } from '../../types/hiresRegion';
-import { HIRES_MULTIPLIER, MAX_HIRES_REGIONS } from '../../types/hiresRegion';
+import { HIRES_MULTIPLIER, MIN_HIRES_MULTIPLIER, MAX_HIRES_MULTIPLIER, MAX_HIRES_REGIONS } from '../../types/hiresRegion';
 import { TICK_EVERY } from '../../workers/rendererProtocol';
 
 const props = defineProps<{
@@ -44,6 +44,10 @@ function setTickMultiplier(region: HiResRegion, value: number): void {
   emit('update-region', { ...region, tickMultiplier: value, updatedAt: Date.now() });
 }
 
+function setMultiplier(region: HiResRegion, value: number): void {
+  emit('update-region', { ...region, multiplier: value, updatedAt: Date.now() });
+}
+
 function tickRateLabel(value: number): string {
   if (value >= TICK_EVERY) return 'max';
   if (value === 1) return '1x';
@@ -58,7 +62,7 @@ function shortId(region: HiResRegion): string {
 <template>
   <div class="hires-tab">
     <p class="text-caption text-medium-emphasis mb-2">
-      {{ HIRES_MULTIPLIER }}x multiplier — click and drag on the grid to place a region
+      {{ MIN_HIRES_MULTIPLIER }}–{{ MAX_HIRES_MULTIPLIER }}x multiplier — click and drag on the grid to place a region
     </p>
 
     <v-btn
@@ -88,7 +92,7 @@ function shortId(region: HiResRegion): string {
           </v-chip>
         </div>
         <div class="text-caption text-medium-emphasis">
-          {{ HIRES_MULTIPLIER }}x · {{ (region.x2 - region.x1 + 1) * (region.y2 - region.y1 + 1) }} base cells
+          {{ region.multiplier }}x · {{ (region.x2 - region.x1 + 1) * (region.y2 - region.y1 + 1) }} base cells
         </div>
         <div class="d-flex align-center gap-2 mt-2 flex-wrap">
           <v-btn size="x-small" variant="tonal" @click="toggleEnabled(region)">
@@ -106,6 +110,23 @@ function shortId(region: HiResRegion): string {
           <v-btn size="x-small" variant="tonal" color="error" @click="$emit('remove-region', region.id)">
             Delete
           </v-btn>
+        </div>
+        <div class="mt-2">
+          <div class="d-flex align-center justify-space-between">
+            <span class="text-caption text-medium-emphasis">Resolution</span>
+            <span class="text-caption text-medium-emphasis">{{ region.multiplier }}x</span>
+          </div>
+          <v-slider
+            :model-value="region.multiplier"
+            :min="MIN_HIRES_MULTIPLIER"
+            :max="MAX_HIRES_MULTIPLIER"
+            :step="1"
+            density="compact"
+            hide-details
+            thumb-size="14"
+            track-size="3"
+            @update:model-value="(v: number) => setMultiplier(region, v)"
+          />
         </div>
         <div class="mt-2">
           <div class="d-flex align-center justify-space-between">

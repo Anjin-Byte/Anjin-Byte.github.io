@@ -20,6 +20,8 @@ export interface HiResStoragePayload {
 }
 
 export const HIRES_MULTIPLIER = 4;
+export const MIN_HIRES_MULTIPLIER = 2;
+export const MAX_HIRES_MULTIPLIER = 8;
 export const MAX_HIRES_REGIONS = 8;
 export const HIRES_STORAGE_VERSION = 2;
 export const HIRES_STORAGE_KEY = 'gol.hires';

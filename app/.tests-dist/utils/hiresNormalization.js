@@ -33,7 +33,9 @@ function normalizeRegion(region, now = Date.now()) {
         y1: Math.min(y1, y2),
         x2: Math.max(x1, x2),
         y2: Math.max(y1, y2),
-        multiplier: hiresRegion_1.HIRES_MULTIPLIER,
+        multiplier: typeof source.multiplier === 'number' && Number.isFinite(source.multiplier)
+            ? Math.trunc(Math.max(hiresRegion_1.MIN_HIRES_MULTIPLIER, Math.min(hiresRegion_1.MAX_HIRES_MULTIPLIER, source.multiplier)))
+            : hiresRegion_1.HIRES_MULTIPLIER,
         enabled: typeof source.enabled === 'boolean' ? source.enabled : true,
         showGrid: typeof source.showGrid === 'boolean' ? source.showGrid : true,
         showBaseGrid: typeof source.showBaseGrid === 'boolean' ? source.showBaseGrid : true,
