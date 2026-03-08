@@ -1,6 +1,6 @@
 (async ()=>{
     const de = ()=>{};
-    function Me(e) {
+    function Se(e) {
         const n = `[${e}]`;
         return {
             debug: de,
@@ -9,7 +9,7 @@
             error: (...t)=>console.error(n, ...t)
         };
     }
-    const ee = 210, Ee = 128;
+    const H = 210, Oe = 128;
     function ce(e, n, t, o) {
         if (!Array.isArray(e)) return [];
         const r = o ?? Date.now(), s = [];
@@ -20,68 +20,68 @@
         }
         return s;
     }
-    const Oe = new Set([
+    const Ue = new Set([
         "minor",
         "major",
         "both"
-    ]), Ue = new Set([
+    ]), Ge = new Set([
         "none",
         "bold-major",
         "fade",
         "noted"
     ]);
-    function ne(e, n, t) {
+    function re(e, n, t) {
         return Math.min(t, Math.max(n, e));
     }
-    function H(e) {
+    function L(e) {
         return typeof e != "number" || !Number.isFinite(e) ? null : Math.trunc(e);
     }
-    function Ge() {
+    function He() {
         return typeof crypto < "u" && typeof crypto.randomUUID == "function" ? crypto.randomUUID() : `zone-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     }
-    function He(e) {
-        return typeof e == "string" && Oe.has(e) ? e : "both";
-    }
     function Le(e) {
-        const n = e && typeof e == "object" ? e : {}, t = typeof n.style == "string" && Ue.has(n.style) ? n.style : "none", o = ne(H(n.widthCells) ?? 1, 1, 4), r = typeof n.opacity == "number" ? n.opacity : 1, s = ne(r, 0, 1), i = {
+        return typeof e == "string" && Ue.has(e) ? e : "both";
+    }
+    function Pe(e) {
+        const n = e && typeof e == "object" ? e : {}, t = typeof n.style == "string" && Ge.has(n.style) ? n.style : "none", o = re(L(n.widthCells) ?? 1, 1, 4), r = typeof n.opacity == "number" ? n.opacity : 1, s = re(r, 0, 1), i = {
             style: t,
             widthCells: o,
             opacity: s
         };
         if (t === "fade") {
             const a = typeof n.fadeStrength == "number" ? n.fadeStrength : .6;
-            i.fadeStrength = ne(a, 0, 1);
+            i.fadeStrength = re(a, 0, 1);
         }
-        return t === "noted" && (i.notePitchCells = Math.max(1, H(n.notePitchCells) ?? 2)), (t === "bold-major" || t === "noted") && (i.hideInteriorBorder = typeof n.hideInteriorBorder == "boolean" ? n.hideInteriorBorder : !1), i;
+        return t === "noted" && (i.notePitchCells = Math.max(1, L(n.notePitchCells) ?? 2)), (t === "bold-major" || t === "noted") && (i.hideInteriorBorder = typeof n.hideInteriorBorder == "boolean" ? n.hideInteriorBorder : !1), i;
     }
-    function Pe(e) {
+    function Ne(e) {
         return typeof e == "boolean" ? e : !0;
     }
     function fe(e, n) {
         return typeof e == "number" && Number.isFinite(e) ? e : n;
     }
-    function Se(e, n = Date.now()) {
+    function De(e, n = Date.now()) {
         if (!e || typeof e != "object") return null;
-        const t = e, o = H(t.x1), r = H(t.y1), s = H(t.x2), i = H(t.y2);
+        const t = e, o = L(t.x1), r = L(t.y1), s = L(t.x2), i = L(t.y2);
         if (o === null || r === null || s === null || i === null) return null;
         const a = Math.min(o, s), u = Math.max(o, s), l = Math.min(r, i), f = Math.max(r, i);
         return {
-            id: typeof t.id == "string" && t.id.length > 0 ? t.id : Ge(),
+            id: typeof t.id == "string" && t.id.length > 0 ? t.id : He(),
             x1: a,
             y1: l,
             x2: u,
             y2: f,
-            mode: He(t.mode),
-            edge: Le(t.edge),
-            enabled: Pe(t.enabled),
+            mode: Le(t.mode),
+            edge: Pe(t.edge),
+            enabled: Ne(t.enabled),
             createdAt: fe(t.createdAt, n),
             updatedAt: fe(t.updatedAt, n)
         };
     }
-    function Ne(e, n = Date.now()) {
-        return ce(e, Se, Ee, n);
+    function Xe(e, n = Date.now()) {
+        return ce(e, De, Oe, n);
     }
-    class te {
+    class ne {
         constructor(n, t){
             this.normalizeOne = n, this.normalizeAll = t;
         }
@@ -122,23 +122,23 @@
             return this.items = [], this.items;
         }
     }
-    class Xe extends te {
+    class Ye extends ne {
         constructor(){
-            super(Se, Ne);
+            super(De, Xe);
         }
     }
-    const Ye = 32, O = [
+    const Ze = 32, O = [
         .49,
         .3,
         1,
         .6
-    ], Ze = new Set([
+    ], je = new Set([
         "solid",
         "checkerboard",
         "stripes",
         "dots",
         "bitmap"
-    ]), je = new Set([
+    ]), Ke = new Set([
         "alpha",
         "multiply",
         "screen"
@@ -149,26 +149,26 @@
     function D(e) {
         return typeof e != "number" || !Number.isFinite(e) ? null : e;
     }
-    function V(e) {
+    function J(e) {
         const n = D(e);
         return n === null ? null : Math.trunc(n);
     }
-    function Ke() {
+    function ve() {
         return typeof crypto < "u" && typeof crypto.randomUUID == "function" ? crypto.randomUUID() : `decal-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     }
-    function ve(e) {
-        return typeof e == "string" && Ze.has(e) ? e : "solid";
-    }
     function qe(e) {
-        return typeof e == "string" && je.has(e) ? e : "alpha";
+        return typeof e == "string" && je.has(e) ? e : "solid";
     }
     function We(e) {
-        const n = e && typeof e == "object" ? e : {}, t = ve(n.kind), o = {
+        return typeof e == "string" && Ke.has(e) ? e : "alpha";
+    }
+    function Ve(e) {
+        const n = e && typeof e == "object" ? e : {}, t = qe(n.kind), o = {
             kind: t
         };
         return t === "solid" ? (o.coverage = U(D(n.coverage) ?? 1, 0, 1), o.solidR = U(D(n.solidR) ?? O[0], 0, 1), o.solidG = U(D(n.solidG) ?? O[1], 0, 1), o.solidB = U(D(n.solidB) ?? O[2], 0, 1)) : t === "checkerboard" ? o.cellSize = Math.max(1, D(n.cellSize) ?? 2) : t === "stripes" ? o.pitchCells = Math.max(2, D(n.pitchCells) ?? 4) : t === "dots" && (o.dotRadius = Math.max(.1, D(n.dotRadius) ?? .4), o.dotSpacing = Math.max(2, D(n.dotSpacing) ?? 3)), o;
     }
-    function Ve(e) {
+    function Je(e) {
         return !Array.isArray(e) || e.length < 4 ? [
             ...O
         ] : [
@@ -178,58 +178,58 @@
             U(D(e[3]) ?? O[3], 0, 1)
         ];
     }
-    function Je(e) {
+    function Qe(e) {
         return typeof e == "boolean" ? e : !0;
     }
     function ue(e, n) {
-        return typeof e == "number" && Number.isFinite(e) ? e : n;
-    }
-    function De(e, n = Date.now()) {
-        if (!e || typeof e != "object") return null;
-        const t = e, o = V(t.x1), r = V(t.y1), s = V(t.x2), i = V(t.y2);
-        return o === null || r === null || s === null || i === null ? null : {
-            id: typeof t.id == "string" && t.id.length > 0 ? t.id : Ke(),
-            x1: Math.min(o, s),
-            y1: Math.min(r, i),
-            x2: Math.max(o, s),
-            y2: Math.max(r, i),
-            pattern: We(t.pattern),
-            tint: Ve(t.tint),
-            blendMode: qe(t.blendMode),
-            suppressCells: typeof t.suppressCells == "boolean" ? t.suppressCells : !1,
-            enabled: Je(t.enabled),
-            createdAt: ue(t.createdAt, n),
-            updatedAt: ue(t.updatedAt, n)
-        };
-    }
-    function Qe(e, n = Date.now()) {
-        return ce(e, De, Ye, n);
-    }
-    class et extends te {
-        constructor(){
-            super(De, Qe);
-        }
-    }
-    const tt = 4, nt = 2, rt = 8, ot = 8;
-    function J(e) {
-        return typeof e != "number" || !Number.isFinite(e) ? null : Math.trunc(e);
-    }
-    function st() {
-        return typeof crypto < "u" && typeof crypto.randomUUID == "function" ? crypto.randomUUID() : `hires-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    }
-    function he(e, n) {
         return typeof e == "number" && Number.isFinite(e) ? e : n;
     }
     function Ie(e, n = Date.now()) {
         if (!e || typeof e != "object") return null;
         const t = e, o = J(t.x1), r = J(t.y1), s = J(t.x2), i = J(t.y2);
         return o === null || r === null || s === null || i === null ? null : {
-            id: typeof t.id == "string" && t.id.length > 0 ? t.id : st(),
+            id: typeof t.id == "string" && t.id.length > 0 ? t.id : ve(),
             x1: Math.min(o, s),
             y1: Math.min(r, i),
             x2: Math.max(o, s),
             y2: Math.max(r, i),
-            multiplier: typeof t.multiplier == "number" && Number.isFinite(t.multiplier) ? Math.trunc(Math.max(nt, Math.min(rt, t.multiplier))) : tt,
+            pattern: Ve(t.pattern),
+            tint: Je(t.tint),
+            blendMode: We(t.blendMode),
+            suppressCells: typeof t.suppressCells == "boolean" ? t.suppressCells : !1,
+            enabled: Qe(t.enabled),
+            createdAt: ue(t.createdAt, n),
+            updatedAt: ue(t.updatedAt, n)
+        };
+    }
+    function et(e, n = Date.now()) {
+        return ce(e, Ie, Ze, n);
+    }
+    class tt extends ne {
+        constructor(){
+            super(Ie, et);
+        }
+    }
+    const nt = 4, rt = 2, ot = 8, st = 8;
+    function Q(e) {
+        return typeof e != "number" || !Number.isFinite(e) ? null : Math.trunc(e);
+    }
+    function it() {
+        return typeof crypto < "u" && typeof crypto.randomUUID == "function" ? crypto.randomUUID() : `hires-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    }
+    function he(e, n) {
+        return typeof e == "number" && Number.isFinite(e) ? e : n;
+    }
+    function ze(e, n = Date.now()) {
+        if (!e || typeof e != "object") return null;
+        const t = e, o = Q(t.x1), r = Q(t.y1), s = Q(t.x2), i = Q(t.y2);
+        return o === null || r === null || s === null || i === null ? null : {
+            id: typeof t.id == "string" && t.id.length > 0 ? t.id : it(),
+            x1: Math.min(o, s),
+            y1: Math.min(r, i),
+            x2: Math.max(o, s),
+            y2: Math.max(r, i),
+            multiplier: typeof t.multiplier == "number" && Number.isFinite(t.multiplier) ? Math.trunc(Math.max(rt, Math.min(ot, t.multiplier))) : nt,
             enabled: typeof t.enabled == "boolean" ? t.enabled : !0,
             showGrid: typeof t.showGrid == "boolean" ? t.showGrid : !0,
             showBaseGrid: typeof t.showBaseGrid == "boolean" ? t.showBaseGrid : !0,
@@ -239,53 +239,53 @@
             updatedAt: he(t.updatedAt, n)
         };
     }
-    function it(e, n) {
+    function at(e, n) {
         return e.x1 <= n.x2 && e.x2 >= n.x1 && e.y1 <= n.y2 && e.y2 >= n.y1;
     }
-    function at(e, n = Date.now()) {
+    function ct(e, n = Date.now()) {
         if (!Array.isArray(e)) return [];
         const t = [];
         for (const o of e){
-            if (t.length >= ot) break;
-            const r = Ie(o, n);
-            !r || t.some((i)=>it(i, r)) || t.push(r);
+            if (t.length >= st) break;
+            const r = ze(o, n);
+            !r || t.some((i)=>at(i, r)) || t.push(r);
         }
         return t;
     }
-    class ct extends te {
+    class lt extends ne {
         constructor(){
-            super(Ie, at);
+            super(ze, ct);
         }
     }
-    const ze = "#1a1a2e", lt = 8, dt = "bold 24px monospace", ft = new Set([
+    const Re = "#1a1a2e", dt = 8, ft = "bold 24px monospace", ut = new Set([
         "sdf",
         "cells",
         "both"
-    ]), ut = /^#[0-9a-fA-F]{6}$/;
-    function ht(e) {
+    ]), ht = /^#[0-9a-fA-F]{6}$/;
+    function pt(e) {
         return typeof e != "number" || !Number.isFinite(e) ? null : e;
     }
-    function Q(e) {
-        const n = ht(e);
+    function ee(e) {
+        const n = pt(e);
         return n === null ? null : Math.trunc(n);
     }
-    function pt() {
+    function yt() {
         return typeof crypto < "u" && typeof crypto.randomUUID == "function" ? crypto.randomUUID() : `text-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     }
     function pe(e, n) {
         return typeof e == "number" && Number.isFinite(e) ? e : n;
     }
-    function Re(e, n = Date.now()) {
+    function Te(e, n = Date.now()) {
         if (!e || typeof e != "object") return null;
         const t = e;
         if (typeof t.text != "string" || t.text.length === 0) return null;
-        const o = Q(t.cellX), r = Q(t.cellY);
+        const o = ee(t.cellX), r = ee(t.cellY);
         if (o === null || r === null) return null;
-        const s = Math.max(1, Q(t.cellsWide) ?? 100), i = Q(t.cellsHigh), a = i !== null && i >= 1 ? i : void 0, u = typeof t.renderMode == "string" && ft.has(t.renderMode) ? t.renderMode : "cells";
+        const s = Math.max(1, ee(t.cellsWide) ?? 100), i = ee(t.cellsHigh), a = i !== null && i >= 1 ? i : void 0, u = typeof t.renderMode == "string" && ut.has(t.renderMode) ? t.renderMode : "cells";
         return {
-            id: typeof t.id == "string" && t.id.length > 0 ? t.id : pt(),
+            id: typeof t.id == "string" && t.id.length > 0 ? t.id : yt(),
             text: t.text,
-            font: typeof t.font == "string" && t.font.length > 0 ? t.font : dt,
+            font: typeof t.font == "string" && t.font.length > 0 ? t.font : ft,
             cellX: o,
             cellY: r,
             cellsWide: s,
@@ -293,33 +293,33 @@
                 cellsHigh: a
             } : {},
             renderMode: u,
-            color: typeof t.color == "string" && ut.test(t.color) ? t.color : ze,
+            color: typeof t.color == "string" && ht.test(t.color) ? t.color : Re,
             enabled: typeof t.enabled == "boolean" ? t.enabled : !0,
             createdAt: pe(t.createdAt, n),
             updatedAt: pe(t.updatedAt, n)
         };
     }
-    function yt(e, n = Date.now()) {
-        return ce(e, Re, lt, n);
+    function gt(e, n = Date.now()) {
+        return ce(e, Te, dt, n);
     }
-    class gt extends te {
+    class mt extends ne {
         constructor(){
-            super(Re, yt);
+            super(Te, gt);
         }
     }
-    const Te = "HgyjpqÑ|";
-    function mt(e, n) {
+    const $e = "HgyjpqÑ|";
+    function bt(e, n) {
         e.font = n;
-        const t = e.measureText(Te), o = t.fontBoundingBoxAscent, r = t.fontBoundingBoxDescent;
+        const t = e.measureText($e), o = t.fontBoundingBoxAscent, r = t.fontBoundingBoxDescent;
         if (typeof o == "number" && typeof r == "number" && isFinite(o) && isFinite(r)) return o + r;
         const s = t.actualBoundingBoxAscent, i = t.actualBoundingBoxDescent;
         if (typeof s == "number" && typeof i == "number" && isFinite(s) && isFinite(i)) return s + i;
         const a = n.match(/(\d+(?:\.\d+)?)px/);
         return a ? parseFloat(a[1]) * 1.2 : 16;
     }
-    function $e(e, n) {
+    function Ce(e, n) {
         e.font = n;
-        const t = e.measureText(Te), o = t.fontBoundingBoxAscent;
+        const t = e.measureText($e), o = t.fontBoundingBoxAscent;
         if (typeof o == "number" && isFinite(o)) return o;
         const r = t.actualBoundingBoxAscent;
         if (typeof r == "number" && isFinite(r)) return r;
@@ -327,41 +327,41 @@
         return s ? parseFloat(s[1]) * .85 : 16;
     }
     let M = null;
-    function bt(e, n) {
+    function xt(e, n) {
         M || (M = new OffscreenCanvas(e, n));
     }
-    function xt(e) {
+    function _t(e) {
         const n = e.match(/(\d+(?:\.\d+)?)px/);
         return n ? parseFloat(n[1]) : 24;
     }
     function le(e, n, t) {
-        bt(t, 1), M.width = t, M.height = 1;
-        const o = M.getContext("2d"), r = xt(n);
+        xt(t, 1), M.width = t, M.height = 1;
+        const o = M.getContext("2d"), r = _t(n);
         o.font = n;
-        const s = Math.max(1, o.measureText(e).width), i = mt(o, n), a = t / s, u = r * a, l = Math.max(1, Math.ceil(i * a * 1.1));
+        const s = Math.max(1, o.measureText(e).width), i = bt(o, n), a = t / s, u = r * a, l = Math.max(1, Math.ceil(i * a * 1.1));
         return {
             fontSize: u,
             cellsHigh: l
         };
     }
-    function _t(e, n, t) {
+    function wt(e, n, t) {
         return le(e, n, t).cellsHigh;
     }
     const ye = new Map, ge = new Map;
-    function wt(e, n, t, o) {
+    function kt(e, n, t, o) {
         return `${t}|${o}|${n}|${e}`;
     }
-    function kt(e, n, t, o, r) {
+    function At(e, n, t, o, r) {
         return `${t}|${o}|${r}|${n}|${e}`;
     }
-    function At(e, n, t, o) {
+    function Mt(e, n, t, o) {
         const { fontSize: r } = le(e, n, t);
         M.width = t, M.height = o;
         const s = M.getContext("2d");
         s.fillStyle = "black", s.fillRect(0, 0, t, o), s.fillStyle = "white";
         const i = n.replace(/\d+px/, `${r}px`);
         s.font = i, s.textBaseline = "alphabetic";
-        const a = $e(s, i);
+        const a = Ce(s, i);
         s.fillText(e, 0, a);
         const u = s.getImageData(0, 0, t, o), l = [];
         for(let f = 0; f < o; f++)for(let d = 0; d < t; d++)u.data[(f * t + d) * 4] > 128 && l.push({
@@ -373,14 +373,14 @@
             cellsHigh: o
         };
     }
-    function Mt(e, n, t, o, r) {
+    function St(e, n, t, o, r) {
         const { fontSize: s } = le(e, n, t * r), i = t * r, a = o * r;
         M.width = i, M.height = a;
         const u = M.getContext("2d");
         u.fillStyle = "black", u.fillRect(0, 0, i, a), u.fillStyle = "white";
         const l = n.replace(/\d+px/, `${s}px`);
         u.font = l, u.textBaseline = "alphabetic";
-        const f = $e(u, l);
+        const f = Ce(u, l);
         u.fillText(e, 0, f);
         const d = u.getImageData(0, 0, i, a), x = [];
         for(let m = 0; m < a; m++)for(let b = 0; b < i; b++)d.data[(m * i + b) * 4] > 128 && x.push({
@@ -392,24 +392,24 @@
             cellsHigh: o
         };
     }
-    function St(e, n, t, o) {
-        const r = wt(e, n, t, o);
+    function Dt(e, n, t, o) {
+        const r = kt(e, n, t, o);
         let s = ye.get(r);
-        return s || (M || (M = new OffscreenCanvas(t, o)), s = At(e, n, t, o), ye.set(r, s)), s;
+        return s || (M || (M = new OffscreenCanvas(t, o)), s = Mt(e, n, t, o), ye.set(r, s)), s;
     }
-    function Dt(e, n, t, o, r) {
-        const s = kt(e, n, t, o, r);
+    function It(e, n, t, o, r) {
+        const s = At(e, n, t, o, r);
         let i = ge.get(s);
-        return i || (M || (M = new OffscreenCanvas(t * r, o * r)), i = Mt(e, n, t, o, r), ge.set(s, i)), i;
+        return i || (M || (M = new OffscreenCanvas(t * r, o * r)), i = St(e, n, t, o, r), ge.set(s, i)), i;
     }
-    function Ce(e, n) {
-        return e.cellsHigh !== void 0 && e.cellsHigh >= 1 ? e.cellsHigh : _t(e.text, e.font, n);
+    function Fe(e, n) {
+        return e.cellsHigh !== void 0 && e.cellsHigh >= 1 ? e.cellsHigh : wt(e.text, e.font, n);
     }
-    function It(e) {
+    function zt(e) {
         const n = [];
         for (const t of e){
             if (!t.enabled || t.renderMode === "sdf") continue;
-            const o = Math.max(1, t.cellsWide), r = Ce(t, o), s = St(t.text, t.font, o, r);
+            const o = Math.max(1, t.cellsWide), r = Fe(t, o), s = Dt(t.text, t.font, o, r);
             for (const { dx: i, dy: a } of s.offsets)n.push({
                 cx: t.cellX + i,
                 cy: t.cellY + a
@@ -417,13 +417,13 @@
         }
         return n;
     }
-    function zt(e, n) {
+    function Rt(e, n) {
         const t = n.multiplier, o = [];
         for (const r of e){
             if (!r.enabled || r.renderMode === "sdf") continue;
-            const s = Math.max(1, r.cellsWide), i = Ce(r, s), a = r.cellX + s - 1, u = r.cellY + i - 1;
+            const s = Math.max(1, r.cellsWide), i = Fe(r, s), a = r.cellX + s - 1, u = r.cellY + i - 1;
             if (a < n.x1 || r.cellX > n.x2 || u < n.y1 || r.cellY > n.y2) continue;
-            const l = Dt(r.text, r.font, s, i, t), f = (n.x2 - n.x1 + 1) * t, d = (n.y2 - n.y1 + 1) * t;
+            const l = It(r.text, r.font, s, i, t), f = (n.x2 - n.x1 + 1) * t, d = (n.y2 - n.y1 + 1) * t;
             for (const { dx: x, dy: m } of l.offsets){
                 const b = (r.cellX - n.x1) * t + x, c = (r.cellY - n.y1) * t + m;
                 b >= 0 && b < f && c >= 0 && c < d && o.push({
@@ -434,8 +434,8 @@
         }
         return o;
     }
-    const W = 1e20;
-    class Rt {
+    const V = 1e20;
+    class Tt {
         constructor({ fontSize: n = 24, buffer: t = 3, radius: o = 8, cutoff: r = .25, fontFamily: s = "sans-serif", fontWeight: i = "normal", fontStyle: a = "normal", lang: u = null } = {}){
             this.buffer = t, this.cutoff = r, this.radius = o, this.lang = u;
             const l = this.size = n + t * 4, f = this._createCanvas(l), d = this.ctx = f.getContext("2d", {
@@ -462,12 +462,12 @@
             const { ctx: g, buffer: h, gridInner: y, gridOuter: k } = this;
             this.lang && (g.lang = this.lang), g.clearRect(h, h, l, f), g.fillText(n, h, h + a);
             const _ = g.getImageData(h, h, l, f);
-            k.fill(W, 0, m), y.fill(0, 0, m);
+            k.fill(V, 0, m), y.fill(0, 0, m);
             for(let w = 0; w < f; w++)for(let A = 0; A < l; A++){
                 const E = _.data[4 * (w * l + A) + 3] / 255;
                 if (E === 0) continue;
                 const G = (w + h) * d + A + h;
-                if (E === 1) k[G] = 0, y[G] = W;
+                if (E === 1) k[G] = 0, y[G] = V;
                 else {
                     const C = .5 - E;
                     k[G] = C > 0 ? C * C : 0, y[G] = C < 0 ? C * C : 0;
@@ -486,7 +486,7 @@
         for(let l = t; l < t + r; l++)be(e, l * s + n, 1, o, i, a, u);
     }
     function be(e, n, t, o, r, s, i) {
-        s[0] = 0, i[0] = -W, i[1] = W, r[0] = e[n];
+        s[0] = 0, i[0] = -V, i[1] = V, r[0] = e[n];
         for(let a = 1, u = 0, l = 0; a < o; a++){
             r[a] = e[n + a * t];
             const f = a * a;
@@ -494,7 +494,7 @@
                 const d = s[u];
                 l = (r[a] - r[d] + f - d * d) / (a - d) / 2;
             }while (l <= i[u] && --u > -1);
-            u++, s[u] = a, i[u] = l, i[u + 1] = W;
+            u++, s[u] = a, i[u] = l, i[u + 1] = V;
         }
         for(let a = 0, u = 0; a < o; a++){
             for(; i[u + 1] < a;)u++;
@@ -508,8 +508,8 @@
             throw new Error(`Cannot create <${e}> in a Worker`);
         }
     });
-    const I = 512, Fe = 48, Tt = 6, $t = 16, Ct = .25;
-    function Ft(e) {
+    const I = 512, Be = 48, $t = 6, Ct = 16, Ft = .25;
+    function Bt(e) {
         const n = e.startsWith("#") ? e.slice(1) : e, t = parseInt(n, 16);
         return [
             (t >> 16 & 255) / 255,
@@ -537,25 +537,25 @@
         };
     }
     const _e = new Map, we = new Map;
-    function Bt(e, n, t) {
+    function Et(e, n, t) {
         const o = `${e}|${n}|${t}`;
         let r = we.get(o);
-        return r || (r = new Rt({
-            fontSize: Fe,
-            buffer: Tt,
-            radius: $t,
-            cutoff: Ct,
+        return r || (r = new Tt({
+            fontSize: Be,
+            buffer: $t,
+            radius: Ct,
+            cutoff: Ft,
             fontFamily: t,
             fontWeight: e,
             fontStyle: n
         }), we.set(o, r)), r;
     }
-    function Et(e, n, t) {
+    function Ot(e, n, t) {
         const o = `${e}|${n}`;
         let r = _e.get(o);
         return r || (r = t.draw(n), _e.set(o, r)), r;
     }
-    function Ot(e) {
+    function Ut(e) {
         const n = e.filter((f)=>f.enabled && f.renderMode !== "cells");
         if (n.length === 0) return null;
         const t = new Map;
@@ -570,9 +570,9 @@
         }
         const o = new Map;
         for (const [f, { weight: d, style: x, family: m, chars: b }] of t){
-            const c = Bt(d, x, m);
+            const c = Et(d, x, m);
             for (const g of b){
-                const h = Et(f, g, c);
+                const h = Ot(f, g, c);
                 o.set(`${f}|${g}`, h);
             }
         }
@@ -605,10 +605,10 @@
                 }), m += A.glyphAdvance);
             }
             if (m === 0) continue;
-            const c = f.cellsWide / m, [g, h, y] = Ft(f.color || ze);
+            const c = f.cellsWide / m, [g, h, y] = Bt(f.color || Re);
             let k = 0;
             for (const { cached: _, pack: w } of b){
-                const A = f.cellX + k * c + _.glyphLeft * c, E = f.cellY + (Fe - _.glyphTop) * c, G = _.glyphWidth * c, C = _.glyphHeight * c;
+                const A = f.cellX + k * c + _.glyphLeft * c, E = f.cellY + (Be - _.glyphTop) * c, G = _.glyphWidth * c, C = _.glyphHeight * c;
                 G > 0 && C > 0 && l.push({
                     cellX: A,
                     cellY: E,
@@ -632,13 +632,13 @@
             atlasHeight: I
         };
     }
-    const Ut = Me("CpuRenderer"), re = 5, Gt = 4279175690, Ht = 4294921596, ke = 4278190080;
-    async function Lt(e) {
+    const Gt = Se("CpuRenderer"), oe = 5, Ht = 4279175690, Lt = 4294921596, ke = 4278190080;
+    async function Pt(e) {
         const n = e.getContext("2d"), { WasmBridge: t } = await import("./index-CBkJc-a4.js").then(async (m)=>{
             await m.__tla;
             return m;
-        }), o = await t.create(), r = re + 1, s = r * o.width + 1, i = r * o.height + 1;
-        e.width = s, e.height = i, Ut.debug("CPU: bridge ready, grid", o.width, "x", o.height);
+        }), o = await t.create(), r = oe + 1, s = r * o.width + 1, i = r * o.height + 1;
+        e.width = s, e.height = i, Gt.debug("CPU: bridge ready, grid", o.width, "x", o.height);
         let a = n.createImageData(s, i), u = new Uint32Array(a.data.buffer);
         u.fill(ke);
         function l() {
@@ -646,10 +646,10 @@
             for(let b = 0; b < x; b++){
                 const c = b * d, g = b * r + 1;
                 for(let h = 0; h < d; h++){
-                    const y = f[c + h] === 0 ? Gt : Ht, k = h * r + 1;
-                    for(let _ = 0; _ < re; _++){
+                    const y = f[c + h] === 0 ? Ht : Lt, k = h * r + 1;
+                    for(let _ = 0; _ < oe; _++){
                         const w = (g + _) * m + k;
-                        for(let A = 0; A < re; A++)u[w + A] = y;
+                        for(let A = 0; A < oe; A++)u[w + A] = y;
                     }
                 }
             }
@@ -670,23 +670,23 @@
             free () {}
         };
     }
-    const F = Me("Renderer"), Be = self;
-    let p = null, L = 0, oe = 0, se = 0;
-    const T = new Xe, $ = new et, z = new ct, R = new gt;
+    const F = Se("Renderer"), Ee = self;
+    let p = null, P = 0, te = 0, se = 0;
+    const T = new Ye, $ = new tt, z = new lt, R = new mt;
     function S(e) {
-        Be.postMessage(e);
+        Ee.postMessage(e);
     }
     function B(e) {
         return e instanceof Error ? e.message : String(e);
     }
-    function Pt(e) {
+    function Ae(e) {
         const n = Math.min(1, Math.max(0, e));
         return n * n * (3 - 2 * n);
     }
     function Nt(e, n, t) {
-        return e % ee === 0 ? "base_tick" : n && t > 0 && e % t === 0 ? "hires_tick" : "render_only";
+        return e % H === 0 ? "base_tick" : n && t > 0 && e % t === 0 ? "hires_tick" : "render_only";
     }
-    function j() {
+    function K() {
         S({
             type: "zones_state",
             zones: T.getAll()
@@ -698,13 +698,13 @@
             message: e
         });
     }
-    function K() {
+    function v() {
         p?.setZones?.(T.getAll());
     }
     function Xt(e) {
-        T.setAll(e), K(), j();
+        T.setAll(e), v(), K();
     }
-    function v() {
+    function q() {
         S({
             type: "decals_state",
             decals: $.getAll()
@@ -716,44 +716,44 @@
             message: e
         });
     }
-    function q() {
+    function W() {
         p?.setDecals?.($.getAll());
     }
     function Yt(e) {
-        $.setAll(e), q(), v();
+        $.setAll(e), W(), q();
     }
-    function P() {
+    function N() {
         S({
             type: "hires_state",
             regions: z.getAll()
         });
     }
-    function Ae(e) {
+    function Me(e) {
         S({
             type: "error",
             phase: "hires",
             message: e
         });
     }
-    function N() {
+    function X() {
         p?.setHiResRegions?.(z.getAll());
     }
-    function X() {
+    function Y() {
         S({
             type: "text_state",
             blocks: R.getAll()
         });
     }
-    function Y(e) {
+    function Z(e) {
         S({
             type: "text_error",
             message: e
         });
     }
-    function Z() {
+    function j() {
         p?.setText?.(R.getAll());
     }
-    Be.onmessage = async (e)=>{
+    Ee.onmessage = async (e)=>{
         switch(e.data.type){
             case "init":
                 {
@@ -771,7 +771,7 @@
                         });
                     }
                     if (o) try {
-                        const { GpuGameOfLife: r } = await import("./game_of_life_gpu-BHr4mR4q.js").then(async (m)=>{
+                        const { GpuGameOfLife: r } = await import("./game_of_life_gpu-aKoy8Tg-.js").then(async (m)=>{
                             await m.__tla;
                             return m;
                         });
@@ -804,14 +804,14 @@
                                 l.get(y.id) !== k ? (i.remove_hires_region?.(_), i.add_hires_region?.(_, y.x1, y.y1, y.x2, y.y2, y.multiplier, y.showGrid ?? !0, y.showBaseGrid ?? !0, y.showBorder ?? !0), l.set(y.id, k)) : i.update_hires_flags?.(_, y.showGrid ?? !0, y.showBaseGrid ?? !0, y.showBorder ?? !0), i.set_hires_paused?.(_, !y.enabled), i.set_hires_tick_multiplier?.(_, y.tickMultiplier ?? 1);
                             }
                             const h = i.max_hires_tick_multiplier?.() ?? 1;
-                            se = h > 1 ? Math.max(1, Math.floor(ee / h)) : 0;
+                            se = h > 1 ? Math.max(1, Math.floor(H / h)) : 0;
                         }, m = (c)=>{
                             const g = c.filter((h)=>h.enabled && h.renderMode !== "sdf");
                             if (g.length === 0) i.clear_frozen_cells?.();
                             else try {
-                                i.set_frozen_cells?.(JSON.stringify(It(g)));
+                                i.set_frozen_cells?.(JSON.stringify(zt(g)));
                             } catch (h) {
-                                Y(`Frozen cell rasterization failed: ${B(h)}`);
+                                Z(`Frozen cell rasterization failed: ${B(h)}`);
                             }
                             for (const h of z.getAll()){
                                 const y = d(h.id);
@@ -820,21 +820,21 @@
                                     continue;
                                 }
                                 try {
-                                    const k = zt(g, h);
+                                    const k = Rt(g, h);
                                     k.length === 0 ? i.clear_hires_frozen_cells?.(y) : i.set_hires_frozen_cells?.(y, JSON.stringify(k));
                                 } catch (k) {
-                                    Y(`Hi-res frozen rasterization failed: ${B(k)}`);
+                                    Z(`Hi-res frozen rasterization failed: ${B(k)}`);
                                 }
                             }
                             try {
-                                const h = Ot(c);
+                                const h = Ut(c);
                                 if (!h) {
                                     i.clear_text_glyphs?.();
                                     return;
                                 }
                                 i.upload_text_atlas?.(h.atlas, h.atlasWidth, h.atlasHeight), i.set_text_glyphs?.(JSON.stringify(h.glyphs));
                             } catch (h) {
-                                Y(`SDF generation failed: ${B(h)}`);
+                                Z(`SDF generation failed: ${B(h)}`);
                             }
                         }, b = ()=>({
                                 screenCols: s.screen_cols(),
@@ -861,7 +861,7 @@
                             setText: (c)=>m(c),
                             gridInfo: b,
                             free: ()=>s.free()
-                        }, p.setScroll?.(L), p.setTransition?.(1), p.setZones?.(T.getAll()), p.setDecals?.($.getAll()), p.setHiResRegions?.(z.getAll()), p.setText?.(R.getAll()), F.info("GPU renderer ready"), S({
+                        }, p.setScroll?.(P), p.setTransition?.(1), p.setZones?.(T.getAll()), p.setDecals?.($.getAll()), p.setHiResRegions?.(z.getAll()), p.setText?.(R.getAll()), F.info("GPU renderer ready"), S({
                             type: "ready",
                             backend: "gpu",
                             gridInfo: b()
@@ -877,7 +877,7 @@
                         break;
                     }
                     try {
-                        p = await Lt(n), p.setScroll?.(L), p.setZones?.(T.getAll()), p.setDecals?.($.getAll()), p.setHiResRegions?.(z.getAll()), p.setText?.(R.getAll()), F.info("CPU renderer ready"), S({
+                        p = await Pt(n), p.setScroll?.(P), p.setZones?.(T.getAll()), p.setDecals?.($.getAll()), p.setHiResRegions?.(z.getAll()), p.setText?.(R.getAll()), F.info("CPU renderer ready"), S({
                             type: "ready",
                             backend: "cpu",
                             gridInfo: {
@@ -901,27 +901,27 @@
             case "frame":
                 {
                     if (!p) break;
-                    switch(oe++, Nt(oe, !!p.hiresTick, se)){
+                    switch(te++, Nt(te, !!p.hiresTick, se)){
                         case "base_tick":
                             p.setTransition?.(0), p.tick();
                             break;
                         case "hires_tick":
-                            p.hiresTick();
+                            p.setTransition?.(Ae(te % H / H)), p.hiresTick();
                             break;
                         case "render_only":
-                            p.setTransition?.(Pt(oe % ee / ee)), p.renderOnly && p.renderOnly();
+                            p.setTransition?.(Ae(te % H / H)), p.renderOnly && p.renderOnly();
                             break;
                     }
                     break;
                 }
             case "resize":
-                F.debug("Resize →", e.data.width, "x", e.data.height), p?.resize(e.data.width, e.data.height), p?.setScroll?.(L), p?.setTransition?.(1), p?.setZones?.(T.getAll()), p?.setDecals?.($.getAll()), p?.setHiResRegions?.(z.getAll()), p?.setText?.(R.getAll()), p?.gridInfo && S({
+                F.debug("Resize →", e.data.width, "x", e.data.height), p?.resize(e.data.width, e.data.height), p?.setScroll?.(P), p?.setTransition?.(1), p?.setZones?.(T.getAll()), p?.setDecals?.($.getAll()), p?.setHiResRegions?.(z.getAll()), p?.setText?.(R.getAll()), p?.gridInfo && S({
                     type: "grid_info",
                     gridInfo: p.gridInfo()
                 });
                 break;
             case "scroll":
-                L = e.data.scrollY, p?.setScroll?.(L);
+                P = e.data.scrollY, p?.setScroll?.(P);
                 break;
             case "toggle_cell":
                 p?.toggleCell?.(e.data.cx, e.data.cy);
@@ -936,7 +936,7 @@
                         ie(n.error);
                         break;
                     }
-                    K(), j();
+                    v(), K();
                     break;
                 }
             case "update_zone":
@@ -946,14 +946,14 @@
                         ie(n.error);
                         break;
                     }
-                    K(), j();
+                    v(), K();
                     break;
                 }
             case "remove_zone":
-                T.remove(e.data.id), K(), j();
+                T.remove(e.data.id), v(), K();
                 break;
             case "clear_zones":
-                T.clear(), K(), j();
+                T.clear(), v(), K();
                 break;
             case "set_decals":
                 Yt(e.data.decals);
@@ -965,7 +965,7 @@
                         ae(n.error);
                         break;
                     }
-                    q(), v();
+                    W(), q();
                     break;
                 }
             case "update_decal":
@@ -975,72 +975,72 @@
                         ae(n.error);
                         break;
                     }
-                    q(), v();
+                    W(), q();
                     break;
                 }
             case "remove_decal":
-                $.remove(e.data.id), q(), v();
+                $.remove(e.data.id), W(), q();
                 break;
             case "clear_decals":
-                $.clear(), q(), v();
+                $.clear(), W(), q();
                 break;
             case "set_hires_regions":
-                z.setAll(e.data.regions), N(), P();
+                z.setAll(e.data.regions), X(), N();
                 break;
             case "add_hires":
                 {
                     const n = z.add(e.data.region);
                     if (n.error) {
-                        Ae(n.error);
+                        Me(n.error);
                         break;
                     }
-                    N(), P();
+                    X(), N();
                     break;
                 }
             case "update_hires":
                 {
                     const n = z.update(e.data.region);
                     if (n.error) {
-                        Ae(n.error);
+                        Me(n.error);
                         break;
                     }
-                    N(), P();
+                    X(), N();
                     break;
                 }
             case "remove_hires":
-                z.remove(e.data.id), N(), P();
+                z.remove(e.data.id), X(), N();
                 break;
             case "clear_hires":
-                z.clear(), N(), P();
+                z.clear(), X(), N();
                 break;
             case "set_text":
-                R.setAll(e.data.blocks), Z(), X();
+                R.setAll(e.data.blocks), j(), Y();
                 break;
             case "add_text":
                 {
                     const n = R.add(e.data.block);
                     if (n.error) {
-                        Y(n.error);
+                        Z(n.error);
                         break;
                     }
-                    Z(), X();
+                    j(), Y();
                     break;
                 }
             case "update_text":
                 {
                     const n = R.update(e.data.block);
                     if (n.error) {
-                        Y(n.error);
+                        Z(n.error);
                         break;
                     }
-                    Z(), X();
+                    j(), Y();
                     break;
                 }
             case "remove_text":
-                R.remove(e.data.id), Z(), X();
+                R.remove(e.data.id), j(), Y();
                 break;
             case "clear_text":
-                R.clear(), Z(), X();
+                R.clear(), j(), Y();
                 break;
             case "perf_snapshot":
                 break;

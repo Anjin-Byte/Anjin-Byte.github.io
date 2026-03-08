@@ -3218,7 +3218,7 @@ function Jk() {
     if (u) for (const c of u) c(s);
   }
   function i(s, u) {
-    const c = new Worker(new URL("/assets/backgroundRenderer-CQKOreA-.js", import.meta.url), { type: "module" });
+    const c = new Worker(new URL("/assets/backgroundRenderer-gyUaxR2j.js", import.meta.url), { type: "module" });
     c.onmessage = (d) => o(d.data), c.onerror = (d) => {
       Df.error("Worker uncaught exception:", d.message, `at ${d.filename}:${d.lineno}`);
     }, e = c, a({ type: "init", canvas: s, cellPx: u }, [s]);
