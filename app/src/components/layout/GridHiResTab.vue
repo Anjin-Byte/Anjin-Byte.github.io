@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue';
 import type { HiResRegion } from '../../types/hiresRegion';
 import { HIRES_MULTIPLIER, MAX_HIRES_REGIONS } from '../../types/hiresRegion';
+import { TICK_EVERY } from '../../workers/rendererProtocol';
 
 const props = defineProps<{
   regions: HiResRegion[];
@@ -37,6 +38,16 @@ function toggleBaseGrid(region: HiResRegion): void {
 
 function toggleBorder(region: HiResRegion): void {
   emit('update-region', { ...region, showBorder: !region.showBorder, updatedAt: Date.now() });
+}
+
+function setTickMultiplier(region: HiResRegion, value: number): void {
+  emit('update-region', { ...region, tickMultiplier: value, updatedAt: Date.now() });
+}
+
+function tickRateLabel(value: number): string {
+  if (value >= TICK_EVERY) return 'max';
+  if (value === 1) return '1x';
+  return `${value}x`;
 }
 
 function shortId(region: HiResRegion): string {
@@ -95,6 +106,23 @@ function shortId(region: HiResRegion): string {
           <v-btn size="x-small" variant="tonal" color="error" @click="$emit('remove-region', region.id)">
             Delete
           </v-btn>
+        </div>
+        <div class="mt-2">
+          <div class="d-flex align-center justify-space-between">
+            <span class="text-caption text-medium-emphasis">Tick rate</span>
+            <span class="text-caption text-medium-emphasis">{{ tickRateLabel(region.tickMultiplier ?? 1) }}</span>
+          </div>
+          <v-slider
+            :model-value="region.tickMultiplier ?? 1"
+            :min="1"
+            :max="TICK_EVERY"
+            :step="1"
+            density="compact"
+            hide-details
+            thumb-size="14"
+            track-size="3"
+            @update:model-value="(v: number) => setTickMultiplier(region, v)"
+          />
         </div>
       </v-card>
       <div v-if="regions.length === 0" class="text-caption" style="opacity: 0.7; padding: 6px 0">

@@ -28,7 +28,7 @@ function makeRegion(overrides: Partial<HiResRegion> = {}): HiResRegion {
   const now = Date.now();
   return {
     id: 'r-1', x1: 0, y1: 0, x2: 9, y2: 9, multiplier: 4,
-    enabled: true, showGrid: true, showBaseGrid: true, showBorder: true,
+    enabled: true, showGrid: true, showBaseGrid: true, showBorder: true, tickMultiplier: 1,
     createdAt: now, updatedAt: now,
     ...overrides,
   };
@@ -67,6 +67,17 @@ test('normalizeRegion — defaults for boolean flags', () => {
   assert(r.enabled === true, 'enabled default');
   assert(r.showGrid === true, 'showGrid default');
   assert(r.showBorder === true, 'showBorder default');
+});
+
+test('normalizeRegion — tickMultiplier defaults and clamps', () => {
+  const def = normalizeRegion({ x1: 0, y1: 0, x2: 5, y2: 5 })!;
+  assertEq(def.tickMultiplier, 1, 'default to 1');
+  const explicit = normalizeRegion(makeRegion({ tickMultiplier: 4 }))!;
+  assertEq(explicit.tickMultiplier, 4, 'explicit 4');
+  const zero = normalizeRegion(makeRegion({ tickMultiplier: 0 }))!;
+  assertEq(zero.tickMultiplier, 1, 'zero clamps to 1');
+  const neg = normalizeRegion(makeRegion({ tickMultiplier: -3 }))!;
+  assertEq(neg.tickMultiplier, 1, 'negative clamps to 1');
 });
 
 // ── normalizeRegions ─────────────────────────────────────────────────────────

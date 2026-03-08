@@ -1,8 +1,9 @@
-import { ref, type Ref } from 'vue';
+import type { Ref } from 'vue';
 
 import type { Decal } from '../types/decals';
 import { normalizeDecal, normalizeDecals } from '../utils/decalNormalization';
-import { clearDecalsStorage, loadDecals, saveDecals } from '../utils/decalStorage';
+import { loadDecals, saveDecals, clearDecalsStorage } from '../utils/decalStorage';
+import { createFeatureComposable } from './createFeatureComposable';
 
 export interface UseDecals {
   decals: Ref<Decal[]>;
@@ -23,71 +24,26 @@ export interface UseDecalsOptions {
 }
 
 export function useDecals(options: UseDecalsOptions = {}): UseDecals {
-  const decals = ref<Decal[]>(loadDecals());
-
-  function commit(next: Decal[]): Decal[] {
-    const normalized = normalizeDecals(next);
-    decals.value = normalized;
-    saveDecals(normalized);
-    return normalized;
-  }
-
-  function setDecals(next: Decal[]): void {
-    const normalized = commit(next);
-    options.onSetDecals?.(normalized);
-  }
-
-  function addDecal(decal: Decal): void {
-    const normalized = normalizeDecal(decal);
-    if (!normalized) {
-      return;
-    }
-    commit([...decals.value, normalized]);
-    options.onAddDecal?.(normalized);
-  }
-
-  function updateDecal(decal: Decal): void {
-    const normalized = normalizeDecal(decal);
-    if (!normalized) {
-      return;
-    }
-    if (!decals.value.some((current) => current.id === normalized.id)) {
-      return;
-    }
-    const next = decals.value.map((current) => current.id === normalized.id ? normalized : current);
-    commit(next);
-    options.onUpdateDecal?.(normalized);
-  }
-
-  function removeDecal(id: string): void {
-    if (!decals.value.some((decal) => decal.id === id)) {
-      return;
-    }
-    const next = decals.value.filter((decal) => decal.id !== id);
-    commit(next);
-    options.onRemoveDecal?.(id);
-  }
-
-  function clearDecals(): void {
-    if (decals.value.length === 0) {
-      return;
-    }
-    decals.value = [];
-    clearDecalsStorage();
-    options.onClearDecals?.();
-  }
-
-  function syncFromWorker(next: Decal[]): void {
-    commit(next);
-  }
+  const {
+    items: decals, setItems, addItem, updateItem, removeItem, clearItems, syncFromWorker,
+  } = createFeatureComposable({
+    storage: { load: loadDecals, save: saveDecals, clear: clearDecalsStorage },
+    normalize: normalizeDecals,
+    normalizeOne: normalizeDecal,
+    onSet: options.onSetDecals,
+    onAdd: options.onAddDecal,
+    onUpdate: options.onUpdateDecal,
+    onRemove: options.onRemoveDecal,
+    onClear: options.onClearDecals,
+  });
 
   return {
     decals,
-    setDecals,
-    addDecal,
-    updateDecal,
-    removeDecal,
-    clearDecals,
+    setDecals: setItems,
+    addDecal: addItem,
+    updateDecal: updateItem,
+    removeDecal: removeItem,
+    clearDecals: clearItems,
     syncFromWorker,
   };
 }

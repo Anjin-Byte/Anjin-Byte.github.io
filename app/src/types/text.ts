@@ -7,6 +7,7 @@ export interface TextBlock {
   cellX: number;
   cellY: number;
   cellsWide: number;
+  cellsHigh?: number; // When set, overrides auto-computed height from font aspect ratio
   renderMode: TextRenderMode;
   color: string; // CSS hex color, e.g. '#1a1a2e'
   enabled: boolean;

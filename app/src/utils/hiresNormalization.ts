@@ -38,6 +38,9 @@ export function normalizeRegion(region: unknown, now = Date.now()): HiResRegion 
     showGrid: typeof source.showGrid === 'boolean' ? source.showGrid : true,
     showBaseGrid: typeof source.showBaseGrid === 'boolean' ? source.showBaseGrid : true,
     showBorder: typeof source.showBorder === 'boolean' ? source.showBorder : true,
+    tickMultiplier: typeof source.tickMultiplier === 'number' && Number.isFinite(source.tickMultiplier) && source.tickMultiplier >= 1
+      ? Math.trunc(source.tickMultiplier)
+      : 1,
     createdAt: normalizeTimestamp(source.createdAt, now),
     updatedAt: normalizeTimestamp(source.updatedAt, now),
   };

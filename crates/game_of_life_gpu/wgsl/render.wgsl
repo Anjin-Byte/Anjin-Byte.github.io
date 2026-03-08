@@ -112,27 +112,35 @@ struct HiResRegionMeta {
 }
 
 // ── Bindings ─────────────────────────────────────────────────────────────────
+//
+// Split into 3 bind groups by ownership:
+//   group(0) = core rendering (uniforms, cells, paper, noise)
+//   group(1) = overlays (zones, decals, SDF text)
+//   group(2) = hi-res regions
 
+// Core rendering
 @group(0) @binding(0)  var<uniform>       uniforms:       RenderUniforms;
 @group(0) @binding(1)  var<storage, read> current_cells:  array<u32>;
 @group(0) @binding(2)  var<storage, read> previous_cells: array<u32>;
 @group(0) @binding(3)  var<uniform>       paper:          PaperParams;
 @group(0) @binding(4)  var                noise_tex:      texture_2d<f32>;
 @group(0) @binding(5)  var                noise_smp:      sampler;
-@group(0) @binding(6)  var<uniform>       zone_meta:      ZoneMeta;
-@group(0) @binding(7)  var<storage, read> zones:          array<ZoneEntry>;
-@group(0) @binding(8)  var<uniform>       decal_meta:     DecalMeta;
-@group(0) @binding(9)  var<storage, read> decals:         array<DecalEntry>;
-// SDF text
-@group(0) @binding(10) var<uniform>       sdf_text_meta:  SdfTextMeta;
-@group(0) @binding(11) var<storage, read> sdf_glyphs:     array<SdfGlyph>;
-@group(0) @binding(12) var                sdf_atlas:      texture_2d<f32>;
-@group(0) @binding(13) var                sdf_smp:        sampler;
+
+// Overlays (zones, decals, SDF text)
+@group(1) @binding(0)  var<uniform>       zone_meta:      ZoneMeta;
+@group(1) @binding(1)  var<storage, read> zones:          array<ZoneEntry>;
+@group(1) @binding(2)  var<uniform>       decal_meta:     DecalMeta;
+@group(1) @binding(3)  var<storage, read> decals:         array<DecalEntry>;
+@group(1) @binding(4)  var<uniform>       sdf_text_meta:  SdfTextMeta;
+@group(1) @binding(5)  var<storage, read> sdf_glyphs:     array<SdfGlyph>;
+@group(1) @binding(6)  var                sdf_atlas:      texture_2d<f32>;
+@group(1) @binding(7)  var                sdf_smp:        sampler;
+
 // Hi-res regions
-@group(0) @binding(14) var<uniform>       hires_meta:     HiResGlobalMeta;
-@group(0) @binding(15) var<storage, read> hires_regions:  array<HiResRegionMeta>;
-@group(0) @binding(16) var<storage, read> hires_cells:      array<u32>;
-@group(0) @binding(17) var<storage, read> hires_cells_prev: array<u32>;
+@group(2) @binding(0)  var<uniform>       hires_meta:     HiResGlobalMeta;
+@group(2) @binding(1)  var<storage, read> hires_regions:  array<HiResRegionMeta>;
+@group(2) @binding(2)  var<storage, read> hires_cells:      array<u32>;
+@group(2) @binding(3)  var<storage, read> hires_cells_prev: array<u32>;
 
 // ── Vertex ────────────────────────────────────────────────────────────────────
 

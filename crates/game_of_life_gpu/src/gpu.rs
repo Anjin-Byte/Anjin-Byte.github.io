@@ -148,69 +148,37 @@ impl GpuGameOfLife {
     /// Call this on render frames that fall between simulation ticks so the
     /// display stays at vsync rate while the simulation runs at a lower rate.
     pub fn render_only(&mut self) {
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("gol_render_only"),
-            });
-        if self.hires_dirty {
-            self.copy_hires_to_render(&mut encoder);
-            self.hires_dirty = false;
-        }
-        match self
-            .renderer
-            .render(&mut encoder, self.simulation.current_visible_is_a())
-        {
-            Ok(output) => {
-                self.queue.submit([encoder.finish()]);
-                output.present();
-            }
-            Err(_) => {
-                self.renderer.reconfigure(&self.device);
-            }
-        }
+        self.sync_hires_if_dirty();
+        self.present();
     }
 
-    /// Advances one GoL generation and presents the result to the canvas.
+    /// Advances one GoL generation (base + hi-res) and presents.
+    ///
+    /// Split into phases with separate `queue.submit()` calls so that
+    /// storage buffer writes are guaranteed visible between phases.
     pub fn tick_and_render(&mut self) {
-        // Flush any pending cell edits to the current visible buffer BEFORE
-        // the compute pass reads it.  This is a separate submit because the
-        // XOR edits must complete before the GoL compute shader samples from
-        // the same buffer.
-        if self.simulation.has_pending_edits() {
-            self.simulation.flush_edits(&self.device, &self.queue);
+        self.flush_edits_if_pending();
+        self.snapshot_pre_tick();
+        self.tick_hires();
+        self.tick_base();
+        self.compose_hires_current();
+        self.present();
+    }
+
+    /// Tick only hi-res regions (1 step) and render. Called between base ticks
+    /// to make hi-res regions visually animate faster than the base grid.
+    ///
+    /// Copies the new hi-res state to both prev and current renderer buffers
+    /// so the transition blend shows the latest state regardless of the base
+    /// transition progress.
+    pub fn hires_tick_and_render(&mut self) {
+        if !self.hires.is_active() {
+            self.render_only();
+            return;
         }
-
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("gol_encoder"),
-            });
-
-        self.renderer.capture_previous_state(
-            &mut encoder,
-            self.simulation.current_visible_buffer(),
-            &self.grid,
-        );
-        self.hires.tick(&mut encoder, self.simulation.frame);
-        self.simulation.tick(&mut encoder, &self.grid);
-        self.copy_hires_to_render(&mut encoder);
-        self.hires_dirty = false;
-
-        match self
-            .renderer
-            .render(&mut encoder, self.simulation.current_visible_is_a())
-        {
-            Ok(output) => {
-                self.queue.submit([encoder.finish()]);
-                output.present();
-            }
-            Err(_) => {
-                // Any surface error (Lost, Outdated, or Timeout on first Chrome frame)
-                // → reconfigure so the next tick can present successfully.
-                self.renderer.reconfigure(&self.device);
-            }
-        }
+        self.tick_hires();
+        self.compose_hires_prev();
+        self.present();
     }
 
     /// Updates the vertical scroll offset (canvas pixels). Call on every scroll event.
@@ -362,7 +330,7 @@ impl GpuGameOfLife {
             return Err(JsValue::from_str("atlas data size mismatch"));
         }
         self.renderer.upload_text_atlas(
-            &self.device, &self.queue, &self.simulation, data, width, height,
+            &self.device, &self.queue, data, width, height,
         );
         Ok(())
     }
@@ -377,7 +345,6 @@ impl GpuGameOfLife {
             &self.device, &self.queue, &self.grid, id, rect, multiplier,
             show_grid, show_base_grid, show_border,
             &self.simulation.buf_a, &self.simulation.buf_b,
-            self.simulation.frame,
         );
         self.hires_dirty = true;
         self.sync_hires_to_renderer();
@@ -392,8 +359,18 @@ impl GpuGameOfLife {
 
     /// Pause or resume a specific hi-res region.
     pub fn set_hires_paused(&mut self, id: u32, paused: bool) {
-        self.hires.set_paused(id, paused, &self.device, &self.queue, self.simulation.frame);
+        self.hires.set_paused(id, paused, &self.device, &self.queue);
         self.hires_dirty = true;
+    }
+
+    /// Set the tick multiplier for a specific hi-res region.
+    pub fn set_hires_tick_multiplier(&mut self, id: u32, multiplier: u32) {
+        self.hires.set_tick_multiplier(id, multiplier);
+    }
+
+    /// Maximum tick_multiplier across all active hi-res regions.
+    pub fn max_hires_tick_multiplier(&self) -> u32 {
+        self.hires.max_tick_multiplier()
     }
 
     /// Update display flags for a specific hi-res region.
@@ -428,22 +405,104 @@ impl GpuGameOfLife {
     }
 }
 
-// Private helpers (outside #[wasm_bindgen] impl block).
+// ── Composable GPU phases ────────────────────────────────────────────────────
+//
+// Each phase owns a single concern (flush, snapshot, tick, compose, present).
+// The public entry points (`tick_and_render`, `hires_tick_and_render`,
+// `render_only`) compose these phases in the order required by their
+// scheduling context.  Each phase that dispatches GPU work creates its own
+// CommandEncoder and calls `queue.submit()` to guarantee storage buffer
+// visibility between phases.
 impl GpuGameOfLife {
-    fn copy_hires_to_render(&self, encoder: &mut wgpu::CommandEncoder) {
-        let dst_cur = self.renderer.hires_cells_buf();
-        let dst_prev = self.renderer.hires_cells_prev_buf();
-        let mut offset: u64 = 0;
-        let vis = self.hires.visible_fine_buffers();
-        let prev = self.hires.previous_fine_buffers();
-        for i in 0..vis.len() {
-            let (src, size) = vis[i];
-            if dst_cur.size() >= offset + size {
-                encoder.copy_buffer_to_buffer(src, 0, dst_cur, offset, size);
+    /// Flush any pending cell edits to the GPU.
+    fn flush_edits_if_pending(&mut self) {
+        if self.simulation.has_pending_edits() {
+            self.simulation.flush_edits(&self.device, &self.queue);
+        }
+    }
+
+    /// Snapshot pre-tick state for transition animation (base + hi-res).
+    fn snapshot_pre_tick(&mut self) {
+        let mut enc = self.device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor { label: Some("gol_snapshot") },
+        );
+        self.renderer.capture_previous_state(
+            &mut enc, self.simulation.current_visible_buffer(), &self.grid,
+        );
+        self.copy_hires_to_buf(&mut enc, self.renderer.hires_cells_prev_buf());
+        self.queue.submit([enc.finish()]);
+    }
+
+    /// Tick hi-res regions (single step, boundary extract + fine compute).
+    fn tick_hires(&mut self) {
+        let mut enc = self.device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor { label: Some("gol_hires_tick") },
+        );
+        self.hires.tick(&mut enc, self.simulation.current_visible_is_a());
+        self.queue.submit([enc.finish()]);
+    }
+
+    /// Tick base simulation (single step).
+    fn tick_base(&mut self) {
+        let mut enc = self.device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor { label: Some("gol_sim_tick") },
+        );
+        self.simulation.tick(&mut enc, &self.grid);
+        self.queue.submit([enc.finish()]);
+    }
+
+    /// Mark hi-res compose as done (present() handles the current-buffer copy).
+    fn compose_hires_current(&mut self) {
+        self.hires_dirty = false;
+    }
+
+    /// Copy hi-res into the renderer's "previous" buffer so the transition
+    /// blend shows the latest hi-res state. present() handles current.
+    fn compose_hires_prev(&mut self) {
+        let mut enc = self.device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor { label: Some("gol_hires_compose") },
+        );
+        self.copy_hires_to_buf(&mut enc, self.renderer.hires_cells_prev_buf());
+        self.queue.submit([enc.finish()]);
+        self.hires_dirty = false;
+    }
+
+    /// If hi-res buffers are dirty (regions added/removed), sync prev buffer.
+    /// present() handles copying current.
+    fn sync_hires_if_dirty(&mut self) {
+        if !self.hires_dirty { return; }
+        let mut enc = self.device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor { label: Some("gol_hires_sync") },
+        );
+        self.copy_hires_to_buf(&mut enc, self.renderer.hires_cells_prev_buf());
+        self.queue.submit([enc.finish()]);
+        self.hires_dirty = false;
+    }
+
+    /// Render the current state and present the frame.
+    fn present(&mut self) {
+        let mut enc = self.device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor { label: Some("gol_present") },
+        );
+        // Copy hi-res current state for the render pass.
+        self.copy_hires_to_buf(&mut enc, self.renderer.hires_cells_buf());
+        match self.renderer.render(&mut enc, self.simulation.current_visible_is_a()) {
+            Ok(output) => {
+                self.queue.submit([enc.finish()]);
+                output.present();
             }
-            let (psrc, psize) = prev[i];
-            if dst_prev.size() >= offset + psize {
-                encoder.copy_buffer_to_buffer(psrc, 0, dst_prev, offset, psize);
+            Err(_) => {
+                self.renderer.reconfigure(&self.device);
+            }
+        }
+    }
+
+    /// Copy all visible hi-res fine-cell buffers into a single destination buffer.
+    fn copy_hires_to_buf(&self, encoder: &mut wgpu::CommandEncoder, dst: &wgpu::Buffer) {
+        let mut offset: u64 = 0;
+        for (src, size) in self.hires.visible_fine_buffers() {
+            if dst.size() >= offset + size {
+                encoder.copy_buffer_to_buffer(src, 0, dst, offset, size);
             }
             offset += size;
         }
@@ -479,7 +538,7 @@ impl GpuGameOfLife {
         let total_bytes = offset as u64 * 4;
         let cells_size = total_bytes.max(4);
         self.renderer.set_hires(
-            &self.device, &self.queue, &self.simulation,
+            &self.device, &self.queue,
             &global, &regions, cells_size,
         );
     }

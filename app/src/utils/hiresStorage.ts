@@ -1,31 +1,40 @@
+import type { HiResRegion } from '../types/hiresRegion';
+import { createFeatureStorage } from './featureStorage';
+import { normalizeRegion, normalizeRegions } from './hiresNormalization';
 import {
   HIRES_STORAGE_KEY,
   HIRES_STORAGE_VERSION,
-  type HiResRegion,
-  type HiResStoragePayload,
 } from '../types/hiresRegion';
-import { normalizeRegion, normalizeRegions } from './hiresNormalization';
-
-function storageAvailable(): boolean {
-  return typeof localStorage !== 'undefined';
-}
 
 const V1_KEY = 'gol.hires.v1';
 
-export function loadRegions(): HiResRegion[] {
-  if (!storageAvailable()) return [];
-  try {
-    let raw = localStorage.getItem(HIRES_STORAGE_KEY);
-    // Try v1 key if current key has no data
-    if (!raw) {
-      raw = localStorage.getItem(V1_KEY);
-      if (raw) localStorage.removeItem(V1_KEY);
+const storage = createFeatureStorage<HiResRegion>({
+  key: HIRES_STORAGE_KEY,
+  version: HIRES_STORAGE_VERSION,
+  normalize: normalizeRegions,
+  itemsKey: 'regions',
+  migrate(raw) {
+    // v1 had a single 'region' field instead of 'regions' array
+    if (raw.region && !raw.regions) {
+      const r = normalizeRegion(raw.region);
+      return { ...raw, regions: r ? [r] : [], version: HIRES_STORAGE_VERSION };
     }
+    return { ...raw, version: HIRES_STORAGE_VERSION };
+  },
+});
+
+// Wrap load to also check the legacy v1 key
+const baseLoad = storage.load;
+export function loadRegions(): HiResRegion[] {
+  const result = baseLoad();
+  if (result.length > 0) return result;
+  if (typeof localStorage === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(V1_KEY);
     if (!raw) return [];
+    localStorage.removeItem(V1_KEY);
     const parsed = JSON.parse(raw);
-    if (typeof parsed.version !== 'number' || parsed.version > HIRES_STORAGE_VERSION) return [];
-    // v1 migration: single `region` → `regions` array
-    if (parsed.version === 1 && parsed.region) {
+    if (parsed.region) {
       const r = normalizeRegion(parsed.region);
       return r ? [r] : [];
     }
@@ -35,16 +44,5 @@ export function loadRegions(): HiResRegion[] {
   }
 }
 
-export function saveRegions(regions: HiResRegion[]): void {
-  if (!storageAvailable()) return;
-  const payload: HiResStoragePayload = {
-    version: HIRES_STORAGE_VERSION,
-    regions: normalizeRegions(regions),
-  };
-  localStorage.setItem(HIRES_STORAGE_KEY, JSON.stringify(payload));
-}
-
-export function clearRegionsStorage(): void {
-  if (!storageAvailable()) return;
-  localStorage.removeItem(HIRES_STORAGE_KEY);
-}
+export const saveRegions = storage.save;
+export const clearRegionsStorage = storage.clear;

@@ -1,5 +1,6 @@
 import type { BlankMode, BlankZone, EdgeStyle, ZoneEdgeBehavior } from '../types/blankZones';
 import { MAX_BLANK_ZONES } from '../types/blankZones';
+import { normalizeArray } from './normalizeArray';
 
 const VALID_MODES = new Set<BlankMode>(['minor', 'major', 'both']);
 const VALID_EDGE_STYLES = new Set<EdgeStyle>(['none', 'bold-major', 'fade', 'noted']);
@@ -100,19 +101,5 @@ export function normalizeZone(zone: unknown, now = Date.now()): BlankZone | null
 }
 
 export function normalizeZones(zones: unknown, now = Date.now()): BlankZone[] {
-  if (!Array.isArray(zones)) {
-    return [];
-  }
-
-  const normalized: BlankZone[] = [];
-  for (const zone of zones) {
-    if (normalized.length >= MAX_BLANK_ZONES) {
-      break;
-    }
-    const next = normalizeZone(zone, now);
-    if (next) {
-      normalized.push(next);
-    }
-  }
-  return normalized;
+  return normalizeArray(zones, normalizeZone, MAX_BLANK_ZONES, now);
 }

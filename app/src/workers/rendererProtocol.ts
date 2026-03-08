@@ -8,6 +8,10 @@ import type { FrameStats } from '../perf';
 
 export type RendererBackend = 'gpu' | 'cpu';
 
+/** Frames between base simulation ticks. At 60 Hz: ~3.5 s per tick.
+ *  Hi-res tick multiplier ranges from 1 (same as base) to TICK_EVERY (every frame). */
+export const TICK_EVERY = 210;
+
 /** Grid dimensions needed by the main thread for pixel→cell coordinate mapping. */
 export interface GridInfo {
   screenCols:  number;

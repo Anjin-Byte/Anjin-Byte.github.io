@@ -1,8 +1,9 @@
-import { ref, type Ref } from 'vue';
+import type { Ref } from 'vue';
 
 import type { HiResRegion } from '../types/hiresRegion';
 import { normalizeRegion, normalizeRegions } from '../utils/hiresNormalization';
-import { clearRegionsStorage, loadRegions, saveRegions } from '../utils/hiresStorage';
+import { loadRegions, saveRegions, clearRegionsStorage } from '../utils/hiresStorage';
+import { createFeatureComposable } from './createFeatureComposable';
 
 export interface UseHiRes {
   regions: Ref<HiResRegion[]>;
@@ -22,48 +23,25 @@ export interface UseHiResOptions {
 }
 
 export function useHiRes(options: UseHiResOptions = {}): UseHiRes {
-  const regions = ref<HiResRegion[]>(loadRegions());
+  const {
+    items: regions, addItem, updateItem, removeItem, clearItems, syncFromWorker,
+  } = createFeatureComposable({
+    storage: { load: loadRegions, save: saveRegions, clear: clearRegionsStorage },
+    normalize: normalizeRegions,
+    normalizeOne: normalizeRegion,
+    onSet: options.onSetRegions,
+    onAdd: options.onAddRegion,
+    onUpdate: options.onUpdateRegion,
+    onRemove: options.onRemoveRegion,
+    onClear: options.onClearRegions,
+  });
 
-  function commit(next: HiResRegion[]): void {
-    const normalized = normalizeRegions(next);
-    regions.value = normalized;
-    saveRegions(normalized);
-  }
-
-  function addRegion(r: HiResRegion): void {
-    const normalized = normalizeRegion(r);
-    if (!normalized) return;
-    commit([...regions.value.filter((e) => e.id !== normalized.id), normalized]);
-    options.onAddRegion?.(normalized);
-  }
-
-  function updateRegion(r: HiResRegion): void {
-    const normalized = normalizeRegion(r);
-    if (!normalized) return;
-    const idx = regions.value.findIndex((e) => e.id === normalized.id);
-    if (idx < 0) return;
-    const updated = regions.value.slice();
-    updated[idx] = normalized;
-    commit(updated);
-    options.onUpdateRegion?.(normalized);
-  }
-
-  function removeRegion(id: string): void {
-    if (!regions.value.some((r) => r.id === id)) return;
-    commit(regions.value.filter((r) => r.id !== id));
-    options.onRemoveRegion?.(id);
-  }
-
-  function clearRegions(): void {
-    if (regions.value.length === 0) return;
-    regions.value = [];
-    clearRegionsStorage();
-    options.onClearRegions?.();
-  }
-
-  function syncFromWorker(next: HiResRegion[]): void {
-    commit(next);
-  }
-
-  return { regions, addRegion, updateRegion, removeRegion, clearRegions, syncFromWorker };
+  return {
+    regions,
+    addRegion: addItem,
+    updateRegion: updateItem,
+    removeRegion: removeItem,
+    clearRegions: clearItems,
+    syncFromWorker,
+  };
 }

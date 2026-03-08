@@ -1,5 +1,6 @@
 import type { TextBlock, TextRenderMode } from '../types/text';
 import { DEFAULT_FONT, DEFAULT_TEXT_COLOR, MAX_TEXT_BLOCKS } from '../types/text';
+import { normalizeArray } from './normalizeArray';
 
 const VALID_RENDER_MODES = new Set<TextRenderMode>(['sdf', 'cells', 'both']);
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
@@ -36,6 +37,8 @@ export function normalizeTextBlock(block: unknown, now = Date.now()): TextBlock 
   if (cellX === null || cellY === null) return null;
 
   const cellsWide = Math.max(1, asInteger(source.cellsWide) ?? 100);
+  const rawCellsHigh = asInteger(source.cellsHigh);
+  const cellsHigh = rawCellsHigh !== null && rawCellsHigh >= 1 ? rawCellsHigh : undefined;
   const renderMode: TextRenderMode =
     typeof source.renderMode === 'string' && VALID_RENDER_MODES.has(source.renderMode as TextRenderMode)
       ? (source.renderMode as TextRenderMode)
@@ -48,6 +51,7 @@ export function normalizeTextBlock(block: unknown, now = Date.now()): TextBlock 
     cellX,
     cellY,
     cellsWide,
+    ...(cellsHigh !== undefined ? { cellsHigh } : {}),
     renderMode,
     color: typeof source.color === 'string' && HEX_COLOR_RE.test(source.color)
       ? source.color
@@ -59,13 +63,5 @@ export function normalizeTextBlock(block: unknown, now = Date.now()): TextBlock 
 }
 
 export function normalizeTextBlocks(blocks: unknown, now = Date.now()): TextBlock[] {
-  if (!Array.isArray(blocks)) return [];
-
-  const normalized: TextBlock[] = [];
-  for (const block of blocks) {
-    if (normalized.length >= MAX_TEXT_BLOCKS) break;
-    const next = normalizeTextBlock(block, now);
-    if (next) normalized.push(next);
-  }
-  return normalized;
+  return normalizeArray(blocks, normalizeTextBlock, MAX_TEXT_BLOCKS, now);
 }

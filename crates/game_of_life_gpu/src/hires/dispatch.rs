@@ -25,14 +25,24 @@ struct FineComputeParams {
 }
 
 /// Per-region GPU resources (bind groups, params buffers, boundary state).
+///
+/// Boundary bind groups come in 4 variants keyed by (base_is_a, region.current)
+/// since the boundary shader reads both the base sim buffer and the fine buffer.
+/// Fine compute bind groups come in two variants (0/1) keyed by region.current.
 struct RegionGpuState {
     boundary: BoundaryState,
     bnd_params_buf: wgpu::Buffer,
-    bnd_bg_even: wgpu::BindGroup,
-    bnd_bg_odd: wgpu::BindGroup,
+    /// Boundary bind groups: [base_is_a][region.current]
+    /// bnd_bgs[0][0] = base=sim_buf_a, fine=bufs[0]
+    /// bnd_bgs[0][1] = base=sim_buf_a, fine=bufs[1]
+    /// bnd_bgs[1][0] = base=sim_buf_b, fine=bufs[0]
+    /// bnd_bgs[1][1] = base=sim_buf_b, fine=bufs[1]
+    bnd_bgs: [[wgpu::BindGroup; 2]; 2],
     fine_params_buf: wgpu::Buffer,
-    fine_bg_even: wgpu::BindGroup,
-    fine_bg_odd: wgpu::BindGroup,
+    /// Fine compute bind group: reads bufs[0], writes bufs[1].
+    fine_bg_0: wgpu::BindGroup,
+    /// Fine compute bind group: reads bufs[1], writes bufs[0].
+    fine_bg_1: wgpu::BindGroup,
 }
 
 /// Manages multiple hi-res regions (up to MAX_HIRES_REGIONS) and their GPU resources.
@@ -76,14 +86,13 @@ impl HiResManager {
         show_border: bool,
         sim_buf_a: &wgpu::Buffer,
         sim_buf_b: &wgpu::Buffer,
-        sim_frame: u32,
     ) {
         if self.regions.len() >= MAX_HIRES_REGIONS { return; }
         // Remove existing region with same id
         self.remove_region(queue, id);
 
         let region = HiResRegion::new(
-            device, queue, id, rect, multiplier, sim_frame,
+            device, queue, id, rect, multiplier,
             show_grid, show_base_grid, show_border,
         );
         let boundary = BoundaryState::new(
@@ -127,20 +136,22 @@ impl HiResManager {
         }
     }
 
-    pub fn set_paused(&mut self, id: u32, paused: bool, device: &wgpu::Device, queue: &wgpu::Queue, sim_frame: u32) {
+    pub fn set_paused(&mut self, id: u32, paused: bool, device: &wgpu::Device, queue: &wgpu::Queue) {
         let Some(r) = self.regions.iter_mut().find(|r| r.id == id) else { return; };
         if r.paused == paused { return; }
+        // On unpause, copy current → write buffer so both contain identical state.
         if !paused {
-            r.resync_frame(sim_frame);
+            let bytes = r.buffer_bytes();
+            let mut encoder = device.create_command_encoder(
+                &wgpu::CommandEncoderDescriptor { label: Some("hires_pause_sync") },
+            );
+            encoder.copy_buffer_to_buffer(
+                &r.bufs[r.current], 0,
+                &r.bufs[1 - r.current], 0,
+                bytes,
+            );
+            queue.submit([encoder.finish()]);
         }
-        let src = r.current_visible_buffer() as *const wgpu::Buffer;
-        let dst = r.previous_visible_buffer() as *const wgpu::Buffer;
-        let size = r.buffer_bytes();
-        let mut encoder = device.create_command_encoder(
-            &wgpu::CommandEncoderDescriptor { label: Some("hires_pause_sync") },
-        );
-        unsafe { encoder.copy_buffer_to_buffer(&*src, 0, &*dst, 0, size); }
-        queue.submit([encoder.finish()]);
         r.paused = paused;
     }
 
@@ -158,47 +169,56 @@ impl HiResManager {
 
     /// Returns visible fine-cell buffers with byte sizes for all active regions.
     pub fn visible_fine_buffers(&self) -> Vec<(&wgpu::Buffer, u64)> {
-        self.regions.iter().map(|r| (r.current_visible_buffer(), r.buffer_bytes())).collect()
+        self.regions.iter().map(|r| (r.read_buf(), r.buffer_bytes())).collect()
     }
 
-    /// Returns previous fine-cell buffers with byte sizes for all active regions.
-    pub fn previous_fine_buffers(&self) -> Vec<(&wgpu::Buffer, u64)> {
-        self.regions.iter().map(|r| (r.previous_visible_buffer(), r.buffer_bytes())).collect()
-    }
-
-    /// Full hi-res tick: boundary extract for all → fine compute for all → swap all.
+    /// Full hi-res tick (single step): boundary extract → fine compute → swap.
+    ///
+    /// `base_is_a` indicates whether the base simulation's buf_a is the
+    /// current visible buffer (true) or buf_b (false).
     pub fn tick(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
-        sim_frame: u32,
+        base_is_a: bool,
     ) {
         if self.regions.is_empty() { return; }
-        // All boundary extractions first (needed for adjacent regions)
         clear_buffer_enc(encoder, &self.inward_grid_buf);
         for (i, region) in self.regions.iter().enumerate() {
             if region.paused { continue; }
-            self.dispatch_boundary_extract(encoder, sim_frame, i);
+            self.dispatch_boundary_extract(encoder, base_is_a, region.current, i);
         }
-        // Then all fine computes
         for (i, region) in self.regions.iter().enumerate() {
             if region.paused { continue; }
-            self.dispatch_fine_compute(encoder, sim_frame, i);
+            self.dispatch_fine_compute(encoder, region.current, i);
         }
-        // Swap all non-paused
         for region in &mut self.regions {
             if !region.paused { region.swap(); }
+        }
+    }
+
+    /// Maximum tick_multiplier across all active regions (minimum 1).
+    pub fn max_tick_multiplier(&self) -> u32 {
+        self.regions.iter().map(|r| r.tick_multiplier).max().unwrap_or(1)
+    }
+
+    /// Set the tick multiplier for a specific region.
+    pub fn set_tick_multiplier(&mut self, id: u32, multiplier: u32) {
+        if let Some(r) = self.regions.iter_mut().find(|r| r.id == id) {
+            r.tick_multiplier = multiplier.max(1);
         }
     }
 
     fn dispatch_boundary_extract(
         &self,
         encoder: &mut wgpu::CommandEncoder,
-        sim_frame: u32,
+        base_is_a: bool,
+        region_current: usize,
         idx: usize,
     ) {
         let gs = &self.gpu_states[idx];
         let Some(ref pipeline) = self.bnd_pipeline else { return; };
-        let bg = if sim_frame & 1 == 0 { &gs.bnd_bg_even } else { &gs.bnd_bg_odd };
+        let base_idx = if base_is_a { 0 } else { 1 };
+        let bg = &gs.bnd_bgs[base_idx][region_current];
 
         gs.boundary.clear_enc(encoder);
         let wg = gs.boundary.layout.inward_count.div_ceil(64);
@@ -214,15 +234,15 @@ impl HiResManager {
     fn dispatch_fine_compute(
         &self,
         encoder: &mut wgpu::CommandEncoder,
-        sim_frame: u32,
+        current: usize,
         idx: usize,
     ) {
         let region = &self.regions[idx];
         let gs = &self.gpu_states[idx];
         let Some(ref pipeline) = self.fine_pipeline else { return; };
-        let bg = if sim_frame & 1 == 0 { &gs.fine_bg_even } else { &gs.fine_bg_odd };
+        let bg = if current == 0 { &gs.fine_bg_0 } else { &gs.fine_bg_1 };
 
-        let dst_buf = if sim_frame & 1 == 0 { &region.buf_b } else { &region.buf_a };
+        let dst_buf = &region.bufs[1 - current];
         clear_buffer_enc(encoder, dst_buf);
 
         let wg_x = region.cols.div_ceil(8);
@@ -289,10 +309,10 @@ impl HiResManager {
         let fine_bgl = match self.fine_bgl { Some(ref b) => b, None => return };
         let gs = &self.gpu_states[idx];
         let frozen = self.regions[idx].frozen_buf.as_ref().unwrap_or(&gs.boundary.frozen_placeholder_buf);
-        let (p, a, b) = build_fine_bind_groups(device, &self.regions[idx], &gs.boundary, frozen, fine_bgl);
+        let (p, bg0, bg1) = build_fine_bind_groups(device, &self.regions[idx], &gs.boundary, frozen, fine_bgl);
         self.gpu_states[idx].fine_params_buf = p;
-        self.gpu_states[idx].fine_bg_even = a;
-        self.gpu_states[idx].fine_bg_odd = b;
+        self.gpu_states[idx].fine_bg_0 = bg0;
+        self.gpu_states[idx].fine_bg_1 = bg1;
     }
 
     fn rebuild_mask(&mut self, queue: &wgpu::Queue) {
@@ -333,20 +353,19 @@ fn build_region_gpu_state(
     bnd_bgl: &wgpu::BindGroupLayout,
     fine_bgl: &wgpu::BindGroupLayout,
 ) -> RegionGpuState {
-    let (bnd_p, bnd_a, bnd_b) = build_bnd_bind_groups(
+    let (bnd_p, bnd_bgs) = build_bnd_bind_groups(
         device, grid, region, &boundary,
         sim_buf_a, sim_buf_b, inward_grid_buf, bnd_bgl,
     );
     let frozen_buf = region.frozen_buf.as_ref().unwrap_or(&boundary.frozen_placeholder_buf);
-    let (fine_p, fine_a, fine_b) = build_fine_bind_groups(device, region, &boundary, frozen_buf, fine_bgl);
+    let (fine_p, fine_0, fine_1) = build_fine_bind_groups(device, region, &boundary, frozen_buf, fine_bgl);
     RegionGpuState {
         boundary,
         bnd_params_buf: bnd_p,
-        bnd_bg_even: bnd_a,
-        bnd_bg_odd: bnd_b,
+        bnd_bgs,
         fine_params_buf: fine_p,
-        fine_bg_even: fine_a,
-        fine_bg_odd: fine_b,
+        fine_bg_0: fine_0,
+        fine_bg_1: fine_1,
     }
 }
 
@@ -359,7 +378,7 @@ fn build_bnd_bind_groups(
     sim_buf_b: &wgpu::Buffer,
     inward_grid_buf: &wgpu::Buffer,
     bgl: &wgpu::BindGroupLayout,
-) -> (wgpu::Buffer, wgpu::BindGroup, wgpu::BindGroup) {
+) -> (wgpu::Buffer, [[wgpu::BindGroup; 2]; 2]) {
     let base_w = region.base_width();
     let base_h = region.base_height();
 
@@ -394,9 +413,18 @@ fn build_bnd_bind_groups(
         })
     };
 
-    let bg_even = mk(sim_buf_a, &region.buf_a, "bnd_bg_even");
-    let bg_odd  = mk(sim_buf_b, &region.buf_b, "bnd_bg_odd");
-    (params_buf, bg_even, bg_odd)
+    // 4 boundary bind groups: [base_buffer][fine_buffer]
+    let bnd_bgs = [
+        [
+            mk(sim_buf_a, &region.bufs[0], "bnd_a0"),
+            mk(sim_buf_a, &region.bufs[1], "bnd_a1"),
+        ],
+        [
+            mk(sim_buf_b, &region.bufs[0], "bnd_b0"),
+            mk(sim_buf_b, &region.bufs[1], "bnd_b1"),
+        ],
+    ];
+    (params_buf, bnd_bgs)
 }
 
 fn build_fine_bind_groups(
@@ -431,8 +459,10 @@ fn build_fine_bind_groups(
         })
     };
 
-    let bg_even = mk(&region.buf_a, &region.buf_b, "fine_bg_even");
-    let bg_odd  = mk(&region.buf_b, &region.buf_a, "fine_bg_odd");
-    (params_buf, bg_even, bg_odd)
+    // Fine bind groups keyed by region's current index:
+    // fine_bg_0: reads bufs[0], writes bufs[1]
+    // fine_bg_1: reads bufs[1], writes bufs[0]
+    let bg_0 = mk(&region.bufs[0], &region.bufs[1], "fine_bg_0");
+    let bg_1 = mk(&region.bufs[1], &region.bufs[0], "fine_bg_1");
+    (params_buf, bg_0, bg_1)
 }
-

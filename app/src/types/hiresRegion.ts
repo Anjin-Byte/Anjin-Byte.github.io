@@ -9,6 +9,7 @@ export interface HiResRegion {
   showGrid: boolean;
   showBaseGrid: boolean;
   showBorder: boolean;
+  tickMultiplier: number;
   createdAt: number;
   updatedAt: number;
 }

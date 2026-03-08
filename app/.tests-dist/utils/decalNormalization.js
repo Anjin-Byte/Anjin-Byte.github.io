@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.normalizeDecal = normalizeDecal;
 exports.normalizeDecals = normalizeDecals;
 const decals_1 = require("../types/decals");
+const normalizeArray_1 = require("./normalizeArray");
 const VALID_KINDS = new Set(['solid', 'checkerboard', 'stripes', 'dots', 'bitmap']);
 const VALID_BLEND_MODES = new Set(['alpha', 'multiply', 'screen']);
 function clamp(value, min, max) {
@@ -97,15 +98,5 @@ function normalizeDecal(decal, now = Date.now()) {
     };
 }
 function normalizeDecals(decals, now = Date.now()) {
-    if (!Array.isArray(decals))
-        return [];
-    const normalized = [];
-    for (const decal of decals) {
-        if (normalized.length >= decals_1.MAX_DECALS)
-            break;
-        const next = normalizeDecal(decal, now);
-        if (next)
-            normalized.push(next);
-    }
-    return normalized;
+    return (0, normalizeArray_1.normalizeArray)(decals, normalizeDecal, decals_1.MAX_DECALS, now);
 }

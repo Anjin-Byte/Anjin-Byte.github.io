@@ -82,6 +82,41 @@ function parseFontString(font: string): { weight: string; style: string; family:
   return { weight, style, family: familyParts.join(' ') || 'monospace' };
 }
 
+// ── Persistent glyph cache ──────────────────────────────────────────────────
+// TinySDF.draw() is expensive. Cache raw glyph bitmaps per font+char so they
+// survive across generateSdf() calls. Bounded by unique (font × char) pairs
+// which is tiny (max 8 blocks × ~50 unique chars = ~400 entries).
+const persistentGlyphCache = new Map<string, CachedGlyph>();
+const sdfInstances = new Map<string, InstanceType<typeof TinySDF>>();
+
+function getSdfInstance(weight: string, style: string, family: string): InstanceType<typeof TinySDF> {
+  const key = `${weight}|${style}|${family}`;
+  let inst = sdfInstances.get(key);
+  if (!inst) {
+    inst = new TinySDF({
+      fontSize: SDF_FONT_SIZE,
+      buffer: SDF_BUFFER,
+      radius: SDF_RADIUS,
+      cutoff: SDF_CUTOFF,
+      fontFamily: family,
+      fontWeight: weight,
+      fontStyle: style,
+    });
+    sdfInstances.set(key, inst);
+  }
+  return inst;
+}
+
+function getCachedGlyph(fontKey: string, ch: string, sdf: InstanceType<typeof TinySDF>): CachedGlyph {
+  const cacheKey = `${fontKey}|${ch}`;
+  let glyph = persistentGlyphCache.get(cacheKey);
+  if (!glyph) {
+    glyph = sdf.draw(ch);
+    persistentGlyphCache.set(cacheKey, glyph);
+  }
+  return glyph;
+}
+
 export function generateSdf(blocks: TextBlock[]): SdfResult | null {
   const enabled = blocks.filter((b) => b.enabled && b.renderMode !== 'cells');
   if (enabled.length === 0) return null;
@@ -101,20 +136,12 @@ export function generateSdf(blocks: TextBlock[]): SdfResult | null {
     }
   }
 
-  // Generate SDF glyphs for all unique chars
+  // Resolve glyphs from persistent cache (only draws new chars)
   const glyphCache = new Map<string, CachedGlyph>();
   for (const [key, { weight, style, family, chars }] of fontKeyMap) {
-    const sdf = new TinySDF({
-      fontSize: SDF_FONT_SIZE,
-      buffer: SDF_BUFFER,
-      radius: SDF_RADIUS,
-      cutoff: SDF_CUTOFF,
-      fontFamily: family,
-      fontWeight: weight,
-      fontStyle: style,
-    });
+    const sdf = getSdfInstance(weight, style, family);
     for (const ch of chars) {
-      const glyph = sdf.draw(ch);
+      const glyph = getCachedGlyph(key, ch, sdf);
       glyphCache.set(`${key}|${ch}`, glyph);
     }
   }
@@ -175,10 +202,9 @@ export function generateSdf(blocks: TextBlock[]): SdfResult | null {
     }
     if (totalAdvance === 0) continue;
 
-    // Scale: cellsWide cells maps to totalAdvance SDF units
+    // Scale: cellsWide cells maps to totalAdvance SDF units.
+    // Height follows naturally from the font's proportions (no stretching).
     const scale = block.cellsWide / totalAdvance;
-    // Compute height from font metrics (fontSize is the reference)
-    const cellsHigh = SDF_FONT_SIZE * scale;
 
     const [colorR, colorG, colorB] = parseHexColor(block.color || DEFAULT_TEXT_COLOR);
 

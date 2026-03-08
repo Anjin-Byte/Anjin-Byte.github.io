@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.normalizeZone = normalizeZone;
 exports.normalizeZones = normalizeZones;
 const blankZones_1 = require("../types/blankZones");
+const normalizeArray_1 = require("./normalizeArray");
 const VALID_MODES = new Set(['minor', 'major', 'both']);
 const VALID_EDGE_STYLES = new Set(['none', 'bold-major', 'fade', 'noted']);
 function clamp(value, min, max) {
@@ -84,18 +85,5 @@ function normalizeZone(zone, now = Date.now()) {
     };
 }
 function normalizeZones(zones, now = Date.now()) {
-    if (!Array.isArray(zones)) {
-        return [];
-    }
-    const normalized = [];
-    for (const zone of zones) {
-        if (normalized.length >= blankZones_1.MAX_BLANK_ZONES) {
-            break;
-        }
-        const next = normalizeZone(zone, now);
-        if (next) {
-            normalized.push(next);
-        }
-    }
-    return normalized;
+    return (0, normalizeArray_1.normalizeArray)(zones, normalizeZone, blankZones_1.MAX_BLANK_ZONES, now);
 }

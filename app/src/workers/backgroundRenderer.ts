@@ -4,6 +4,7 @@
 
 import { createLogger } from '../logger';
 import { PERF_ENABLED, PerfSampler } from '../perf';
+import { TICK_EVERY } from './rendererProtocol';
 import type { WorkerInMsg, WorkerOutMsg, GridInfo } from './rendererProtocol';
 import type { BlankZone } from '../types/blankZones';
 import type { Decal } from '../types/decals';
@@ -26,6 +27,7 @@ const perf: PerfSampler | null = PERF_ENABLED ? new PerfSampler(log) : null;
 interface Renderer {
   tick(): void;
   renderOnly?(): void;
+  hiresTick?(): void;
   resize(w: number, h: number): void;
   setScroll?(scrollY: number): void;
   setTransition?(transitionT: number): void;
@@ -43,11 +45,10 @@ let renderer: Renderer | null = null;
 // renderer becomes available (init is async) or after a resize (resize rewrites
 // the uniform buffer, resetting scroll_y to 0).
 let pendingScrollY = 0;
-// Simulation tick rate throttle. The display renders every frame for smooth
-// scrolling; the GoL simulation only advances every TICK_EVERY frames.
-// At 60 Hz: TICK_EVERY=32 → ~1.9 sim fps. Adjust to taste.
-const TICK_EVERY = 210;
 let frameCount  = 0;
+// When a hi-res region has tick_multiplier > 1, we tick hi-res this often
+// (in frames) between base ticks. 0 = no intermediate hi-res ticks.
+let hiresTickInterval = 0;
 const zoneState  = new BlankZoneState();
 const decalState = new DecalState();
 const hiresState = new HiResState();
@@ -66,6 +67,15 @@ function errorMessage(err: unknown): string {
 function easeTransition(t: number): number {
   const clamped = Math.min(1, Math.max(0, t));
   return clamped * clamped * (3 - 2 * clamped);
+}
+
+/** Frame action resolved by the scheduler — separates "what frame" from "do thing". */
+type FrameAction = 'base_tick' | 'hires_tick' | 'render_only';
+
+function resolveFrameAction(frame: number, hasHiresTick: boolean, interval: number): FrameAction {
+  if (frame % TICK_EVERY === 0) return 'base_tick';
+  if (hasHiresTick && interval > 0 && frame % interval === 0) return 'hires_tick';
+  return 'render_only';
 }
 
 function postZonesState(): void {
@@ -154,6 +164,10 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
             remove_hires_region?: (id: number) => void;
             update_hires_flags?: (id: number, showGrid: boolean, showBaseGrid: boolean, showBorder: boolean) => void;
             set_hires_paused?: (id: number, paused: boolean) => void;
+            set_hires_tick_multiplier?: (id: number, multiplier: number) => void;
+            max_hires_tick_multiplier?: () => number;
+            hires_tick_and_render?: () => void;
+
             clear_hires_regions?: () => void;
             set_hires_frozen_cells?: (regionId: number, cellsJson: string) => void;
             clear_hires_frozen_cells?: (regionId: number) => void;
@@ -201,6 +215,7 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
             if (regions.length === 0) {
               gpuExt.clear_hires_regions?.();
               activeHiResKeys.clear();
+              hiresTickInterval = 0;
               return;
             }
             for (const r of regions) {
@@ -215,7 +230,11 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
                 gpuExt.update_hires_flags?.(nid, r.showGrid ?? true, r.showBaseGrid ?? true, r.showBorder ?? true);
               }
               gpuExt.set_hires_paused?.(nid, !r.enabled);
+              gpuExt.set_hires_tick_multiplier?.(nid, r.tickMultiplier ?? 1);
             }
+            // Recalculate hi-res sub-tick interval from the GPU-side max.
+            const maxMult = gpuExt.max_hires_tick_multiplier?.() ?? 1;
+            hiresTickInterval = maxMult > 1 ? Math.max(1, Math.floor(TICK_EVERY / maxMult)) : 0;
           };
           const setTextOnGpu = (blocks: TextBlock[]): void => {
             // Frozen cells (cells/both modes) — base grid
@@ -258,6 +277,7 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
           renderer = {
             tick:       () => gpu.tick_and_render(),
             renderOnly: () => gpu.render_only(),
+            hiresTick:  () => gpuExt.hires_tick_and_render?.(),
             resize:     (w, h) => { canvas.width = w; canvas.height = h; gpu.resize(w, h); },
             setScroll:  (scrollY) => gpu.set_scroll(scrollY),
             setTransition: (transitionT) => gpu.set_transition(transitionT),
@@ -310,21 +330,32 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
       break;
     }
 
-    case 'frame':
+    case 'frame': {
       if (!renderer) break;
       perf?.beginFrame();
       frameCount++;
-      if (renderer.renderOnly && frameCount % TICK_EVERY !== 0) {
-        renderer.setTransition?.(easeTransition((frameCount % TICK_EVERY) / TICK_EVERY));
-        if (perf) { perf.time('render', () => renderer!.renderOnly!()); }
-        else { renderer.renderOnly(); }
-      } else {
-        renderer.setTransition?.(0);
-        if (perf) { perf.time('tick', () => renderer!.tick()); }
-        else { renderer.tick(); }
+      const action = resolveFrameAction(frameCount, !!renderer.hiresTick, hiresTickInterval);
+      switch (action) {
+        case 'base_tick':
+          renderer.setTransition?.(0);
+          if (perf) { perf.time('tick', () => renderer!.tick()); }
+          else { renderer.tick(); }
+          break;
+        case 'hires_tick':
+          if (perf) { perf.time('hires_tick', () => renderer!.hiresTick!()); }
+          else { renderer.hiresTick!(); }
+          break;
+        case 'render_only':
+          renderer.setTransition?.(easeTransition((frameCount % TICK_EVERY) / TICK_EVERY));
+          if (renderer.renderOnly) {
+            if (perf) { perf.time('render', () => renderer!.renderOnly!()); }
+            else { renderer.renderOnly(); }
+          }
+          break;
       }
       perf?.endFrame();
       break;
+    }
 
     case 'resize':
       log.debug('Resize →', e.data.width, 'x', e.data.height);

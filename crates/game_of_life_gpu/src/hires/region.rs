@@ -2,21 +2,26 @@
 ///
 /// Each region owns an independent pair of bitpacked cell buffers
 /// (ping-pong) at `multiplier` × the base grid resolution.
+///
+/// Buffer roles are tracked explicitly via `current` index rather than
+/// a frame counter, eliminating parity drift issues.
 pub struct HiResRegion {
     pub id: u32,                  // unique identifier for CRUD
     pub rect: [i32; 4],           // [x1, y1, x2, y2] base cell-space (inclusive)
     pub multiplier: u32,          // 4 (Phase 1)
-    pub buf_a: wgpu::Buffer,      // fine cells (even frames)
-    pub buf_b: wgpu::Buffer,      // fine cells (odd frames)
+    /// The two cell buffers. `bufs[current]` is the latest simulation state.
+    pub bufs: [wgpu::Buffer; 2],
+    /// Index (0 or 1) of the buffer holding the current visible state.
+    pub current: usize,
     pub cols: u32,                // fine-cell columns
     pub rows: u32,                // fine-cell rows
     pub words_per_row: u32,       // fine grid words per row (power of 2 / 32)
     pub padded_rows: u32,         // fine grid padded rows (power of 2)
-    pub frame: u32,               // ping-pong counter
     pub show_grid: bool,
     pub show_base_grid: bool,
     pub show_border: bool,
     pub paused: bool,
+    pub tick_multiplier: u32,
     pub frozen_buf: Option<wgpu::Buffer>,
 }
 
@@ -28,7 +33,6 @@ impl HiResRegion {
         id: u32,
         rect: [i32; 4],
         multiplier: u32,
-        sim_frame: u32,
         show_grid: bool,
         show_base_grid: bool,
         show_border: bool,
@@ -46,43 +50,43 @@ impl HiResRegion {
 
         let init_data = random_cell_data(total_words);
 
-        let buf_a = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("hires_cells_a"),
+        let buf_0 = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("hires_cells_0"),
             contents: bytemuck::cast_slice(&init_data),
             usage: wgpu::BufferUsages::STORAGE
                 | wgpu::BufferUsages::COPY_DST
                 | wgpu::BufferUsages::COPY_SRC,
         });
-        let buf_b = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("hires_cells_b"),
+        let buf_1 = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("hires_cells_1"),
             size: buf_bytes as u64,
             usage: wgpu::BufferUsages::STORAGE
                 | wgpu::BufferUsages::COPY_DST
                 | wgpu::BufferUsages::COPY_SRC,
             mapped_at_creation: false,
         });
-        // Copy initial state to buf_b so both buffers are valid.
+        // Copy initial state to buf_1 so both buffers are valid.
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("hires_init_copy"),
         });
-        encoder.copy_buffer_to_buffer(&buf_a, 0, &buf_b, 0, buf_bytes as u64);
+        encoder.copy_buffer_to_buffer(&buf_0, 0, &buf_1, 0, buf_bytes as u64);
         queue.submit([encoder.finish()]);
 
         HiResRegion {
             id,
             rect,
             multiplier,
-            buf_a,
-            buf_b,
+            bufs: [buf_0, buf_1],
+            current: 0,
             cols,
             rows,
             words_per_row,
             padded_rows,
-            frame: sim_frame,
             show_grid,
             show_base_grid,
             show_border,
             paused: false,
+            tick_multiplier: 1,
             frozen_buf: None,
         }
     }
@@ -97,34 +101,19 @@ impl HiResRegion {
         self.total_words() as u64 * 4
     }
 
-    /// Returns (current_src, current_dst) buffers based on frame parity.
-    pub fn ping_pong_buffers(&self) -> (&wgpu::Buffer, &wgpu::Buffer) {
-        if self.frame % 2 == 0 {
-            (&self.buf_a, &self.buf_b)
-        } else {
-            (&self.buf_b, &self.buf_a)
-        }
+    /// Buffer holding the current (latest) simulation state.
+    pub fn read_buf(&self) -> &wgpu::Buffer {
+        &self.bufs[self.current]
     }
 
-    /// The buffer that holds the current visible state.
-    pub fn current_visible_buffer(&self) -> &wgpu::Buffer {
-        self.ping_pong_buffers().0
+    /// Buffer that will be written to by the next compute step.
+    pub fn write_buf(&self) -> &wgpu::Buffer {
+        &self.bufs[1 - self.current]
     }
 
-    /// The buffer that held the previous visible state (before last swap).
-    pub fn previous_visible_buffer(&self) -> &wgpu::Buffer {
-        self.ping_pong_buffers().1
-    }
-
-    /// Advance the ping-pong counter.
+    /// Swap read/write roles after a compute step.
     pub fn swap(&mut self) {
-        self.frame += 1;
-    }
-
-    /// Re-align the ping-pong counter to an external frame so that
-    /// the bind-group parity matches after a pause gap.
-    pub fn resync_frame(&mut self, sim_frame: u32) {
-        self.frame = sim_frame;
+        self.current = 1 - self.current;
     }
 
     /// Base-cell width of the region.

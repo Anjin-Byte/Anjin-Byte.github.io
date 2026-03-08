@@ -1,8 +1,9 @@
-import { ref, type Ref } from 'vue';
+import type { Ref } from 'vue';
 
 import type { TextBlock } from '../types/text';
 import { normalizeTextBlock, normalizeTextBlocks } from '../utils/textNormalization';
-import { clearTextStorage, loadTextBlocks, saveTextBlocks } from '../utils/textStorage';
+import { loadTextBlocks, saveTextBlocks, clearTextStorage } from '../utils/textStorage';
+import { createFeatureComposable } from './createFeatureComposable';
 
 export interface UseText {
   blocks: Ref<TextBlock[]>;
@@ -23,61 +24,26 @@ export interface UseTextOptions {
 }
 
 export function useText(options: UseTextOptions = {}): UseText {
-  const blocks = ref<TextBlock[]>(loadTextBlocks());
-
-  function commit(next: TextBlock[]): TextBlock[] {
-    const normalized = normalizeTextBlocks(next);
-    blocks.value = normalized;
-    saveTextBlocks(normalized);
-    return normalized;
-  }
-
-  function setBlocks(next: TextBlock[]): void {
-    const normalized = commit(next);
-    options.onSetBlocks?.(normalized);
-  }
-
-  function addBlock(block: TextBlock): void {
-    const normalized = normalizeTextBlock(block);
-    if (!normalized) return;
-    commit([...blocks.value, normalized]);
-    options.onAddBlock?.(normalized);
-  }
-
-  function updateBlock(block: TextBlock): void {
-    const normalized = normalizeTextBlock(block);
-    if (!normalized) return;
-    if (!blocks.value.some((b) => b.id === normalized.id)) return;
-    const next = blocks.value.map((b) => b.id === normalized.id ? normalized : b);
-    commit(next);
-    options.onUpdateBlock?.(normalized);
-  }
-
-  function removeBlock(id: string): void {
-    if (!blocks.value.some((b) => b.id === id)) return;
-    const next = blocks.value.filter((b) => b.id !== id);
-    commit(next);
-    options.onRemoveBlock?.(id);
-  }
-
-  function clearBlocks(): void {
-    if (blocks.value.length === 0) return;
-    blocks.value = [];
-    clearTextStorage();
-    options.onClearBlocks?.();
-  }
-
-  function syncFromWorker(next: TextBlock[]): void {
-    commit(next);
-  }
+  const {
+    items: blocks, setItems, addItem, updateItem, removeItem, clearItems, syncFromWorker,
+  } = createFeatureComposable({
+    storage: { load: loadTextBlocks, save: saveTextBlocks, clear: clearTextStorage },
+    normalize: normalizeTextBlocks,
+    normalizeOne: normalizeTextBlock,
+    onSet: options.onSetBlocks,
+    onAdd: options.onAddBlock,
+    onUpdate: options.onUpdateBlock,
+    onRemove: options.onRemoveBlock,
+    onClear: options.onClearBlocks,
+  });
 
   return {
     blocks,
-    setBlocks,
-    addBlock,
-    updateBlock,
-    removeBlock,
-    clearBlocks,
+    setBlocks: setItems,
+    addBlock: addItem,
+    updateBlock: updateItem,
+    removeBlock: removeItem,
+    clearBlocks: clearItems,
     syncFromWorker,
   };
 }

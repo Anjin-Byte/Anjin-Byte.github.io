@@ -1,5 +1,6 @@
 import type { Decal, DecalBlendMode, DecalKind, DecalPattern } from '../types/decals';
 import { DECAL_DEFAULT_TINT, MAX_DECALS } from '../types/decals';
+import { normalizeArray } from './normalizeArray';
 
 const VALID_KINDS = new Set<DecalKind>(['solid', 'checkerboard', 'stripes', 'dots', 'bitmap']);
 const VALID_BLEND_MODES = new Set<DecalBlendMode>(['alpha', 'multiply', 'screen']);
@@ -105,13 +106,5 @@ export function normalizeDecal(decal: unknown, now = Date.now()): Decal | null {
 }
 
 export function normalizeDecals(decals: unknown, now = Date.now()): Decal[] {
-  if (!Array.isArray(decals)) return [];
-
-  const normalized: Decal[] = [];
-  for (const decal of decals) {
-    if (normalized.length >= MAX_DECALS) break;
-    const next = normalizeDecal(decal, now);
-    if (next) normalized.push(next);
-  }
-  return normalized;
+  return normalizeArray(decals, normalizeDecal, MAX_DECALS, now);
 }
