@@ -342,6 +342,7 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
           else { renderer.tick(); }
           break;
         case 'hires_tick':
+          renderer.setTransition?.(easeTransition((frameCount % TICK_EVERY) / TICK_EVERY));
           if (perf) { perf.time('hires_tick', () => renderer!.hiresTick!()); }
           else { renderer.hiresTick!(); }
           break;

@@ -1,5 +1,6 @@
 use wasm_bindgen::prelude::*;
 
+use crate::context::GpuContext;
 use crate::decals::parse_decal_entries_json;
 use crate::grid::Grid;
 use crate::hires::HiResManager;
@@ -27,21 +28,23 @@ fn aligned_pitch(canvas_width: u32, target: f32) -> f32 {
 ///   2. Surface  ← must exist before adapter request
 ///   3. Adapter (compatible_surface = &surface)
 ///   4. Device + Queue
+///
+/// `ctx` holds the shared device + queue.  Multiple `GpuRenderer`s can
+/// target different canvases while sharing one device and simulation.
 #[wasm_bindgen]
 pub struct GpuGameOfLife {
-    device: wgpu::Device,
-    queue: wgpu::Queue,
+    ctx: GpuContext,
     grid: Grid,
     simulation: Simulation,
     hires: HiResManager,
-    renderer: GpuRenderer,
+    renderers: Vec<GpuRenderer>,
     target_pitch: f32,   // stored as reference for resize recomputation
     zones_json: String,  // latest sanitized zone payload from the app
     decals_json: String, // latest sanitized decal payload from the app
     hires_dirty: bool,
 }
 
-/// Shared init path: requests adapter + device, builds grid/simulation/renderer.
+/// Shared init path: creates context + subsystems from a surface.
 /// Called by both `new` (HtmlCanvasElement) and `new_offscreen` (OffscreenCanvas).
 async fn from_surface(
     instance: wgpu::Instance,
@@ -53,39 +56,19 @@ async fn from_surface(
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
 
-    let adapter = instance
-        .request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::HighPerformance,
-            compatible_surface: Some(&surface),
-            force_fallback_adapter: false,
-        })
-        .await
-        .ok_or_else(|| JsValue::from_str("No WebGPU adapter found"))?;
-
-    let (device, queue) = adapter
-        .request_device(
-            &wgpu::DeviceDescriptor {
-                label: Some("gol_device"),
-                required_features: wgpu::Features::empty(),
-                required_limits: wgpu::Limits::default(),
-                memory_hints: wgpu::MemoryHints::default(),
-            },
-            None,
-        )
-        .await
-        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let (ctx, adapter) = GpuContext::from_compatible_surface(&instance, &surface).await?;
 
     let grid_pitch = aligned_pitch(width, target_pitch);
     let cell_px = grid_pitch.round() as u32;
 
     let grid = Grid::new(width, height, cell_px);
-    let hires = HiResManager::new(&device, &grid);
+    let hires = HiResManager::new(&ctx.device, &grid);
     let simulation = Simulation::new(
-        &device, &queue, &grid, hires.mask_buffer(), hires.inward_buffer(),
+        &ctx.device, &ctx.queue, &grid, hires.mask_buffer(), hires.inward_buffer(),
     );
     let renderer = GpuRenderer::new(
-        &device,
-        &queue,
+        &ctx.device,
+        &ctx.queue,
         &adapter,
         surface,
         &grid,
@@ -95,12 +78,11 @@ async fn from_surface(
     );
 
     Ok(GpuGameOfLife {
-        device,
-        queue,
+        ctx,
         grid,
         simulation,
         hires,
-        renderer,
+        renderers: vec![renderer],
         target_pitch,
         zones_json: String::new(),
         decals_json: String::new(),
@@ -165,29 +147,28 @@ impl GpuGameOfLife {
         self.present();
     }
 
-    /// Tick only hi-res regions (1 step) and render. Called between base ticks
+    /// Selectively tick hi-res regions and render. Called between base ticks
     /// to make hi-res regions visually animate faster than the base grid.
     ///
-    /// Copies the new hi-res state to both prev and current renderer buffers
-    /// so the transition blend shows the latest state regardless of the base
-    /// transition progress.
+    /// Uses per-region Bresenham accumulators so each region ticks at its
+    /// own `tick_multiplier` rate, independent of other regions.
     pub fn hires_tick_and_render(&mut self) {
         if !self.hires.is_active() {
             self.render_only();
             return;
         }
-        self.tick_hires();
+        self.tick_hires_selective();
         self.compose_hires_prev();
         self.present();
     }
 
     /// Updates the vertical scroll offset (canvas pixels). Call on every scroll event.
     pub fn set_scroll(&self, scroll_y: f32) {
-        self.renderer.set_scroll(&self.queue, scroll_y);
+        self.primary().set_scroll(&self.ctx.queue, scroll_y);
     }
 
     pub fn set_transition(&self, t: f32) {
-        self.renderer.set_transition(&self.queue, t.clamp(0.0, 1.0));
+        self.primary().set_transition(&self.ctx.queue, t.clamp(0.0, 1.0));
     }
 
     /// Call whenever the canvas dimensions change.
@@ -198,35 +179,35 @@ impl GpuGameOfLife {
         let grid_pitch = aligned_pitch(width, self.target_pitch);
         let cell_px = grid_pitch.round() as u32;
         self.grid = Grid::new(width, height, cell_px);
-        self.hires.resize_mask(&self.device, &self.queue, &self.grid);
+        self.hires.resize_mask(&self.ctx.device, &self.ctx.queue, &self.grid);
         self.simulation.resize(
-            &self.device, &self.queue, &self.grid,
+            &self.ctx.device, &self.ctx.queue, &self.grid,
             self.hires.mask_buffer(), self.hires.inward_buffer(),
         );
         self.hires.rebuild_all_bind_groups(
-            &self.device, &self.grid, &self.simulation.buf_a, &self.simulation.buf_b,
+            &self.ctx.device, &self.grid, &self.simulation.buf_a, &self.simulation.buf_b,
         );
-        self.renderer.resize(
-            &self.device,
-            &self.queue,
+        self.renderers[0].resize(
+            &self.ctx.device,
+            &self.ctx.queue,
             &self.grid,
             grid_pitch,
             &self.simulation,
         );
         if self.zones_json.is_empty() {
-            self.renderer.clear_zones(&self.queue);
+            self.renderers[0].clear_zones(&self.ctx.queue);
         } else if let Ok(entries) = parse_zone_entries_json(&self.zones_json, &self.grid) {
-            self.renderer.set_zones(&self.queue, &entries);
+            self.renderers[0].set_zones(&self.ctx.queue, &entries);
         }
         if self.decals_json.is_empty() {
-            self.renderer.clear_decals(&self.queue);
+            self.renderers[0].clear_decals(&self.ctx.queue);
         } else if let Ok(entries) = parse_decal_entries_json(&self.decals_json, &self.grid) {
-            self.renderer.set_decals(&self.queue, &entries);
+            self.renderers[0].set_decals(&self.ctx.queue, &entries);
         }
         if self.hires.is_active() {
             self.sync_hires_to_renderer();
         } else {
-            self.renderer.clear_hires(&self.queue);
+            self.renderers[0].clear_hires(&self.ctx.queue);
         }
     }
 
@@ -245,7 +226,7 @@ impl GpuGameOfLife {
     /// without waiting for the next simulation tick.
     pub fn flush_and_render(&mut self) {
         if self.simulation.has_pending_edits() {
-            self.simulation.flush_edits(&self.device, &self.queue);
+            self.simulation.flush_edits(&self.ctx.device, &self.ctx.queue);
         }
         self.render_only();
     }
@@ -276,7 +257,7 @@ impl GpuGameOfLife {
         let entries = parse_zone_entries_json(zones_json, &self.grid)?;
         self.zones_json.clear();
         self.zones_json.push_str(zones_json);
-        self.renderer.set_zones(&self.queue, &entries);
+        self.renderers[0].set_zones(&self.ctx.queue, &entries);
         Ok(())
     }
 
@@ -286,7 +267,7 @@ impl GpuGameOfLife {
         let entries = parse_decal_entries_json(decals_json, &self.grid)?;
         self.decals_json.clear();
         self.decals_json.push_str(decals_json);
-        self.renderer.set_decals(&self.queue, &entries);
+        self.renderers[0].set_decals(&self.ctx.queue, &entries);
         Ok(())
     }
 
@@ -294,7 +275,7 @@ impl GpuGameOfLife {
     /// Packs into the bitpacked frozen buffer and rebuilds compute bind groups.
     pub fn set_frozen_cells(&mut self, cells_json: &str) -> Result<(), JsValue> {
         let buf = parse_frozen_cells_json(cells_json, &self.grid)?;
-        self.queue.write_buffer(
+        self.ctx.queue.write_buffer(
             &self.simulation.frozen_buf,
             0,
             bytemuck::cast_slice(&buf),
@@ -305,7 +286,7 @@ impl GpuGameOfLife {
     /// Clear all frozen cells (zero the frozen buffer).
     pub fn clear_frozen_cells(&mut self) {
         let zeros = vec![0u32; self.grid.total_words() as usize];
-        self.queue.write_buffer(
+        self.ctx.queue.write_buffer(
             &self.simulation.frozen_buf,
             0,
             bytemuck::cast_slice(&zeros),
@@ -315,13 +296,13 @@ impl GpuGameOfLife {
     /// Upload SDF glyph metadata (JSON array of positioned glyph records).
     pub fn set_text_glyphs(&mut self, glyphs_json: &str) -> Result<(), JsValue> {
         let glyphs = parse_text_glyphs_json(glyphs_json)?;
-        self.renderer.set_text_glyphs(&self.queue, &glyphs);
+        self.renderers[0].set_text_glyphs(&self.ctx.queue, &glyphs);
         Ok(())
     }
 
     /// Clear all SDF text glyphs.
     pub fn clear_text_glyphs(&mut self) {
-        self.renderer.clear_text_glyphs(&self.queue);
+        self.renderers[0].clear_text_glyphs(&self.ctx.queue);
     }
 
     /// Upload the SDF atlas texture (R8unorm raw data).
@@ -329,8 +310,8 @@ impl GpuGameOfLife {
         if data.len() != (width * height) as usize {
             return Err(JsValue::from_str("atlas data size mismatch"));
         }
-        self.renderer.upload_text_atlas(
-            &self.device, &self.queue, data, width, height,
+        self.renderers[0].upload_text_atlas(
+            &self.ctx.device, &self.ctx.queue, data, width, height,
         );
         Ok(())
     }
@@ -342,7 +323,7 @@ impl GpuGameOfLife {
     ) {
         let rect = [x1, y1, x2, y2];
         self.hires.add_region(
-            &self.device, &self.queue, &self.grid, id, rect, multiplier,
+            &self.ctx.device, &self.ctx.queue, &self.grid, id, rect, multiplier,
             show_grid, show_base_grid, show_border,
             &self.simulation.buf_a, &self.simulation.buf_b,
         );
@@ -352,14 +333,14 @@ impl GpuGameOfLife {
 
     /// Remove a hi-res region by id.
     pub fn remove_hires_region(&mut self, id: u32) {
-        self.hires.remove_region(&self.queue, id);
+        self.hires.remove_region(&self.ctx.queue, id);
         self.hires_dirty = true;
         self.sync_hires_to_renderer();
     }
 
     /// Pause or resume a specific hi-res region.
     pub fn set_hires_paused(&mut self, id: u32, paused: bool) {
-        self.hires.set_paused(id, paused, &self.device, &self.queue);
+        self.hires.set_paused(id, paused, &self.ctx.device, &self.ctx.queue);
         self.hires_dirty = true;
     }
 
@@ -383,8 +364,8 @@ impl GpuGameOfLife {
 
     /// Clear all hi-res regions.
     pub fn clear_hires_regions(&mut self) {
-        self.hires.clear_regions(&self.queue);
-        self.renderer.clear_hires(&self.queue);
+        self.hires.clear_regions(&self.ctx.queue);
+        self.renderers[0].clear_hires(&self.ctx.queue);
     }
 
     /// Upload frozen cells for a hi-res region (fine-cell space, region-relative).
@@ -395,14 +376,19 @@ impl GpuGameOfLife {
             None => return Err(JsValue::from_str("Region not found")),
         };
         let buf = crate::text::parse_hires_frozen_cells_json(cells_json, wpr, padded_rows)?;
-        self.hires.set_region_frozen(&self.device, &self.queue, region_id, &buf);
+        self.hires.set_region_frozen(&self.ctx.device, &self.ctx.queue, region_id, &buf);
         Ok(())
     }
 
     /// Clear frozen cells for a hi-res region.
     pub fn clear_hires_frozen_cells(&mut self, region_id: u32) {
-        self.hires.clear_region_frozen(&self.device, region_id);
+        self.hires.clear_region_frozen(&self.ctx.device, region_id);
     }
+}
+
+// ── Renderer accessors ───────────────────────────────────────────────────────
+impl GpuGameOfLife {
+    fn primary(&self) -> &GpuRenderer { &self.renderers[0] }
 }
 
 // ── Composable GPU phases ────────────────────────────────────────────────────
@@ -417,38 +403,48 @@ impl GpuGameOfLife {
     /// Flush any pending cell edits to the GPU.
     fn flush_edits_if_pending(&mut self) {
         if self.simulation.has_pending_edits() {
-            self.simulation.flush_edits(&self.device, &self.queue);
+            self.simulation.flush_edits(&self.ctx.device, &self.ctx.queue);
         }
     }
 
     /// Snapshot pre-tick state for transition animation (base + hi-res).
     fn snapshot_pre_tick(&mut self) {
-        let mut enc = self.device.create_command_encoder(
+        let mut enc = self.ctx.device.create_command_encoder(
             &wgpu::CommandEncoderDescriptor { label: Some("gol_snapshot") },
         );
-        self.renderer.capture_previous_state(
+        self.renderers[0].capture_previous_state(
             &mut enc, self.simulation.current_visible_buffer(), &self.grid,
         );
-        self.copy_hires_to_buf(&mut enc, self.renderer.hires_cells_prev_buf());
-        self.queue.submit([enc.finish()]);
+        let dst = self.renderers[0].hires_cells_prev_buf();
+        Self::copy_hires_to_buf_inner(&self.hires, &mut enc, dst);
+        self.ctx.queue.submit([enc.finish()]);
     }
 
-    /// Tick hi-res regions (single step, boundary extract + fine compute).
+    /// Tick all hi-res regions (base tick path — every region advances).
     fn tick_hires(&mut self) {
-        let mut enc = self.device.create_command_encoder(
+        let mut enc = self.ctx.device.create_command_encoder(
             &wgpu::CommandEncoderDescriptor { label: Some("gol_hires_tick") },
         );
         self.hires.tick(&mut enc, self.simulation.current_visible_is_a());
-        self.queue.submit([enc.finish()]);
+        self.ctx.queue.submit([enc.finish()]);
+    }
+
+    /// Selectively tick hi-res regions using per-region accumulators.
+    fn tick_hires_selective(&mut self) {
+        let mut enc = self.ctx.device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor { label: Some("gol_hires_tick") },
+        );
+        self.hires.tick_selective(&mut enc, self.simulation.current_visible_is_a());
+        self.ctx.queue.submit([enc.finish()]);
     }
 
     /// Tick base simulation (single step).
     fn tick_base(&mut self) {
-        let mut enc = self.device.create_command_encoder(
+        let mut enc = self.ctx.device.create_command_encoder(
             &wgpu::CommandEncoderDescriptor { label: Some("gol_sim_tick") },
         );
         self.simulation.tick(&mut enc, &self.grid);
-        self.queue.submit([enc.finish()]);
+        self.ctx.queue.submit([enc.finish()]);
     }
 
     /// Mark hi-res compose as done (present() handles the current-buffer copy).
@@ -459,11 +455,12 @@ impl GpuGameOfLife {
     /// Copy hi-res into the renderer's "previous" buffer so the transition
     /// blend shows the latest hi-res state. present() handles current.
     fn compose_hires_prev(&mut self) {
-        let mut enc = self.device.create_command_encoder(
+        let mut enc = self.ctx.device.create_command_encoder(
             &wgpu::CommandEncoderDescriptor { label: Some("gol_hires_compose") },
         );
-        self.copy_hires_to_buf(&mut enc, self.renderer.hires_cells_prev_buf());
-        self.queue.submit([enc.finish()]);
+        let dst = self.renderers[0].hires_cells_prev_buf();
+        Self::copy_hires_to_buf_inner(&self.hires, &mut enc, dst);
+        self.ctx.queue.submit([enc.finish()]);
         self.hires_dirty = false;
     }
 
@@ -471,36 +468,41 @@ impl GpuGameOfLife {
     /// present() handles copying current.
     fn sync_hires_if_dirty(&mut self) {
         if !self.hires_dirty { return; }
-        let mut enc = self.device.create_command_encoder(
+        let mut enc = self.ctx.device.create_command_encoder(
             &wgpu::CommandEncoderDescriptor { label: Some("gol_hires_sync") },
         );
-        self.copy_hires_to_buf(&mut enc, self.renderer.hires_cells_prev_buf());
-        self.queue.submit([enc.finish()]);
+        let dst = self.renderers[0].hires_cells_prev_buf();
+        Self::copy_hires_to_buf_inner(&self.hires, &mut enc, dst);
+        self.ctx.queue.submit([enc.finish()]);
         self.hires_dirty = false;
     }
 
     /// Render the current state and present the frame.
     fn present(&mut self) {
-        let mut enc = self.device.create_command_encoder(
+        let mut enc = self.ctx.device.create_command_encoder(
             &wgpu::CommandEncoderDescriptor { label: Some("gol_present") },
         );
-        // Copy hi-res current state for the render pass.
-        self.copy_hires_to_buf(&mut enc, self.renderer.hires_cells_buf());
-        match self.renderer.render(&mut enc, self.simulation.current_visible_is_a()) {
+        let dst = self.renderers[0].hires_cells_buf();
+        Self::copy_hires_to_buf_inner(&self.hires, &mut enc, dst);
+        match self.renderers[0].render(&mut enc, self.simulation.current_visible_is_a()) {
             Ok(output) => {
-                self.queue.submit([enc.finish()]);
+                self.ctx.queue.submit([enc.finish()]);
                 output.present();
             }
             Err(_) => {
-                self.renderer.reconfigure(&self.device);
+                self.renderers[0].reconfigure(&self.ctx.device);
             }
         }
     }
 
     /// Copy all visible hi-res fine-cell buffers into a single destination buffer.
-    fn copy_hires_to_buf(&self, encoder: &mut wgpu::CommandEncoder, dst: &wgpu::Buffer) {
+    fn copy_hires_to_buf_inner(
+        hires: &HiResManager,
+        encoder: &mut wgpu::CommandEncoder,
+        dst: &wgpu::Buffer,
+    ) {
         let mut offset: u64 = 0;
-        for (src, size) in self.hires.visible_fine_buffers() {
+        for (src, size) in hires.visible_fine_buffers() {
             if dst.size() >= offset + size {
                 encoder.copy_buffer_to_buffer(src, 0, dst, offset, size);
             }
@@ -511,7 +513,7 @@ impl GpuGameOfLife {
     fn sync_hires_to_renderer(&mut self) {
         let metas = self.hires.render_meta();
         if metas.is_empty() {
-            self.renderer.clear_hires(&self.queue);
+            self.renderers[0].clear_hires(&self.ctx.queue);
             return;
         }
         let global = HiResGlobalMetaGpu {
@@ -537,8 +539,8 @@ impl GpuGameOfLife {
         }
         let total_bytes = offset as u64 * 4;
         let cells_size = total_bytes.max(4);
-        self.renderer.set_hires(
-            &self.device, &self.queue,
+        self.renderers[0].set_hires(
+            &self.ctx.device, &self.ctx.queue,
             &global, &regions, cells_size,
         );
     }

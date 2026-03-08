@@ -1,3 +1,4 @@
+mod context;
 mod decals;
 mod gpu;
 mod grid;

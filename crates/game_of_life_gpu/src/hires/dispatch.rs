@@ -173,6 +173,10 @@ impl HiResManager {
     }
 
     /// Full hi-res tick (single step): boundary extract → fine compute → swap.
+    /// Ticks ALL non-paused regions and resets tick accumulators.
+    ///
+    /// Called on base tick frames where every region must advance because
+    /// the base grid just changed (new boundary conditions).
     ///
     /// `base_is_a` indicates whether the base simulation's buf_a is the
     /// current visible buffer (true) or buf_b (false).
@@ -193,6 +197,50 @@ impl HiResManager {
         }
         for region in &mut self.regions {
             if !region.paused { region.swap(); }
+            region.tick_accum = 0;
+        }
+    }
+
+    /// Selective hi-res tick: only advances regions whose Bresenham
+    /// accumulator reaches the threshold.
+    ///
+    /// Called on intermediate hi-res frames (between base ticks). Each
+    /// region's accumulator is incremented by its `tick_multiplier`.
+    /// When it reaches `max_tick_multiplier`, the region ticks and the
+    /// accumulator wraps. This distributes ticks proportionally so a
+    /// region with multiplier M gets exactly M ticks per base-tick cycle.
+    pub fn tick_selective(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        base_is_a: bool,
+    ) {
+        if self.regions.is_empty() { return; }
+        let max_mult = self.max_tick_multiplier();
+        if max_mult <= 1 { return; }
+
+        // Advance accumulators and decide which regions tick this frame.
+        let mut should_tick = [false; MAX_HIRES_REGIONS];
+        for (i, region) in self.regions.iter_mut().enumerate() {
+            if region.paused { continue; }
+            region.tick_accum += region.tick_multiplier;
+            if region.tick_accum >= max_mult {
+                region.tick_accum -= max_mult;
+                should_tick[i] = true;
+            }
+        }
+
+        if !should_tick.iter().any(|&t| t) { return; }
+        clear_buffer_enc(encoder, &self.inward_grid_buf);
+        for (i, &tick) in should_tick.iter().enumerate() {
+            if !tick { continue; }
+            self.dispatch_boundary_extract(encoder, base_is_a, self.regions[i].current, i);
+        }
+        for (i, &tick) in should_tick.iter().enumerate() {
+            if !tick { continue; }
+            self.dispatch_fine_compute(encoder, self.regions[i].current, i);
+        }
+        for (i, region) in self.regions.iter_mut().enumerate() {
+            if should_tick[i] { region.swap(); }
         }
     }
 

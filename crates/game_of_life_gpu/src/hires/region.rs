@@ -22,6 +22,11 @@ pub struct HiResRegion {
     pub show_border: bool,
     pub paused: bool,
     pub tick_multiplier: u32,
+    /// Bresenham-style accumulator for per-region tick scheduling.
+    /// Incremented by `tick_multiplier` each intermediate hi-res frame;
+    /// when it reaches `max_tick_multiplier`, the region ticks and the
+    /// accumulator wraps. Reset to 0 on every base tick.
+    pub tick_accum: u32,
     pub frozen_buf: Option<wgpu::Buffer>,
 }
 
@@ -87,6 +92,7 @@ impl HiResRegion {
             show_border,
             paused: false,
             tick_multiplier: 1,
+            tick_accum: 0,
             frozen_buf: None,
         }
     }

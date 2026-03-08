@@ -9,3 +9,4 @@ wasm-pack.log
 app/node_modules/
 app/dist/
 .DS_Store
+
