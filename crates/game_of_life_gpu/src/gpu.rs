@@ -1,13 +1,11 @@
 use wasm_bindgen::prelude::*;
 
 use crate::context::GpuContext;
-use crate::decals::parse_decal_entries_json;
 use crate::grid::Grid;
 use crate::hires::HiResManager;
 use crate::renderer::GpuRenderer;
-use crate::renderer::types::{HiResGlobalMetaGpu, HiResRegionMetaGpu};
+use crate::renderer::types::{HiResGlobalMetaGpu, HiResRegionMetaGpu, ThemeParams};
 use crate::simulation::Simulation;
-use crate::text::{parse_frozen_cells_json, parse_text_glyphs_json};
 use crate::zones::parse_zone_entries_json;
 
 // Major-grid divisor: 5 minor cells per major square (must match render.wgsl major_every).
@@ -40,7 +38,6 @@ pub struct GpuGameOfLife {
     renderers: Vec<GpuRenderer>,
     target_pitch: f32,   // stored as reference for resize recomputation
     zones_json: String,  // latest sanitized zone payload from the app
-    decals_json: String, // latest sanitized decal payload from the app
     hires_dirty: bool,
 }
 
@@ -85,7 +82,6 @@ async fn from_surface(
         renderers: vec![renderer],
         target_pitch,
         zones_json: String::new(),
-        decals_json: String::new(),
         hires_dirty: true,
     })
 }
@@ -199,11 +195,6 @@ impl GpuGameOfLife {
         } else if let Ok(entries) = parse_zone_entries_json(&self.zones_json, &self.grid) {
             self.renderers[0].set_zones(&self.ctx.queue, &entries);
         }
-        if self.decals_json.is_empty() {
-            self.renderers[0].clear_decals(&self.ctx.queue);
-        } else if let Ok(entries) = parse_decal_entries_json(&self.decals_json, &self.grid) {
-            self.renderers[0].set_decals(&self.ctx.queue, &entries);
-        }
         if self.hires.is_active() {
             self.sync_hires_to_renderer();
         } else {
@@ -261,58 +252,12 @@ impl GpuGameOfLife {
         Ok(())
     }
 
-    /// Accepts a JSON array of decal records and uploads them to the GPU.
-    /// Caches the payload for re-application after resize.
-    pub fn set_decals_json(&mut self, decals_json: &str) -> Result<(), JsValue> {
-        let entries = parse_decal_entries_json(decals_json, &self.grid)?;
-        self.decals_json.clear();
-        self.decals_json.push_str(decals_json);
-        self.renderers[0].set_decals(&self.ctx.queue, &entries);
-        Ok(())
-    }
-
-    /// Upload frozen cell coordinates (JSON array of `{cx, cy}` pairs).
-    /// Packs into the bitpacked frozen buffer and rebuilds compute bind groups.
-    pub fn set_frozen_cells(&mut self, cells_json: &str) -> Result<(), JsValue> {
-        let buf = parse_frozen_cells_json(cells_json, &self.grid)?;
-        self.ctx.queue.write_buffer(
-            &self.simulation.frozen_buf,
-            0,
-            bytemuck::cast_slice(&buf),
-        );
-        Ok(())
-    }
-
-    /// Clear all frozen cells (zero the frozen buffer).
-    pub fn clear_frozen_cells(&mut self) {
-        let zeros = vec![0u32; self.grid.total_words() as usize];
-        self.ctx.queue.write_buffer(
-            &self.simulation.frozen_buf,
-            0,
-            bytemuck::cast_slice(&zeros),
-        );
-    }
-
-    /// Upload SDF glyph metadata (JSON array of positioned glyph records).
-    pub fn set_text_glyphs(&mut self, glyphs_json: &str) -> Result<(), JsValue> {
-        let glyphs = parse_text_glyphs_json(glyphs_json)?;
-        self.renderers[0].set_text_glyphs(&self.ctx.queue, &glyphs);
-        Ok(())
-    }
-
-    /// Clear all SDF text glyphs.
-    pub fn clear_text_glyphs(&mut self) {
-        self.renderers[0].clear_text_glyphs(&self.ctx.queue);
-    }
-
-    /// Upload the SDF atlas texture (R8unorm raw data).
-    pub fn upload_text_atlas(&mut self, data: &[u8], width: u32, height: u32) -> Result<(), JsValue> {
-        if data.len() != (width * height) as usize {
-            return Err(JsValue::from_str("atlas data size mismatch"));
-        }
-        self.renderers[0].upload_text_atlas(
-            &self.ctx.device, &self.ctx.queue, data, width, height,
-        );
+    /// Apply a theme palette. Accepts a JSON object with OKLab endpoints and
+    /// grid lerp positions; all color relationships are derived from these.
+    /// Schema: `{ surface: [L,a,b], ink: [L,a,b], minor_t, major_t, border_t, ink_opacity }`.
+    pub fn set_theme_json(&mut self, theme_json: &str) -> Result<(), JsValue> {
+        let theme = parse_theme_json(theme_json)?;
+        self.renderers[0].set_theme(&self.ctx.queue, &theme);
         Ok(())
     }
 
@@ -368,22 +313,6 @@ impl GpuGameOfLife {
         self.renderers[0].clear_hires(&self.ctx.queue);
     }
 
-    /// Upload frozen cells for a hi-res region (fine-cell space, region-relative).
-    pub fn set_hires_frozen_cells(&mut self, region_id: u32, cells_json: &str) -> Result<(), JsValue> {
-        let region = self.hires.regions.iter().find(|r| r.id == region_id);
-        let (wpr, padded_rows) = match region {
-            Some(r) => (r.words_per_row, r.padded_rows),
-            None => return Err(JsValue::from_str("Region not found")),
-        };
-        let buf = crate::text::parse_hires_frozen_cells_json(cells_json, wpr, padded_rows)?;
-        self.hires.set_region_frozen(&self.ctx.device, &self.ctx.queue, region_id, &buf);
-        Ok(())
-    }
-
-    /// Clear frozen cells for a hi-res region.
-    pub fn clear_hires_frozen_cells(&mut self, region_id: u32) {
-        self.hires.clear_region_frozen(&self.ctx.device, region_id);
-    }
 }
 
 // ── Renderer accessors ───────────────────────────────────────────────────────
@@ -544,4 +473,48 @@ impl GpuGameOfLife {
             &global, &regions, cells_size,
         );
     }
+}
+
+fn parse_theme_json(theme_json: &str) -> Result<ThemeParams, JsValue> {
+    use js_sys::{Array, Reflect};
+
+    let parsed = js_sys::JSON::parse(theme_json)
+        .map_err(|_| JsValue::from_str("Invalid theme JSON payload"))?;
+    if !parsed.is_object() {
+        return Err(JsValue::from_str("Theme JSON must be an object"));
+    }
+
+    let read_lab = |key: &str| -> Result<[f32; 4], JsValue> {
+        let v = Reflect::get(&parsed, &JsValue::from_str(key))
+            .map_err(|_| JsValue::from_str(&format!("theme.{key} missing")))?;
+        if !Array::is_array(&v) {
+            return Err(JsValue::from_str(&format!("theme.{key} must be [L,a,b]")));
+        }
+        let arr = Array::from(&v);
+        if arr.length() < 3 {
+            return Err(JsValue::from_str(&format!("theme.{key} needs [L,a,b]")));
+        }
+        let l = arr.get(0).as_f64().unwrap_or(0.0) as f32;
+        let a = arr.get(1).as_f64().unwrap_or(0.0) as f32;
+        let b = arr.get(2).as_f64().unwrap_or(0.0) as f32;
+        Ok([l, a, b, 0.0])
+    };
+    let read_f32 = |key: &str, default: f32| -> f32 {
+        Reflect::get(&parsed, &JsValue::from_str(key))
+            .ok()
+            .and_then(|v| v.as_f64())
+            .map(|n| n as f32)
+            .unwrap_or(default)
+    };
+
+    Ok(ThemeParams {
+        surface: read_lab("surface")?,
+        ink: read_lab("ink")?,
+        minor_t: read_f32("minor_t", 0.08),
+        major_t: read_f32("major_t", 0.14),
+        border_t: read_f32("border_t", 0.24),
+        ink_opacity: read_f32("ink_opacity", 0.88),
+        grain_intensity: read_f32("grain_intensity", 0.0),
+        _pad0: 0.0, _pad1: 0.0, _pad2: 0.0,
+    })
 }

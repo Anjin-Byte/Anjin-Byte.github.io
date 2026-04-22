@@ -1,6 +1,5 @@
 import { createLogger } from '../logger';
 import type { BlankZone } from '../types/blankZones';
-import type { Decal } from '../types/decals';
 
 const log = createLogger('CpuRenderer');
 const CELL_SIZE   = 5;
@@ -17,7 +16,6 @@ export interface CpuRenderer {
   renderOnly?(): void;
   resize(w: number, h: number): void;
   setZones?(zones: BlankZone[]): void;
-  setDecals?(decals: Decal[]): void;
   free(): void;
 }
 
@@ -85,7 +83,6 @@ export async function makeCpuRenderer(canvas: OffscreenCanvas): Promise<CpuRende
       }
     },
     setZones(_zones: BlankZone[]) { /* CPU fallback ignores blank zones */ },
-    setDecals(_decals: Decal[]) { /* CPU fallback ignores decals */ },
     free() { /* WasmBridge has no explicit destructor */ },
   };
 }

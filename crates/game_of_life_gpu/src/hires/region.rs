@@ -112,11 +112,6 @@ impl HiResRegion {
         &self.bufs[self.current]
     }
 
-    /// Buffer that will be written to by the next compute step.
-    pub fn write_buf(&self) -> &wgpu::Buffer {
-        &self.bufs[1 - self.current]
-    }
-
     /// Swap read/write roles after a compute step.
     pub fn swap(&mut self) {
         self.current = 1 - self.current;
@@ -132,40 +127,6 @@ impl HiResRegion {
         (self.rect[3] - self.rect[1] + 1) as u32
     }
 
-    /// Create or update the frozen cell buffer from bitpacked data.
-    pub fn set_frozen(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, data: &[u32]) {
-        let expected = self.total_words() as usize;
-        let buf_data = if data.len() >= expected {
-            &data[..expected]
-        } else {
-            // Pad with zeros if data is shorter
-            let mut padded = vec![0u32; expected];
-            padded[..data.len()].copy_from_slice(data);
-            self.frozen_buf = Some(device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("hires_frozen"),
-                contents: bytemuck::cast_slice(&padded),
-                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            }));
-            return;
-        };
-        match self.frozen_buf {
-            Some(ref buf) if buf.size() == (expected * 4) as u64 => {
-                queue.write_buffer(buf, 0, bytemuck::cast_slice(buf_data));
-            }
-            _ => {
-                self.frozen_buf = Some(device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("hires_frozen"),
-                    contents: bytemuck::cast_slice(buf_data),
-                    usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-                }));
-            }
-        }
-    }
-
-    /// Clear the frozen cell buffer.
-    pub fn clear_frozen(&mut self) {
-        self.frozen_buf = None;
-    }
 }
 
 /// Generate random bitpacked cell data with ~25% alive density.

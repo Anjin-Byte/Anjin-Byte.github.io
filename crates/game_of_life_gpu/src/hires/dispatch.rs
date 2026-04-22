@@ -340,29 +340,6 @@ impl HiResManager {
         }
     }
 
-    pub fn set_region_frozen(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, id: u32, data: &[u32]) {
-        let Some(idx) = self.regions.iter().position(|r| r.id == id) else { return; };
-        self.regions[idx].set_frozen(device, queue, data);
-        self.rebuild_fine_for_region(device, idx);
-    }
-
-    pub fn clear_region_frozen(&mut self, device: &wgpu::Device, id: u32) {
-        let Some(idx) = self.regions.iter().position(|r| r.id == id) else { return; };
-        self.regions[idx].clear_frozen();
-        self.rebuild_fine_for_region(device, idx);
-    }
-
-    fn rebuild_fine_for_region(&mut self, device: &wgpu::Device, idx: usize) {
-        ensure_fine_pipeline(device, &mut self.fine_pipeline, &mut self.fine_bgl);
-        let fine_bgl = match self.fine_bgl { Some(ref b) => b, None => return };
-        let gs = &self.gpu_states[idx];
-        let frozen = self.regions[idx].frozen_buf.as_ref().unwrap_or(&gs.boundary.frozen_placeholder_buf);
-        let (p, bg0, bg1) = build_fine_bind_groups(device, &self.regions[idx], &gs.boundary, frozen, fine_bgl);
-        self.gpu_states[idx].fine_params_buf = p;
-        self.gpu_states[idx].fine_bg_0 = bg0;
-        self.gpu_states[idx].fine_bg_1 = bg1;
-    }
-
     fn rebuild_mask(&mut self, queue: &wgpu::Queue) {
         let rects: Vec<[i32; 4]> = self.regions.iter().map(|r| r.rect).collect();
         self.mask.rebuild(queue, &rects);

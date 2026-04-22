@@ -1,5 +1,5 @@
 /// Resources for the core bind group (group 0):
-/// uniforms, current/previous cells, paper params, noise texture+sampler.
+/// uniforms, current/previous cells, paper params, noise texture+sampler, theme.
 pub(super) struct CoreBindGroupResources<'a> {
     pub uniform_buf: &'a wgpu::Buffer,
     pub current_buf: &'a wgpu::Buffer,
@@ -7,19 +7,14 @@ pub(super) struct CoreBindGroupResources<'a> {
     pub paper_buf: &'a wgpu::Buffer,
     pub noise_view: &'a wgpu::TextureView,
     pub noise_sampler: &'a wgpu::Sampler,
+    pub theme_buf: &'a wgpu::Buffer,
 }
 
 /// Resources for the overlay bind group (group 1):
-/// zones, decals, SDF text.
+/// zones.
 pub(super) struct OverlayBindGroupResources<'a> {
     pub zone_meta_buf: &'a wgpu::Buffer,
     pub zone_buf: &'a wgpu::Buffer,
-    pub decal_meta_buf: &'a wgpu::Buffer,
-    pub decal_buf: &'a wgpu::Buffer,
-    pub sdf_meta_buf: &'a wgpu::Buffer,
-    pub sdf_glyphs_buf: &'a wgpu::Buffer,
-    pub sdf_atlas_view: &'a wgpu::TextureView,
-    pub sdf_sampler: &'a wgpu::Sampler,
 }
 
 /// Resources for the hi-res bind group (group 2):
@@ -43,6 +38,7 @@ pub(super) fn core_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLa
             uniform_bgl_entry(3),   // PaperParams
             texture_bgl_entry(4),   // noise_tex
             sampler_bgl_entry(5),   // noise_smp
+            uniform_bgl_entry(6),   // ThemeParams
         ],
     })
 }
@@ -63,6 +59,7 @@ pub(super) fn make_core_bind_group(
             wgpu::BindGroupEntry { binding: 3, resource: res.paper_buf.as_entire_binding() },
             wgpu::BindGroupEntry { binding: 4, resource: wgpu::BindingResource::TextureView(res.noise_view) },
             wgpu::BindGroupEntry { binding: 5, resource: wgpu::BindingResource::Sampler(res.noise_sampler) },
+            wgpu::BindGroupEntry { binding: 6, resource: res.theme_buf.as_entire_binding() },
         ],
     })
 }
@@ -75,12 +72,6 @@ pub(super) fn overlay_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGrou
         entries: &[
             uniform_bgl_entry(0),   // zone_meta
             storage_bgl_entry(1),   // zones
-            uniform_bgl_entry(2),   // decal_meta
-            storage_bgl_entry(3),   // decals
-            uniform_bgl_entry(4),   // sdf_text_meta
-            storage_bgl_entry(5),   // sdf_glyphs
-            texture_bgl_entry(6),   // sdf_atlas
-            sampler_bgl_entry(7),   // sdf_smp
         ],
     })
 }
@@ -97,12 +88,6 @@ pub(super) fn make_overlay_bind_group(
         entries: &[
             wgpu::BindGroupEntry { binding: 0, resource: res.zone_meta_buf.as_entire_binding() },
             wgpu::BindGroupEntry { binding: 1, resource: res.zone_buf.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 2, resource: res.decal_meta_buf.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 3, resource: res.decal_buf.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 4, resource: res.sdf_meta_buf.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 5, resource: res.sdf_glyphs_buf.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 6, resource: wgpu::BindingResource::TextureView(res.sdf_atlas_view) },
-            wgpu::BindGroupEntry { binding: 7, resource: wgpu::BindingResource::Sampler(res.sdf_sampler) },
         ],
     })
 }

@@ -70,39 +70,46 @@ impl PaperParams {
     }
 }
 
-// ── Placeholder structs for future features ──────────────────────────────────
-
-/// SDF text meta — binding 10.
+/// Palette parameters — must match `ThemeParams` struct in render.wgsl.
+///
+/// All colors are expressed in OKLab (L, a, b). The grid lines are derived
+/// proportionally by interpolating along the surface→ink lightness axis.
+/// Swapping light ↔ dark is a single substitution of `surface` and `ink`.
+///
+/// Size: 64 bytes, 16-byte aligned. Grain + three pad scalars round out the
+/// tail block so the uniform layout stays on a 16-byte boundary (WGSL rule).
 #[repr(C)]
-#[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy, Default)]
-pub struct SdfTextMetaGpu {
-    pub glyph_count: u32,
-    pub pad0: u32,
-    pub pad1: u32,
-    pub pad2: u32,
+#[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy)]
+pub struct ThemeParams {
+    pub surface: [f32; 4],    // paper color OKLab (L, a, b, _pad)
+    pub ink: [f32; 4],        // cell ink OKLab (L, a, b, _pad)
+    pub minor_t: f32,         // lerp position surface→ink for minor grid
+    pub major_t: f32,         // lerp position surface→ink for major grid
+    pub border_t: f32,        // lerp position surface→ink for page border
+    pub ink_opacity: f32,     // max alpha of cell ink at full coverage
+    pub grain_intensity: f32, // ± dither amplitude added before gamma encode
+    pub _pad0: f32,
+    pub _pad1: f32,
+    pub _pad2: f32,
 }
 
-/// SDF text glyph — binding 11 (array). Must match WGSL `SdfGlyph`.
-pub const MAX_TEXT_GLYPHS: usize = 256;
-
-#[repr(C)]
-#[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy, Default)]
-pub struct TextGlyphGpu {
-    pub cell_x: f32,
-    pub cell_y: f32,
-    pub cell_w: f32,
-    pub cell_h: f32,
-    pub uv_x: f32,
-    pub uv_y: f32,
-    pub uv_w: f32,
-    pub uv_h: f32,
-    pub color_r: f32,
-    pub color_g: f32,
-    pub color_b: f32,
-    pub pad0: f32,
+impl ThemeParams {
+    /// Default light palette. Grain off — bright surface has no banding.
+    pub fn light() -> Self {
+        ThemeParams {
+            surface: [0.985, -0.001,  0.004, 0.0],
+            ink:     [0.280,  0.001,  0.005, 0.0],
+            minor_t:  0.08,
+            major_t:  0.14,
+            border_t: 0.24,
+            ink_opacity: 0.88,
+            grain_intensity: 0.0,
+            _pad0: 0.0, _pad1: 0.0, _pad2: 0.0,
+        }
+    }
 }
 
-/// Hi-res region global meta — binding 14.
+/// Hi-res region global meta.
 pub const MAX_HIRES_REGIONS: usize = 8;
 
 #[repr(C)]

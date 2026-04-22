@@ -7,15 +7,11 @@ import { PERF_ENABLED, PerfSampler } from '../perf';
 import { TICK_EVERY } from './rendererProtocol';
 import type { WorkerInMsg, WorkerOutMsg, GridInfo } from './rendererProtocol';
 import type { BlankZone } from '../types/blankZones';
-import type { Decal } from '../types/decals';
 import type { HiResRegion } from '../types/hiresRegion';
-import type { TextBlock } from '../types/text';
+import type { ThemePalette } from '../types/theme';
+import { LIGHT_THEME, serializeTheme } from '../types/theme';
 import { BlankZoneState } from './BlankZoneState';
-import { DecalState } from './DecalState';
 import { HiResState } from './HiResState';
-import { TextState } from './TextState';
-import { rasterizeTextBlocks, rasterizeTextBlocksForRegion } from './textRasterizer';
-import { generateSdf } from './textSdfGenerator';
 import { makeCpuRenderer } from './cpuRenderer';
 
 const log = createLogger('Renderer');
@@ -33,9 +29,8 @@ interface Renderer {
   setTransition?(transitionT: number): void;
   toggleCell?(cx: number, cy: number): void;
   setZones?(zones: BlankZone[]): void;
-  setDecals?(decals: Decal[]): void;
   setHiResRegions?(regions: HiResRegion[]): void;
-  setText?(blocks: TextBlock[]): void;
+  setTheme?(theme: ThemePalette): void;
   gridInfo?(): GridInfo;
   free(): void;
 }
@@ -50,9 +45,10 @@ let frameCount  = 0;
 // (in frames) between base ticks. 0 = no intermediate hi-res ticks.
 let hiresTickInterval = 0;
 const zoneState  = new BlankZoneState();
-const decalState = new DecalState();
 const hiresState = new HiResState();
-const textState  = new TextState();
+// Cached so the current theme survives renderer hand-offs (GPU→CPU fallback,
+// resize, etc). Defaults to light until the main thread sends `set_theme`.
+let currentTheme: ThemePalette = LIGHT_THEME;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -96,31 +92,9 @@ function setZonesState(next: unknown): void {
   postZonesState();
 }
 
-function postDecalsState(): void {
-  post({ type: 'decals_state', decals: decalState.getAll() });
-}
-
-function postDecalsError(message: string): void {
-  post({ type: 'decals_error', message });
-}
-
-function applyDecalsToRenderer(): void {
-  renderer?.setDecals?.(decalState.getAll());
-}
-
-function setDecalsState(next: unknown): void {
-  decalState.setAll(next);
-  applyDecalsToRenderer();
-  postDecalsState();
-}
-
 function postHiResState(): void { post({ type: 'hires_state', regions: hiresState.getAll() }); }
 function postHiResError(message: string): void { post({ type: 'error', phase: 'hires', message }); }
 function applyHiResToRenderer(): void { renderer?.setHiResRegions?.(hiresState.getAll()); }
-
-function postTextState(): void { post({ type: 'text_state', blocks: textState.getAll() }); }
-function postTextError(message: string): void { post({ type: 'text_error', message }); }
-function applyTextToRenderer(): void { renderer?.setText?.(textState.getAll()); }
 
 // ── Message handler ───────────────────────────────────────────────────────────
 
@@ -159,7 +133,7 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
           // produces a visible warning rather than silently failing on every zone update.
           const gpuExt = gpu as unknown as {
             set_zones_json?: (zonesJson: string) => void;
-            set_decals_json?: (decalsJson: string) => void;
+            set_theme_json?: (themeJson: string) => void;
             add_hires_region?: (id: number, x1: number, y1: number, x2: number, y2: number, m: number, showGrid: boolean, showBaseGrid: boolean, showBorder: boolean) => void;
             remove_hires_region?: (id: number) => void;
             update_hires_flags?: (id: number, showGrid: boolean, showBaseGrid: boolean, showBorder: boolean) => void;
@@ -167,15 +141,7 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
             set_hires_tick_multiplier?: (id: number, multiplier: number) => void;
             max_hires_tick_multiplier?: () => number;
             hires_tick_and_render?: () => void;
-
             clear_hires_regions?: () => void;
-            set_hires_frozen_cells?: (regionId: number, cellsJson: string) => void;
-            clear_hires_frozen_cells?: (regionId: number) => void;
-            set_frozen_cells?: (cellsJson: string) => void;
-            clear_frozen_cells?: () => void;
-            set_text_glyphs?: (glyphsJson: string) => void;
-            clear_text_glyphs?: () => void;
-            upload_text_atlas?: (data: Uint8Array, width: number, height: number) => void;
           };
           const setZonesOnGpu = (zones: BlankZone[]): void => {
             if (typeof gpuExt.set_zones_json !== 'function') return;
@@ -185,12 +151,12 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
               postZonesError(`GPU zone update failed: ${errorMessage(err)}`);
             }
           };
-          const setDecalsOnGpu = (decals: Decal[]): void => {
-            if (typeof gpuExt.set_decals_json !== 'function') return;
+          const setThemeOnGpu = (theme: ThemePalette): void => {
+            if (typeof gpuExt.set_theme_json !== 'function') return;
             try {
-              gpuExt.set_decals_json(JSON.stringify(decals));
+              gpuExt.set_theme_json(serializeTheme(theme));
             } catch (err) {
-              postDecalsError(`GPU decal update failed: ${errorMessage(err)}`);
+              log.error('GPU theme update failed:', errorMessage(err));
             }
           };
           // Track active region geometry per id so we can detect flag-only updates.
@@ -236,36 +202,6 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
             const maxMult = gpuExt.max_hires_tick_multiplier?.() ?? 1;
             hiresTickInterval = maxMult > 1 ? Math.max(1, Math.floor(TICK_EVERY / maxMult)) : 0;
           };
-          const setTextOnGpu = (blocks: TextBlock[]): void => {
-            // Frozen cells (cells/both modes) — base grid
-            const cellBlocks = blocks.filter((b) => b.enabled && b.renderMode !== 'sdf');
-            if (cellBlocks.length === 0) { gpuExt.clear_frozen_cells?.(); }
-            else {
-              try {
-                gpuExt.set_frozen_cells?.(JSON.stringify(rasterizeTextBlocks(cellBlocks)));
-              } catch (err) { postTextError(`Frozen cell rasterization failed: ${errorMessage(err)}`); }
-            }
-            // Frozen cells — hi-res regions (fine resolution)
-            for (const region of hiresState.getAll()) {
-              const nid = hiresIdNum(region.id);
-              if (cellBlocks.length === 0) {
-                gpuExt.clear_hires_frozen_cells?.(nid);
-                continue;
-              }
-              try {
-                const fineCells = rasterizeTextBlocksForRegion(cellBlocks, region);
-                if (fineCells.length === 0) { gpuExt.clear_hires_frozen_cells?.(nid); }
-                else { gpuExt.set_hires_frozen_cells?.(nid, JSON.stringify(fineCells)); }
-              } catch (err) { postTextError(`Hi-res frozen rasterization failed: ${errorMessage(err)}`); }
-            }
-            // SDF glyphs (sdf/both modes)
-            try {
-              const sdf = generateSdf(blocks);
-              if (!sdf) { gpuExt.clear_text_glyphs?.(); return; }
-              gpuExt.upload_text_atlas?.(sdf.atlas, sdf.atlasWidth, sdf.atlasHeight);
-              gpuExt.set_text_glyphs?.(JSON.stringify(sdf.glyphs));
-            } catch (err) { postTextError(`SDF generation failed: ${errorMessage(err)}`); }
-          };
           const getGridInfo = (): GridInfo => ({
             screenCols:  gpu.screen_cols(),
             screenRows:  gpu.screen_rows(),
@@ -283,9 +219,8 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
             setTransition: (transitionT) => gpu.set_transition(transitionT),
             toggleCell: (cx, cy) => { gpu.toggle_cell(cx, cy); gpu.flush_and_render(); },
             setZones:   (zones)  => setZonesOnGpu(zones),
-            setDecals:  (decals) => setDecalsOnGpu(decals),
             setHiResRegions: (regions) => setHiResRegionsOnGpu(regions),
-            setText:    (blocks) => setTextOnGpu(blocks),
+            setTheme:   (theme)  => setThemeOnGpu(theme),
             gridInfo:   getGridInfo,
             free:       () => gpu.free(),
           };
@@ -294,9 +229,8 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
           renderer.setScroll?.(pendingScrollY);
           renderer.setTransition?.(1);
           renderer.setZones?.(zoneState.getAll());
-          renderer.setDecals?.(decalState.getAll());
           renderer.setHiResRegions?.(hiresState.getAll());
-          renderer.setText?.(textState.getAll());
+          renderer.setTheme?.(currentTheme);
           log.info('GPU renderer ready');
           post({ type: 'ready', backend: 'gpu', gridInfo: getGridInfo() });
           break;
@@ -316,9 +250,8 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
         renderer = await makeCpuRenderer(canvas);
         renderer.setScroll?.(pendingScrollY);
         renderer.setZones?.(zoneState.getAll());
-        renderer.setDecals?.(decalState.getAll());
         renderer.setHiResRegions?.(hiresState.getAll());
-        renderer.setText?.(textState.getAll());
+        renderer.setTheme?.(currentTheme);
         log.info('CPU renderer ready');
         // CPU renderer has no grid info; supply zeroed placeholder.
         post({ type: 'ready', backend: 'cpu', gridInfo: { screenCols: 0, screenRows: 0, paddedRows: 0, wordsPerRow: 0, gridPitch: 0 } });
@@ -365,9 +298,8 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
       renderer?.setScroll?.(pendingScrollY);
       renderer?.setTransition?.(1);
       renderer?.setZones?.(zoneState.getAll());
-      renderer?.setDecals?.(decalState.getAll());
       renderer?.setHiResRegions?.(hiresState.getAll());
-      renderer?.setText?.(textState.getAll());
+      renderer?.setTheme?.(currentTheme);
       // Grid dimensions change on resize; notify main thread.
       if (renderer?.gridInfo) {
         post({ type: 'grid_info', gridInfo: renderer.gridInfo() });
@@ -397,20 +329,6 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
     case 'remove_zone': zoneState.remove(e.data.id); applyZonesToRenderer(); postZonesState(); break;
     case 'clear_zones': zoneState.clear(); applyZonesToRenderer(); postZonesState(); break;
 
-    case 'set_decals': setDecalsState(e.data.decals); break;
-    case 'add_decal': {
-      const result = decalState.add(e.data.decal);
-      if (result.error) { postDecalsError(result.error); break; }
-      applyDecalsToRenderer(); postDecalsState(); break;
-    }
-    case 'update_decal': {
-      const result = decalState.update(e.data.decal);
-      if (result.error) { postDecalsError(result.error); break; }
-      applyDecalsToRenderer(); postDecalsState(); break;
-    }
-    case 'remove_decal': decalState.remove(e.data.id); applyDecalsToRenderer(); postDecalsState(); break;
-    case 'clear_decals': decalState.clear(); applyDecalsToRenderer(); postDecalsState(); break;
-
     case 'set_hires_regions': hiresState.setAll(e.data.regions); applyHiResToRenderer(); postHiResState(); break;
     case 'add_hires': {
       const result = hiresState.add(e.data.region);
@@ -425,19 +343,10 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
     case 'remove_hires': hiresState.remove(e.data.id); applyHiResToRenderer(); postHiResState(); break;
     case 'clear_hires': hiresState.clear(); applyHiResToRenderer(); postHiResState(); break;
 
-    case 'set_text': textState.setAll(e.data.blocks); applyTextToRenderer(); postTextState(); break;
-    case 'add_text': {
-      const result = textState.add(e.data.block);
-      if (result.error) { postTextError(result.error); break; }
-      applyTextToRenderer(); postTextState(); break;
-    }
-    case 'update_text': {
-      const result = textState.update(e.data.block);
-      if (result.error) { postTextError(result.error); break; }
-      applyTextToRenderer(); postTextState(); break;
-    }
-    case 'remove_text': textState.remove(e.data.id); applyTextToRenderer(); postTextState(); break;
-    case 'clear_text': textState.clear(); applyTextToRenderer(); postTextState(); break;
+    case 'set_theme':
+      currentTheme = e.data.theme;
+      renderer?.setTheme?.(currentTheme);
+      break;
 
     case 'perf_snapshot':
       if (perf) {

@@ -4,7 +4,6 @@ use wgpu::util::DeviceExt;
 use crate::grid::Grid;
 use crate::shaders;
 use crate::simulation::Simulation;
-use crate::decals::{DecalEntryGpu, DecalMetaGpu, MAX_DECALS};
 use crate::zones::{ZoneEntryGpu, ZoneMetaGpu, MAX_BLANK_ZONES};
 
 use super::bindings::{
@@ -15,8 +14,7 @@ use super::bindings::{
 use super::noise::make_noise_texture;
 use super::types::{
     HiResGlobalMetaGpu, HiResRegionMetaGpu, MAX_HIRES_REGIONS,
-    PaperParams, RenderUniforms, SdfTextMetaGpu,
-    TextGlyphGpu, MAX_TEXT_GLYPHS,
+    PaperParams, RenderUniforms, ThemeParams,
 };
 
 pub struct GpuRenderer {
@@ -26,6 +24,7 @@ pub struct GpuRenderer {
     // Core resources (group 0)
     uniform_buf: wgpu::Buffer,
     paper_buf: wgpu::Buffer,
+    theme_buf: wgpu::Buffer,
     prev_visible_buf: wgpu::Buffer,
     _noise_texture: wgpu::Texture,
     noise_view: wgpu::TextureView,
@@ -36,14 +35,6 @@ pub struct GpuRenderer {
     // Overlay resources (group 1)
     zone_meta_buf: wgpu::Buffer,
     zone_buf: wgpu::Buffer,
-    decal_meta_buf: wgpu::Buffer,
-    decal_buf: wgpu::Buffer,
-    sdf_meta_buf: wgpu::Buffer,
-    sdf_glyphs_buf: wgpu::Buffer,
-    _sdf_atlas_texture: wgpu::Texture,
-    sdf_atlas_view: wgpu::TextureView,
-    sdf_sampler: wgpu::Sampler,
-    overlay_bgl: wgpu::BindGroupLayout,
     overlay_bg: wgpu::BindGroup,
     // Hi-res resources (group 2)
     hires_meta_buf: wgpu::Buffer,
@@ -87,32 +78,13 @@ impl GpuRenderer {
         // Core resources
         let uniform_buf = mk_uniform("render_uniforms", bytes_of(&RenderUniforms::from_grid(grid)));
         let paper_buf = mk_uniform("paper_params", bytes_of(&PaperParams::for_pitch(grid_pitch)));
+        let theme_buf = mk_uniform("theme_params", bytes_of(&ThemeParams::light()));
         let prev_visible_buf = mk_storage("prev_visible_cells", grid.buffer_bytes());
         let (noise_texture, noise_view, noise_sampler) = make_noise_texture(device, queue);
 
         // Overlay resources
         let zone_meta_buf = mk_uniform("blank_zone_meta", bytes_of(&ZoneMetaGpu::default()));
         let zone_buf = mk_storage("blank_zone_entries", (MAX_BLANK_ZONES * std::mem::size_of::<ZoneEntryGpu>()) as u64);
-        let decal_meta_buf = mk_uniform("decal_meta", bytes_of(&DecalMetaGpu::default()));
-        let decal_buf = mk_storage("decal_entries", (MAX_DECALS * std::mem::size_of::<DecalEntryGpu>()) as u64);
-        let sdf_meta_buf = mk_uniform("sdf_text_meta", bytes_of(&SdfTextMetaGpu::default()));
-        let sdf_glyphs_buf = mk_storage("sdf_glyphs", (MAX_TEXT_GLYPHS * std::mem::size_of::<TextGlyphGpu>()) as u64);
-        let sdf_atlas_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("sdf_atlas"),
-            size: wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
-            mip_level_count: 1, sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::R8Unorm,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[],
-        });
-        let sdf_atlas_view = sdf_atlas_texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let sdf_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("sdf_sampler"),
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            ..Default::default()
-        });
 
         // Hi-res resources
         let hires_meta_buf = mk_uniform("hires_meta", bytes_of(&HiResGlobalMetaGpu::default()));
@@ -136,17 +108,16 @@ impl GpuRenderer {
         let core_bg_a = make_core_bind_group(device, &core_bgl, &CoreBindGroupResources {
             uniform_buf: &uniform_buf, current_buf: buf_a, previous_buf: &prev_visible_buf,
             paper_buf: &paper_buf, noise_view: &noise_view, noise_sampler: &noise_sampler,
+            theme_buf: &theme_buf,
         }, "core_bg_a");
         let core_bg_b = make_core_bind_group(device, &core_bgl, &CoreBindGroupResources {
             uniform_buf: &uniform_buf, current_buf: buf_b, previous_buf: &prev_visible_buf,
             paper_buf: &paper_buf, noise_view: &noise_view, noise_sampler: &noise_sampler,
+            theme_buf: &theme_buf,
         }, "core_bg_b");
 
         let overlay_bg = make_overlay_bind_group(device, &overlay_bgl, &OverlayBindGroupResources {
             zone_meta_buf: &zone_meta_buf, zone_buf: &zone_buf,
-            decal_meta_buf: &decal_meta_buf, decal_buf: &decal_buf,
-            sdf_meta_buf: &sdf_meta_buf, sdf_glyphs_buf: &sdf_glyphs_buf,
-            sdf_atlas_view: &sdf_atlas_view, sdf_sampler: &sdf_sampler,
         }, "overlay_bg");
 
         let hires_bg = make_hires_bind_group(device, &hires_bgl, &HiResBindGroupResources {
@@ -194,14 +165,11 @@ impl GpuRenderer {
 
         GpuRenderer {
             surface, surface_config, pipeline,
-            uniform_buf, paper_buf, prev_visible_buf,
+            uniform_buf, paper_buf, theme_buf, prev_visible_buf,
             _noise_texture: noise_texture, noise_view, noise_sampler,
             core_bgl, core_bg_a, core_bg_b,
             zone_meta_buf, zone_buf,
-            decal_meta_buf, decal_buf,
-            sdf_meta_buf, sdf_glyphs_buf,
-            _sdf_atlas_texture: sdf_atlas_texture, sdf_atlas_view, sdf_sampler,
-            overlay_bgl, overlay_bg,
+            overlay_bg,
             hires_meta_buf, hires_regions_buf,
             hires_cells_buf, hires_cells_prev_buf,
             hires_bgl, hires_bg,
@@ -309,64 +277,8 @@ impl GpuRenderer {
         self.set_zones(queue, &[]);
     }
 
-    pub fn set_decals(&self, queue: &wgpu::Queue, decals: &[DecalEntryGpu]) {
-        let count = decals.len().min(MAX_DECALS);
-        let meta = DecalMetaGpu { decal_count: count as u32, ..DecalMetaGpu::default() };
-        queue.write_buffer(&self.decal_meta_buf, 0, bytes_of(&meta));
-        if count > 0 {
-            queue.write_buffer(&self.decal_buf, 0, cast_slice(&decals[..count]));
-        }
-    }
-
-    pub fn clear_decals(&self, queue: &wgpu::Queue) {
-        self.set_decals(queue, &[]);
-    }
-
-    pub fn set_text_glyphs(&self, queue: &wgpu::Queue, glyphs: &[TextGlyphGpu]) {
-        let count = glyphs.len().min(MAX_TEXT_GLYPHS);
-        let meta = SdfTextMetaGpu { glyph_count: count as u32, ..Default::default() };
-        queue.write_buffer(&self.sdf_meta_buf, 0, bytes_of(&meta));
-        if count > 0 {
-            queue.write_buffer(&self.sdf_glyphs_buf, 0, cast_slice(&glyphs[..count]));
-        }
-    }
-
-    pub fn clear_text_glyphs(&self, queue: &wgpu::Queue) {
-        self.set_text_glyphs(queue, &[]);
-    }
-
-    pub fn upload_text_atlas(
-        &mut self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        data: &[u8],
-        width: u32,
-        height: u32,
-    ) {
-        let tex = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("sdf_atlas"),
-            size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
-            mip_level_count: 1, sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::R8Unorm,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[],
-        });
-        queue.write_texture(
-            wgpu::ImageCopyTexture {
-                texture: &tex, mip_level: 0,
-                origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All,
-            },
-            data,
-            wgpu::ImageDataLayout {
-                offset: 0, bytes_per_row: Some(width), rows_per_image: Some(height),
-            },
-            wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
-        );
-        self._sdf_atlas_texture = tex;
-        self.sdf_atlas_view = self._sdf_atlas_texture.create_view(&wgpu::TextureViewDescriptor::default());
-        // Only rebuild overlay bind group — core and hires are unaffected
-        self.rebuild_overlay_bind_group(device);
+    pub fn set_theme(&self, queue: &wgpu::Queue, theme: &ThemeParams) {
+        queue.write_buffer(&self.theme_buf, 0, bytes_of(theme));
     }
 
     pub fn hires_cells_buf(&self) -> &wgpu::Buffer { &self.hires_cells_buf }
@@ -413,19 +325,11 @@ impl GpuRenderer {
             uniform_buf: &self.uniform_buf, current_buf: buf_a,
             previous_buf: &self.prev_visible_buf, paper_buf: &self.paper_buf,
             noise_view: &self.noise_view, noise_sampler: &self.noise_sampler,
+            theme_buf: &self.theme_buf,
         };
         self.core_bg_a = make_core_bind_group(device, &self.core_bgl, &shared, "core_bg_a");
         let res_b = CoreBindGroupResources { current_buf: buf_b, ..shared };
         self.core_bg_b = make_core_bind_group(device, &self.core_bgl, &res_b, "core_bg_b");
-    }
-
-    fn rebuild_overlay_bind_group(&mut self, device: &wgpu::Device) {
-        self.overlay_bg = make_overlay_bind_group(device, &self.overlay_bgl, &OverlayBindGroupResources {
-            zone_meta_buf: &self.zone_meta_buf, zone_buf: &self.zone_buf,
-            decal_meta_buf: &self.decal_meta_buf, decal_buf: &self.decal_buf,
-            sdf_meta_buf: &self.sdf_meta_buf, sdf_glyphs_buf: &self.sdf_glyphs_buf,
-            sdf_atlas_view: &self.sdf_atlas_view, sdf_sampler: &self.sdf_sampler,
-        }, "overlay_bg");
     }
 
     fn rebuild_hires_bind_group(&mut self, device: &wgpu::Device) {

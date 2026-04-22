@@ -1,48 +1,56 @@
 <script setup lang="ts">
-interface ContactLink {
-  label: string;
-  icon: string;
-  href: string;
-  color: string;
-}
-
-const links: ContactLink[] = [
-  {
-    label: 'GitHub',
-    icon: 'mdi-github',
-    href: 'https://github.com/Anjin-Byte',
-    color: 'white',
-  },
-  {
-    label: 'Email',
-    icon: 'mdi-email-outline',
-    href: 'mailto:thalesarkanzen@gmail.com',
-    color: 'secondary',
-  },
-];
+import ContactStrip from '../layout/ContactStrip.vue';
 </script>
 
 <template>
-  <section id="contact">
-    <v-container class="py-16 text-center">
-      <h2 class="text-h4 font-weight-bold mb-4">Get in Touch</h2>
-      <p class="text-body-1 text-medium-emphasis mb-8">
-        Open to interesting problems. Reach out anytime.
-      </p>
-      <div class="d-flex justify-center flex-wrap ga-3">
-        <v-btn
-          v-for="link in links"
-          :key="link.label"
-          :href="link.href"
-          :color="link.color"
-          :prepend-icon="link.icon"
-          variant="outlined"
-          target="_blank"
-          size="large"
-        >
-          {{ link.label }}
-        </v-btn>
+  <section id="contact" class="contact-section">
+    <v-container class="contact-container content-surface">
+      <div class="contact-head">
+        <span class="section-eyebrow">Contact</span>
+        <h2 class="contact-title">Open to interesting problems.</h2>
       </div>
+
+      <ContactStrip class="contact-strip-wrap" />
     </v-container>
   </section>
 </template>
+
+<style scoped>
+.contact-section {
+  position: relative;
+  z-index: 1;
+  padding-block: 5rem 3rem;
+  border-top: 1px solid var(--theme-grid-minor);
+}
+
+.contact-container {
+  max-width: 820px;
+  text-align: center;
+  padding: clamp(2.5rem, 4vw, 3.5rem) clamp(1.5rem, 3vw, 2.5rem);
+}
+
+.contact-head {
+  margin-bottom: 2.25rem;
+}
+
+.section-eyebrow {
+  display: block;
+  color: var(--theme-text-tertiary);
+  font-size: 0.82rem;
+  font-variant: small-caps;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.5rem;
+}
+
+.contact-title {
+  font-size: clamp(1.5rem, 2.5vw, 1.875rem);
+  font-weight: 500;
+  color: var(--theme-text-primary);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.contact-strip-wrap {
+  justify-content: center;
+}
+</style>

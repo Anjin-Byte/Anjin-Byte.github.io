@@ -1,22 +1,14 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import type { BlankZone, BlankZoneDraft, BlankZoneRect } from '../../types/blankZones';
-import type { Decal } from '../../types/decals';
 import type { HiResRegion } from '../../types/hiresRegion';
-import type { TextBlock, TextRenderMode } from '../../types/text';
 import GridZoneTab from './GridZoneTab.vue';
-import GridDecalTab from './GridDecalTab.vue';
 import GridHiResTab from './GridHiResTab.vue';
-import GridTextTab from './GridTextTab.vue';
-import GridHiResTextTab from './GridHiResTextTab.vue';
-import type { HiResTextToolPayload } from './GridHiResTextTab.vue';
 
 defineProps<{
   zones: BlankZone[];
   previewRect?: BlankZoneRect | null;
-  decals: Decal[];
   hiresRegions: HiResRegion[];
-  textBlocks: TextBlock[];
 }>();
 
 defineEmits<{
@@ -26,22 +18,11 @@ defineEmits<{
   (e: 'clear-zones'): void;
   (e: 'tool-change', payload: { enabled: boolean; snapMajor: boolean }): void;
   (e: 'draft-change', draft: BlankZoneDraft): void;
-  (e: 'add-decal', decal: Decal): void;
-  (e: 'update-decal', decal: Decal): void;
-  (e: 'remove-decal', id: string): void;
-  (e: 'clear-decals'): void;
-  (e: 'decal-tool-change', payload: { enabled: boolean; snapMajor: boolean }): void;
   (e: 'add-hires-region', region: HiResRegion): void;
   (e: 'update-hires-region', region: HiResRegion): void;
   (e: 'remove-hires-region', id: string): void;
   (e: 'clear-hires-regions'): void;
   (e: 'hires-tool-change', payload: { enabled: boolean }): void;
-  (e: 'add-text', block: TextBlock): void;
-  (e: 'update-text', block: TextBlock): void;
-  (e: 'remove-text', id: string): void;
-  (e: 'clear-text'): void;
-  (e: 'text-tool-change', payload: { enabled: boolean; font: string; renderMode: TextRenderMode; color: string }): void;
-  (e: 'hires-text-tool-change', payload: HiResTextToolPayload): void;
 }>();
 
 const activeTab = ref('zones');
@@ -58,10 +39,7 @@ const collapsed = ref(false);
 
       <v-tabs v-model="activeTab" density="compact" grow>
         <v-tab value="zones">Zones</v-tab>
-        <v-tab value="decals">Decals</v-tab>
         <v-tab value="hires">Hi-Res</v-tab>
-        <v-tab value="text">Text</v-tab>
-        <v-tab value="hires-text">Hi-Res Text</v-tab>
       </v-tabs>
 
       <v-card-text class="pt-2">
@@ -79,17 +57,6 @@ const collapsed = ref(false);
             />
           </v-tabs-window-item>
 
-          <v-tabs-window-item value="decals">
-            <GridDecalTab
-              :decals="decals"
-              @add-decal="$emit('add-decal', $event)"
-              @update-decal="$emit('update-decal', $event)"
-              @remove-decal="$emit('remove-decal', $event)"
-              @clear-decals="$emit('clear-decals')"
-              @decal-tool-change="$emit('decal-tool-change', $event)"
-            />
-          </v-tabs-window-item>
-
           <v-tabs-window-item value="hires">
             <GridHiResTab
               :regions="hiresRegions"
@@ -101,22 +68,6 @@ const collapsed = ref(false);
             />
           </v-tabs-window-item>
 
-          <v-tabs-window-item value="text">
-            <GridTextTab
-              :blocks="textBlocks"
-              @add-text="$emit('add-text', $event)"
-              @update-text="$emit('update-text', $event)"
-              @remove-text="$emit('remove-text', $event)"
-              @clear-text="$emit('clear-text')"
-              @text-tool-change="$emit('text-tool-change', $event)"
-            />
-          </v-tabs-window-item>
-
-          <v-tabs-window-item value="hires-text">
-            <GridHiResTextTab
-              @hires-text-tool-change="$emit('hires-text-tool-change', $event)"
-            />
-          </v-tabs-window-item>
         </v-tabs-window>
       </v-card-text>
     </v-card>
