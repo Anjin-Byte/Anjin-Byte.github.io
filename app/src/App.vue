@@ -84,12 +84,14 @@ a {
 }
 
 .quiet-sheet {
-  background: color-mix(in oklab, var(--theme-surface) 70%, transparent);
-  border: 1px solid color-mix(in oklab, var(--theme-grid-minor) 88%, white 6%);
+  background: color-mix(in oklab, var(--theme-surface) 78%, transparent);
+  border: 1px solid color-mix(in oklab, var(--theme-grid-border) 54%, white 8%);
   border-radius: 18px;
   backdrop-filter: blur(8px) saturate(1.04);
   -webkit-backdrop-filter: blur(8px) saturate(1.04);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 10px 28px rgba(0, 0, 0, 0.07);
 }
 
 .glass-chip {
@@ -145,5 +147,43 @@ a {
   font-size: 0.98rem;
   line-height: 1.7;
   max-width: 56ch;
+}
+
+html[data-theme-mode="light"] .v-app-bar.bg-background {
+  background-color: color-mix(in oklab, var(--theme-surface) 94%, white 6%) !important;
+  border-bottom-color: color-mix(in oklab, var(--theme-grid-major) 42%, white 46%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 10px 30px rgba(120, 112, 98, 0.08);
+}
+
+html[data-theme-mode="light"] .glass-panel {
+  background: color-mix(in oklab, var(--theme-surface) 93%, white 7%);
+  border-color: color-mix(in oklab, var(--theme-grid-major) 38%, white 42%);
+  backdrop-filter: blur(10px) saturate(1.02);
+  -webkit-backdrop-filter: blur(10px) saturate(1.02);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 16px 44px rgba(130, 120, 108, 0.08);
+}
+
+html[data-theme-mode="light"] .glass-panel--strong {
+  background: color-mix(in oklab, var(--theme-surface) 96%, white 4%);
+}
+
+html[data-theme-mode="light"] .quiet-sheet {
+  background: color-mix(in oklab, var(--theme-surface) 95%, white 5%);
+  border-color: color-mix(in oklab, var(--theme-grid-major) 36%, white 42%);
+  backdrop-filter: blur(6px) saturate(1.01);
+  -webkit-backdrop-filter: blur(6px) saturate(1.01);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    0 10px 24px rgba(130, 120, 108, 0.06);
+}
+
+html[data-theme-mode="light"] .glass-chip {
+  background: color-mix(in oklab, var(--theme-surface) 92%, white 8%);
+  border-color: color-mix(in oklab, var(--theme-grid-major) 36%, white 45%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88);
 }
 </style>

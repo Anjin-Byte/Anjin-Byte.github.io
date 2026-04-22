@@ -67,6 +67,7 @@ if (typeof window !== 'undefined' && document?.documentElement) {
     const s = (name: string, value: string): void => {
       root.style.setProperty(name, value);
     };
+    root.dataset.themeMode = t.surface[0] > 0.5 ? 'light' : 'dark';
     // Surfaces + primary ink
     s('--theme-surface', oklabCss(t.surface));
     s('--theme-ink', oklabCss(t.ink));

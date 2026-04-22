@@ -8,13 +8,8 @@ import { experience, education } from '../../data/profile';
       <div class="resume-head">
         <div class="resume-heading">
           <span class="glass-chip section-kicker">Resume</span>
-          <h2 class="section-heading resume-title">Experience arranged like a page, not a dashboard.</h2>
+          <h2 class="section-heading resume-title">Experience</h2>
         </div>
-        <p class="section-intro resume-intro">
-          The content stays dense where it needs to be, but the framing moves
-          out of the way. Dates and locations become the rail; the writing stays
-          on a quieter sheet.
-        </p>
       </div>
 
       <ol class="timeline">
@@ -25,13 +20,15 @@ import { experience, education } from '../../data/profile';
         >
           <div class="entry-rail">
             <span class="entry-dates glass-chip">{{ job.dates }}</span>
-            <span class="entry-location">{{ job.location }}</span>
           </div>
           <article class="entry quiet-sheet">
             <header class="entry-head">
               <div class="entry-titleblock">
                 <h3 class="entry-role">{{ job.role }}</h3>
-                <p class="entry-company">{{ job.company }}</p>
+                <div class="entry-subhead">
+                  <p class="entry-company">{{ job.company }}</p>
+                  <span class="entry-work-location">{{ job.location }}</span>
+                </div>
               </div>
             </header>
             <ul class="entry-bullets">
@@ -114,7 +111,7 @@ import { experience, education } from '../../data/profile';
 .timeline::before {
   content: '';
   position: absolute;
-  left: 11.45rem;
+  left: 10.2rem;
   top: 0;
   bottom: 0;
   width: 1px;
@@ -130,14 +127,14 @@ import { experience, education } from '../../data/profile';
 .timeline-row {
   position: relative;
   display: grid;
-  grid-template-columns: 10.25rem minmax(0, 1fr);
+  grid-template-columns: 9rem minmax(0, 1fr);
   gap: 1.2rem;
   align-items: start;
 }
 
 .entry-rail {
   display: grid;
-  gap: 0.35rem;
+  gap: 0;
   justify-items: end;
   padding-top: 0.55rem;
 }
@@ -172,6 +169,21 @@ import { experience, education } from '../../data/profile';
   font-size: 0.96rem;
   color: var(--theme-text-secondary);
   margin: 0;
+}
+
+.entry-subhead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.entry-work-location {
+  color: var(--theme-text-tertiary);
+  font-size: 0.8rem;
+  line-height: 1.35;
+  text-align: right;
 }
 
 .entry-meta {
@@ -268,6 +280,18 @@ import { experience, education } from '../../data/profile';
   .entry-rail {
     justify-items: start;
     padding-top: 0;
+  }
+
+  .entry-dates {
+    justify-self: start;
+  }
+
+  .entry-subhead {
+    justify-content: flex-start;
+  }
+
+  .entry-work-location {
+    text-align: left;
   }
 
   .entry-location {

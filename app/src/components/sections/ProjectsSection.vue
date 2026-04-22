@@ -1,7 +1,31 @@
 <script setup lang="ts">
-import { projects } from '../../data/profile';
+import { projects, type Project } from '../../data/profile';
+import {
+  getProjectVisibleLinks,
+  type ResolvedProjectLink,
+} from '../../utils/projectLinks';
 
-const [featuredProject, ...projectIndex] = projects;
+interface FeaturedProject extends Project {
+  visibleLinks: ResolvedProjectLink[];
+}
+
+interface ProjectIndexItem extends Project {
+  visibleLinks: ResolvedProjectLink[];
+}
+
+const [rawFeaturedProject, ...rawProjectIndex] = projects;
+
+const featuredProject: FeaturedProject | null = rawFeaturedProject
+  ? {
+      ...rawFeaturedProject,
+      visibleLinks: getProjectVisibleLinks(rawFeaturedProject, 'featured'),
+    }
+  : null;
+
+const projectIndex: ProjectIndexItem[] = rawProjectIndex.map((project) => ({
+  ...project,
+  visibleLinks: getProjectVisibleLinks(project, 'compact'),
+}));
 </script>
 
 <template>
@@ -13,8 +37,8 @@ const [featuredProject, ...projectIndex] = projects;
           <h2 class="section-heading projects-title">Rendering systems, WASM, and interfaces with texture.</h2>
         </div>
         <p class="section-intro projects-intro">
-          A featured build up front, then a quieter index behind it. The page
-          stays readable, but it no longer relies on a wall of equal cards.
+          Projects spanning graphics, emulation, mesh generation, and interface
+          engineering.
         </p>
       </div>
 
@@ -33,14 +57,17 @@ const [featuredProject, ...projectIndex] = projects;
         </div>
         <div class="project-feature-actions">
           <a
-            v-if="featuredProject.github"
-            :href="featuredProject.github"
+            v-for="link in featuredProject.visibleLinks"
+            :key="link.kind"
+            :href="link.href"
             target="_blank"
             rel="noopener noreferrer"
             class="project-link"
+            :class="{ 'project-link--demo': link.kind === 'demo' }"
+            :aria-label="link.ariaLabel"
           >
-            <v-icon icon="mdi-github" />
-            <span>Source</span>
+            <v-icon :icon="link.icon" />
+            <span>{{ link.label }}</span>
           </a>
         </div>
       </article>
@@ -53,16 +80,21 @@ const [featuredProject, ...projectIndex] = projects;
         >
           <header class="project-item-head">
             <h3 class="project-item-title">{{ project.title }}</h3>
-            <a
-              v-if="project.github"
-              :href="project.github"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="project-item-link"
-              aria-label="GitHub repository"
-            >
-              <v-icon icon="mdi-github" />
-            </a>
+            <div v-if="project.visibleLinks.length" class="project-item-links" aria-label="Project links">
+              <a
+                v-for="link in project.visibleLinks"
+                :key="link.kind"
+                :href="link.href"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="project-item-link"
+                :class="{ 'project-item-link--demo': link.kind === 'demo' }"
+                :aria-label="link.ariaLabel"
+                :title="link.label"
+              >
+                <v-icon :icon="link.icon" />
+              </a>
+            </div>
           </header>
           <p class="project-item-blurb">{{ project.blurb }}</p>
           <div class="project-item-tech">
@@ -173,6 +205,17 @@ const [featuredProject, ...projectIndex] = projects;
   outline: none;
 }
 
+.project-link--demo {
+  background: color-mix(in oklab, var(--theme-surface) 74%, var(--theme-accent) 12%);
+}
+
+.project-feature-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 0.7rem;
+}
+
 .project-index {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -211,15 +254,38 @@ const [featuredProject, ...projectIndex] = projects;
 }
 
 .project-item-link {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
   color: var(--theme-text-tertiary);
   display: inline-flex;
-  transition: color 120ms ease-out;
+  align-items: center;
+  justify-content: center;
+  transition: color 120ms ease-out, background-color 120ms ease-out, transform 120ms ease-out;
+}
+
+.project-item-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.18rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--theme-grid-border) 48%, white 8%);
+  background: color-mix(in oklab, var(--theme-surface) 76%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in oklab, white 24%, transparent);
 }
 
 .project-item-link:hover,
 .project-item-link:focus-visible {
   color: var(--theme-text-primary);
+  background: color-mix(in oklab, var(--theme-surface) 82%, white 6%);
+  transform: translateY(-1px);
   outline: none;
+}
+
+.project-item-link--demo {
+  color: var(--theme-text-primary);
+  background: color-mix(in oklab, var(--theme-surface) 78%, var(--theme-accent) 10%);
 }
 
 .project-item-blurb {

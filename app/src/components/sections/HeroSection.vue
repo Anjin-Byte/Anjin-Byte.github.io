@@ -11,7 +11,7 @@ const heroLinks = contactLinks.filter((link) =>
     <v-container class="hero-container">
       <div class="hero-frame glass-panel glass-panel--strong">
         <div class="hero-main">
-          <span class="hero-kicker glass-chip section-kicker">Systems-focused portfolio</span>
+          <span class="hero-kicker glass-chip section-kicker">Systems engineer</span>
           <p class="hero-location">
             <v-icon icon="mdi-map-marker-outline" class="hero-location-icon" />
             {{ profile.location }}

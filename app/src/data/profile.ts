@@ -46,12 +46,18 @@ export const skills: SkillGroup[] = [
 
 // ── Projects / demos ────────────────────────────────────────────────────────
 
+export type ProjectLinkKind = 'demo' | 'source' | 'writeup' | 'video' | 'docs';
+
+export interface ProjectLink {
+  kind: ProjectLinkKind;
+  href: string;
+}
+
 export interface Project {
   title: string;
   blurb: string;
   tech: string[];
-  github?: string;
-  demo?: string;  // in-site anchor or external demo URL
+  links?: ProjectLink[];
 }
 
 export const projects: Project[] = [
@@ -61,14 +67,19 @@ export const projects: Project[] = [
       'This site. Conway\'s Game of Life running as a WebGPU-rendered ' +
       'engineering-paper background, with a theme system parameterized in OKLab.',
     tech: ['Rust', 'WebGPU', 'WASM', 'Vue 3', 'TypeScript', 'WGSL'],
-    github: 'https://github.com/Anjin-Byte/Anjin-Byte.github.io',
+    links: [
+      { kind: 'demo', href: 'https://anjin-byte.github.io/' },
+      { kind: 'source', href: 'https://github.com/Anjin-Byte/Anjin-Byte.github.io' },
+    ],
   },
   {
     title: 'Gestalt',
     blurb:
       'A GPU-driven voxel mesh renderer built with Rust + WASM + Svelte 5 + WebGPU.',
     tech: ['Rust', 'WASM', 'WebGPU', 'Svelte 5'],
-    github: 'https://github.com/Anjin-Byte/Gestalt',
+    links: [
+      { kind: 'source', href: 'https://github.com/Anjin-Byte/Gestalt' },
+    ],
   },
   {
     title: 'fragile-canvas',
@@ -77,7 +88,10 @@ export const projects: Project[] = [
       'into readable assembly and a custom microcode format, rendered with a ' +
       'WebGL2 LCD-substrate shader for material-grain authenticity.',
     tech: ['Rust', 'WASM', 'WebGL2', 'Svelte', 'TypeScript'],
-    github: 'https://github.com/Anjin-Byte/fragile-canvas',
+    links: [
+      { kind: 'demo', href: 'https://anjin-byte.github.io/fragile-canvas/' },
+      { kind: 'source', href: 'https://github.com/Anjin-Byte/fragile-canvas' },
+    ],
   },
   {
     title: 'shiny-parakeet',
@@ -86,7 +100,9 @@ export const projects: Project[] = [
       'extended with entropy-based heuristics that dynamically adjust sample ' +
       'density for rendering efficiency.',
     tech: ['C++', 'Rendering'],
-    github: 'https://github.com/Anjin-Byte/shiny-parakeet',
+    links: [
+      { kind: 'source', href: 'https://github.com/Anjin-Byte/shiny-parakeet' },
+    ],
   },
   {
     title: 'SIBR SDF Lattice Generator',
@@ -95,7 +111,9 @@ export const projects: Project[] = [
       'cubic, Kelvin, and BccXy unit cells; produces STL through a ' +
       'marching-cubes pipeline with Taubin smoothing and optional QEM decimation.',
     tech: ['Rust', 'SDF', 'Marching Cubes', 'Mesh Processing'],
-    github: 'https://github.com/Anjin-Byte/SIBR_SDF_Lattice_Generator',
+    links: [
+      { kind: 'source', href: 'https://github.com/Anjin-Byte/SIBR_SDF_Lattice_Generator' },
+    ],
   },
 ];
 
