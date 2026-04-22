@@ -73,6 +73,10 @@ if (typeof window !== 'undefined' && document?.documentElement) {
     // Text tiers — lerped once here so CSS consumers get a direct color value
     s('--theme-ink-secondary', oklabCss(lerpOkLab(t.surface, t.ink, t.ink_secondary_t)));
     s('--theme-ink-tertiary',  oklabCss(lerpOkLab(t.surface, t.ink, t.ink_tertiary_t)));
+    // Legacy aliases used across the HTML sections.
+    s('--theme-text-primary',   oklabCss(t.ink));
+    s('--theme-text-secondary', oklabCss(lerpOkLab(t.surface, t.ink, t.ink_secondary_t)));
+    s('--theme-text-tertiary',  oklabCss(lerpOkLab(t.surface, t.ink, t.ink_tertiary_t)));
     // Grid-derived colors (minor/major/border) — same lerp the shader does
     s('--theme-grid-minor',  oklabCss(lerpOkLab(t.surface, t.ink, t.minor_t)));
     s('--theme-grid-major',  oklabCss(lerpOkLab(t.surface, t.ink, t.major_t)));

@@ -28,9 +28,8 @@ defineProps<{
 .contact-strip {
   display: flex;
   flex-wrap: wrap;
-  gap: 1.25rem 1.75rem;
+  gap: 0.85rem;
   align-items: center;
-  row-gap: 0.75rem;
 }
 
 .contact-strip.is-dense {
@@ -41,16 +40,24 @@ defineProps<{
 .contact-link {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
   color: var(--theme-text-secondary);
   text-decoration: none;
-  font-size: 0.9rem;
-  transition: color 120ms ease-out;
+  font-size: 0.88rem;
+  padding: 0.7rem 0.95rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--theme-grid-border) 52%, white 8%);
+  background: color-mix(in oklab, var(--theme-surface) 72%, transparent);
+  backdrop-filter: blur(10px) saturate(1.04);
+  -webkit-backdrop-filter: blur(10px) saturate(1.04);
+  transition: color 120ms ease-out, border-color 120ms ease-out, transform 120ms ease-out;
 }
 
 .contact-link:hover,
 .contact-link:focus-visible {
   color: var(--theme-text-primary);
+  border-color: var(--theme-grid-border);
+  transform: translateY(-1px);
   outline: none;
 }
 
@@ -61,7 +68,7 @@ defineProps<{
 
 .contact-icon {
   font-size: 1rem;
-  opacity: 0.85;
+  opacity: 0.78;
 }
 
 .is-dense .contact-text {

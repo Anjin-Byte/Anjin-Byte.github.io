@@ -39,12 +39,15 @@ const navLinks = [
    useThemePreference and swap live when the user toggles light/dark. */
 .title-ink {
   color: var(--theme-ink);
-  font-size: 1.35rem;
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  letter-spacing: -0.02em;
 }
 
 .nav-ink {
   color: var(--theme-ink-secondary) !important;
-  font-size: 1.0rem !important;
+  font-size: 0.88rem !important;
+  letter-spacing: 0.08em;
 }
 .nav-ink:hover {
   color: var(--theme-ink) !important;

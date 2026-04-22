@@ -1,29 +1,63 @@
 <script setup lang="ts">
-import { profile, skills } from '../../data/profile';
+import { contactLinks, profile, skills } from '../../data/profile';
+
+const heroLinks = contactLinks.filter((link) =>
+  link.label === 'Email' || link.label === 'GitHub' || link.label === 'LinkedIn'
+);
 </script>
 
 <template>
   <section id="hero" class="hero-section">
-    <v-container class="hero-container content-surface">
-      <p class="hero-location">
-        <v-icon icon="mdi-map-marker-outline" class="hero-location-icon" />
-        {{ profile.location }}
-      </p>
-      <h1 class="hero-name">{{ profile.name }}</h1>
-      <p class="hero-tagline">{{ profile.tagline }}</p>
-      <p class="hero-bio">{{ profile.bio }}</p>
+    <v-container class="hero-container">
+      <div class="hero-frame glass-panel glass-panel--strong">
+        <div class="hero-main">
+          <span class="hero-kicker glass-chip section-kicker">Systems-focused portfolio</span>
+          <p class="hero-location">
+            <v-icon icon="mdi-map-marker-outline" class="hero-location-icon" />
+            {{ profile.location }}
+          </p>
+          <h1 class="hero-name section-heading">{{ profile.name }}</h1>
+          <p class="hero-tagline">{{ profile.tagline }}</p>
+          <p class="hero-bio">{{ profile.bio }}</p>
 
-      <div class="skills-block">
-        <div v-for="group in skills" :key="group.label" class="skill-group">
-          <span class="skill-label">{{ group.label }}</span>
-          <span class="skill-items">{{ group.items.join('  ·  ') }}</span>
+          <div class="hero-actions">
+            <a href="#projects" class="hero-link hero-link--primary">
+              View selected work
+              <v-icon icon="mdi-arrow-right" class="hero-link-icon" />
+            </a>
+            <a href="#contact" class="hero-link">Get in touch</a>
+          </div>
         </div>
-      </div>
 
-      <a href="#contact" class="hero-cta">
-        Get in touch
-        <v-icon icon="mdi-arrow-right" class="hero-cta-arrow" />
-      </a>
+        <aside class="hero-rail">
+          <section class="hero-note quiet-sheet">
+            <p class="hero-note-label">Capabilities</p>
+            <div class="skills-block">
+              <div v-for="group in skills" :key="group.label" class="skill-group">
+                <span class="skill-label">{{ group.label }}</span>
+                <span class="skill-items">{{ group.items.join('  ·  ') }}</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="hero-note quiet-sheet">
+            <p class="hero-note-label">Elsewhere</p>
+            <div class="hero-links">
+              <a
+                v-for="link in heroLinks"
+                :key="link.label"
+                :href="link.href"
+                class="hero-meta-link"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <v-icon :icon="link.icon" class="hero-meta-link-icon" />
+                <span>{{ link.display ?? link.label }}</span>
+              </a>
+            </div>
+          </section>
+        </aside>
+      </div>
     </v-container>
   </section>
 </template>
@@ -40,8 +74,22 @@ import { profile, skills } from '../../data/profile';
 }
 
 .hero-container {
-  max-width: 820px;
-  padding: clamp(2rem, 4vw, 3rem) clamp(1.5rem, 3vw, 2.5rem);
+  max-width: 1160px;
+}
+
+.hero-frame {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.85fr);
+  gap: clamp(1.5rem, 3vw, 2.5rem);
+  padding: clamp(2rem, 4vw, 3.25rem);
+}
+
+.hero-main {
+  max-width: 58rem;
+}
+
+.hero-kicker {
+  margin-bottom: 1.2rem;
 }
 
 .hero-location {
@@ -50,8 +98,8 @@ import { profile, skills } from '../../data/profile';
   gap: 0.4rem;
   color: var(--theme-text-tertiary);
   font-size: 0.82rem;
-  letter-spacing: 0.02em;
-  margin: 0 0 1rem;
+  letter-spacing: 0.04em;
+  margin: 0 0 1.15rem;
 }
 
 .hero-location-icon {
@@ -60,88 +108,153 @@ import { profile, skills } from '../../data/profile';
 }
 
 .hero-name {
-  font-size: clamp(2.25rem, 5vw, 3.5rem);
-  font-weight: 700;
-  line-height: 1.05;
-  letter-spacing: -0.02em;
-  color: var(--theme-text-primary);
-  margin: 0 0 0.6rem;
+  max-width: 11ch;
+  margin: 0 0 0.85rem;
 }
 
 .hero-tagline {
-  font-size: clamp(1rem, 1.6vw, 1.2rem);
-  font-weight: 400;
+  font-size: clamp(1rem, 1.8vw, 1.25rem);
+  font-weight: 500;
   color: var(--theme-text-secondary);
-  margin: 0 0 2.25rem;
-  letter-spacing: 0.01em;
+  margin: 0 0 1.8rem;
+  letter-spacing: 0.015em;
+  max-width: 36ch;
 }
 
 .hero-bio {
   font-size: 1.05rem;
-  line-height: 1.65;
+  line-height: 1.75;
   color: var(--theme-text-primary);
-  max-width: 60ch;
-  margin: 0 0 2.75rem;
+  max-width: 62ch;
+  margin: 0 0 2.4rem;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+}
+
+.hero-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  text-decoration: none;
+  padding: 0.8rem 1.05rem;
+  border-radius: 999px;
+  color: var(--theme-text-primary);
+  border: 1px solid color-mix(in oklab, var(--theme-grid-border) 56%, white 6%);
+  background: color-mix(in oklab, var(--theme-surface) 72%, transparent);
+  transition: transform 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.hero-link--primary {
+  background: color-mix(in oklab, var(--theme-surface) 82%, var(--theme-accent) 18%);
+}
+
+.hero-link:hover,
+.hero-link:focus-visible {
+  transform: translateY(-1px);
+  border-color: var(--theme-grid-border);
+  outline: none;
+}
+
+.hero-link-icon {
+  font-size: 1rem;
+}
+
+.hero-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-self: stretch;
+}
+
+.hero-note {
+  padding: 1.15rem 1.2rem 1.25rem;
+}
+
+.hero-note-label {
+  margin: 0 0 0.95rem;
+  color: var(--theme-text-tertiary);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .skills-block {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 3rem;
+  gap: 0.9rem;
 }
 
 .skill-group {
-  display: flex;
-  gap: 0.75rem;
-  align-items: baseline;
-  flex-wrap: wrap;
-  font-size: 0.9rem;
-  line-height: 1.5;
+  display: grid;
+  gap: 0.35rem;
 }
 
 .skill-label {
   color: var(--theme-text-tertiary);
-  font-variant: small-caps;
-  letter-spacing: 0.05em;
-  min-width: 10rem;
-  flex-shrink: 0;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .skill-items {
   color: var(--theme-text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.65;
 }
 
-/* Single CTA pointing to the canonical contact section.  Underline-on-hover
-   + arrow translation is a quiet, modern affordance that reads "action here"
-   without shouting. */
-.hero-cta {
+.hero-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.hero-meta-link {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  color: var(--theme-text-primary);
+  gap: 0.65rem;
   text-decoration: none;
-  font-size: 1rem;
-  font-weight: 500;
-  padding: 0.65rem 0;
-  border-bottom: 1px solid var(--theme-grid-major);
-  transition: border-color 150ms ease, gap 150ms ease;
+  color: var(--theme-text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.4;
+  transition: color 140ms ease, transform 140ms ease;
 }
 
-.hero-cta:hover,
-.hero-cta:focus-visible {
-  border-bottom-color: var(--theme-text-primary);
-  gap: 0.75rem;
+.hero-meta-link:hover,
+.hero-meta-link:focus-visible {
+  color: var(--theme-text-primary);
+  transform: translateX(2px);
   outline: none;
 }
 
-.hero-cta-arrow {
+.hero-meta-link-icon {
   font-size: 1rem;
-  transition: transform 150ms ease;
+  opacity: 0.78;
 }
 
-.hero-cta:hover .hero-cta-arrow,
-.hero-cta:focus-visible .hero-cta-arrow {
-  transform: translateX(2px);
+@media (max-width: 960px) {
+  .hero-frame {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-name {
+    max-width: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero-section {
+    padding-block: 4rem;
+  }
+
+  .hero-frame {
+    padding: 1.5rem;
+    border-radius: 20px;
+  }
 }
 </style>

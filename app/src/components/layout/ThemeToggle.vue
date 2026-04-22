@@ -30,7 +30,12 @@ const { preference } = useThemePreference();
 
 <style scoped>
 .theme-toggle {
-  background: transparent !important;
+  background: color-mix(in oklab, var(--theme-surface) 74%, transparent) !important;
+  border: 1px solid color-mix(in oklab, var(--theme-grid-border) 55%, white 8%);
+  border-radius: 999px;
+  backdrop-filter: blur(10px) saturate(1.05);
+  -webkit-backdrop-filter: blur(10px) saturate(1.05);
   margin-inline-start: 8px;
+  padding: 2px;
 }
 </style>

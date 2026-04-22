@@ -27,10 +27,16 @@ defineEmits<{
 
 const activeTab = ref('zones');
 const collapsed = ref(false);
+const showPanel = import.meta.env.DEV;
 </script>
 
 <template>
-  <aside class="zone-panel" :class="{ 'is-collapsed': collapsed }" data-grid-ignore-click="true">
+  <aside
+    v-if="showPanel"
+    class="zone-panel"
+    :class="{ 'is-collapsed': collapsed }"
+    data-grid-ignore-click="true"
+  >
     <v-card v-if="!collapsed" elevation="6" rounded="lg" class="zone-card">
       <v-card-title class="zone-title">
         <span class="text-subtitle-1">Grid Tools</span>
