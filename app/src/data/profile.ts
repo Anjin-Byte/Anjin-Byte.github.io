@@ -62,7 +62,7 @@ export interface Project {
 
 export const projects: Project[] = [
   {
-    title: 'fragile-canvas',
+    title: 'SM83 Emulator',
     blurb:
       'An SM83 CPU disassembler and emulator — translating Game Boy binaries ' +
       'into readable assembly and a custom microcode format, rendered with a ' +
@@ -95,7 +95,7 @@ export const projects: Project[] = [
     ],
   },
   {
-    title: 'shiny-parakeet',
+    title: 'Adaptive Ray Tracer',
     blurb:
       'A first-principles ray tracer based on "Ray Tracing in One Weekend," ' +
       'extended with entropy-based heuristics that dynamically adjust sample ' +
@@ -115,6 +115,18 @@ export const projects: Project[] = [
     links: [
       { kind: 'demo', href: 'https://anjin-byte.github.io/WoodwardFormanLatticeGen/' },
       { kind: 'source', href: 'https://github.com/Anjin-Byte/SIBR_SDF_Lattice_Generator' },
+    ],
+  },
+  {
+    title: 'Heightfield Filters',
+    blurb:
+      'A Rust image-processing suite for terrain heightfields — hexagonal-' +
+      'kernel aggregation, Sobel/Prewitt edge detection, and extraction of ' +
+      'structural lines (crests, thalwegs, convex/concave ridges) from raw ' +
+      '.r32 elevation rasters. Parallelized with Rayon.',
+    tech: ['Rust', 'Image Processing', 'Terrain Analysis', 'Rayon'],
+    links: [
+      { kind: 'source', href: 'https://github.com/Anjin-Byte/probable-eureka' },
     ],
   },
   {

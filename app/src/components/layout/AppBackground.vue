@@ -12,6 +12,7 @@ import { useCoordinateMapper } from '../../composables/useCoordinateMapper';
 import { useAnimationLoop } from '../../composables/useAnimationLoop';
 import { useDragTools } from '../../composables/useDragTools';
 import { useThemePreference } from '../../composables/useThemePreference';
+import { FEATURE_HIRES } from '../../config/features';
 import GridBlankZonePanel from './GridBlankZonePanel.vue';
 
 const log = createLogger('AppBackground');
@@ -50,11 +51,22 @@ const blankZones = useBlankZones({
   onRemoveZone: (id) => bridge.post({ type: 'remove_zone', id }),
   onClearZones: () => bridge.post({ type: 'clear_zones' }),
 });
+// Hi-res callbacks are no-ops when FEATURE_HIRES is off — the composable
+// still owns in-memory state so types stay simple, but nothing reaches the
+// worker or GPU. Vite strips the truthy branches at build time.
 const hiRes = useHiRes({
-  onAddRegion: (r) => bridge.post({ type: 'add_hires', region: { ...r } }),
-  onUpdateRegion: (r) => bridge.post({ type: 'update_hires', region: { ...r } }),
-  onRemoveRegion: (id) => bridge.post({ type: 'remove_hires', id }),
-  onClearRegions: () => bridge.post({ type: 'clear_hires' }),
+  onAddRegion: (r) => {
+    if (FEATURE_HIRES) bridge.post({ type: 'add_hires', region: { ...r } });
+  },
+  onUpdateRegion: (r) => {
+    if (FEATURE_HIRES) bridge.post({ type: 'update_hires', region: { ...r } });
+  },
+  onRemoveRegion: (id) => {
+    if (FEATURE_HIRES) bridge.post({ type: 'remove_hires', id });
+  },
+  onClearRegions: () => {
+    if (FEATURE_HIRES) bridge.post({ type: 'clear_hires' });
+  },
 });
 // ── Tool state ──────────────────────────────────────────────────────────────
 const zoneToolEnabled = ref(false);
@@ -178,7 +190,9 @@ onMounted(() => {
     log.info(`${msg.backend.toUpperCase()} renderer active`);
     bridge.post({ type: 'set_theme', theme: currentTheme.value });
     bridge.post({ type: 'set_zones', zones: toWorkerZones(blankZones.zones.value) });
-    if (hiRes.regions.value.length > 0) bridge.post({ type: 'set_hires_regions', regions: hiRes.regions.value.map((r) => ({ ...r })) });
+    if (FEATURE_HIRES && hiRes.regions.value.length > 0) {
+      bridge.post({ type: 'set_hires_regions', regions: hiRes.regions.value.map((r) => ({ ...r })) });
+    }
   });
   bridge.on('zones_state', (msg) => blankZones.syncFromWorker(msg.zones));
   bridge.on('zones_error', (msg) => log.error('Zone update rejected:', msg.message));

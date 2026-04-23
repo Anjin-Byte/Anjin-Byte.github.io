@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import type { BlankZone, BlankZoneDraft, BlankZoneRect } from '../../types/blankZones';
 import type { HiResRegion } from '../../types/hiresRegion';
+import { FEATURE_HIRES } from '../../config/features';
 import GridZoneTab from './GridZoneTab.vue';
 import GridHiResTab from './GridHiResTab.vue';
 
@@ -28,6 +29,10 @@ defineEmits<{
 const activeTab = ref('zones');
 const collapsed = ref(false);
 const showPanel = import.meta.env.DEV;
+// Track the flag as a local constant so the template can reference it via
+// v-if.  Stays a literal boolean so Vite can still dead-code-eliminate the
+// hi-res tab markup when FEATURE_HIRES is false.
+const hiresTabEnabled = FEATURE_HIRES;
 </script>
 
 <template>
@@ -45,7 +50,7 @@ const showPanel = import.meta.env.DEV;
 
       <v-tabs v-model="activeTab" density="compact" grow>
         <v-tab value="zones">Zones</v-tab>
-        <v-tab value="hires">Hi-Res</v-tab>
+        <v-tab v-if="hiresTabEnabled" value="hires">Hi-Res</v-tab>
       </v-tabs>
 
       <v-card-text class="pt-2">
@@ -63,7 +68,7 @@ const showPanel = import.meta.env.DEV;
             />
           </v-tabs-window-item>
 
-          <v-tabs-window-item value="hires">
+          <v-tabs-window-item v-if="hiresTabEnabled" value="hires">
             <GridHiResTab
               :regions="hiresRegions"
               @add-region="$emit('add-hires-region', $event)"

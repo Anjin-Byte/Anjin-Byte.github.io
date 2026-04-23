@@ -367,6 +367,13 @@ fn hires_region_grid(px: f32, world_y: f32, gp: f32) -> vec4f {
 
 // Compute the region border coverage for a bold-major-style rectangle.
 // No toroidal wrap — border appears only at the canonical region position.
+//
+// Uses a constant 1-pixel feather (`smoothstep(half_w - 1.0, half_w + 1.0, …)`)
+// instead of fwidth-based aastep.  This function is called from inside the
+// non-uniform `if hr_show_border { … }` branch in fs_main, and fwidth requires
+// uniform control flow across a quad of fragments.  Since px/world_y are
+// linear screen-space coords, fwidth(d) ≈ 1.0 canvas pixel, so the constant
+// feather produces visually-equivalent AA without the uniformity hazard.
 fn hires_border_cov(px: f32, world_y: f32, gp: f32, half_w: f32) -> f32 {
     var cov = 0.0;
     for (var ri: u32 = 0u; ri < hires_meta.region_count; ri = ri + 1u) {
@@ -375,10 +382,10 @@ fn hires_border_cov(px: f32, world_y: f32, gp: f32, half_w: f32) -> f32 {
         let ty = f32(reg.rect.y) * gp;
         let rx = f32(reg.rect.z + 1) * gp;
         let by = f32(reg.rect.w + 1) * gp;
-        let dl = 1.0 - aastep(half_w, abs(px - lx));
-        let dr = 1.0 - aastep(half_w, abs(px - rx));
-        let dt = 1.0 - aastep(half_w, abs(world_y - ty));
-        let db = 1.0 - aastep(half_w, abs(world_y - by));
+        let dl = 1.0 - smoothstep(half_w - 1.0, half_w + 1.0, abs(px - lx));
+        let dr = 1.0 - smoothstep(half_w - 1.0, half_w + 1.0, abs(px - rx));
+        let dt = 1.0 - smoothstep(half_w - 1.0, half_w + 1.0, abs(world_y - ty));
+        let db = 1.0 - smoothstep(half_w - 1.0, half_w + 1.0, abs(world_y - by));
         let in_y = step(ty - half_w, world_y) * (1.0 - step(by + half_w, world_y));
         let in_x = step(lx - half_w, px) * (1.0 - step(rx + half_w, px));
         cov = max(cov, max(max(dl, dr) * in_y, max(dt, db) * in_x));
@@ -689,14 +696,18 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     let hr_flags = u32(hr.z);
     let hr_show_grid   = (hr_flags & 1u) != 0u;  // bit 0
     let hr_show_border = (hr_flags & 4u) != 0u;  // bit 2
-    if hr.x > 0.5 && hr_show_grid {
-        let fine_pitch = hr.y;
-        let fine_half = fine_pitch * 0.015 + fiber_bleed;
-        let fine_x = grid_line_aa(px,      fine_pitch, fine_half) * print_fade_x;
-        let fine_y = grid_line_aa(world_y, fine_pitch, fine_half) * print_fade_y;
-        let fine_cov = max(fine_x, fine_y) * content_mask;
-        minor_cov = max(minor_cov, fine_cov);
-    }
+    // Compute the fine-grid coverage unconditionally so grid_line_aa's internal
+    // fwidth sits in uniform control flow, then gate the contribution with
+    // select().  When hr.x is 0 (not inside a region) hr.y is also 0, which
+    // would divide-by-zero in grid_line_aa; max(hr.y, 1.0) keeps the math
+    // defined — the result is discarded by the select anyway.
+    let fine_pitch   = max(hr.y, 1.0);
+    let fine_half    = fine_pitch * 0.015 + fiber_bleed;
+    let fine_x_raw   = grid_line_aa(px,      fine_pitch, fine_half) * print_fade_x;
+    let fine_y_raw   = grid_line_aa(world_y, fine_pitch, fine_half) * print_fade_y;
+    let fine_cov     = max(fine_x_raw, fine_y_raw) * content_mask;
+    let show_fine    = hr.x > 0.5 && hr_show_grid;
+    minor_cov = select(minor_cov, max(minor_cov, fine_cov), show_fine);
     // Region border — bold rectangle around the hi-res area.
     if hr_show_border {
         let hr_bdr_half = paper.major_half_px * 2.0 + fiber_bleed;
