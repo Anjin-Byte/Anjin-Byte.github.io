@@ -68,6 +68,7 @@ const projectIndex: ProjectIndexItem[] = rawProjectIndex.map((project) => ({
           >
             <v-icon :icon="link.icon" />
             <span>{{ link.label }}</span>
+            <v-tooltip activator="parent" location="top" :text="link.ariaLabel" />
           </a>
         </div>
       </article>
@@ -90,9 +91,9 @@ const projectIndex: ProjectIndexItem[] = rawProjectIndex.map((project) => ({
                 class="project-item-link"
                 :class="{ 'project-item-link--demo': link.kind === 'demo' }"
                 :aria-label="link.ariaLabel"
-                :title="link.label"
               >
                 <v-icon :icon="link.icon" />
+                <v-tooltip activator="parent" location="top" :text="link.ariaLabel" />
               </a>
             </div>
           </header>
@@ -258,10 +259,19 @@ const projectIndex: ProjectIndexItem[] = rawProjectIndex.map((project) => ({
   height: 2rem;
   border-radius: 999px;
   color: var(--theme-text-tertiary);
+  text-decoration: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transform: translateY(1px);
   transition: color 120ms ease-out, background-color 120ms ease-out, transform 120ms ease-out;
+}
+
+.project-item-link :deep(.v-icon) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .project-item-links {
@@ -279,7 +289,7 @@ const projectIndex: ProjectIndexItem[] = rawProjectIndex.map((project) => ({
 .project-item-link:focus-visible {
   color: var(--theme-text-primary);
   background: color-mix(in oklab, var(--theme-surface) 82%, white 6%);
-  transform: translateY(-1px);
+  transform: translateY(0);
   outline: none;
 }
 

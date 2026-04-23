@@ -12,7 +12,7 @@ export interface ResolvedProjectLink extends ProjectLink {
 const projectLinkMeta = {
   demo: {
     ariaLabel: 'Live demo',
-    icon: 'mdi-open-in-new',
+    icon: 'mdi-play-circle-outline',
     label: 'Demo',
     priority: 0,
   },

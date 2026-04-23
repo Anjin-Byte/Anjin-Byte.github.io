@@ -63,9 +63,13 @@ export interface ThemePalette {
 // and text tiers are shared (perceptual parity in OKLab holds), but endpoint
 // L, `ink_opacity`, `grain_intensity`, and accent chroma are asymmetric:
 //
-//   Light:  paper-on-desk feel; ink readable where it matters, cells ghostly.
-//   Dark:   night-surface feel; grain masks OLED banding; accent chroma
-//           compressed to prevent bloom.
+//   Light:  paper-on-desk feel; ink readable where it matters, cells ghostly;
+//           accent is a pastel rose — warm, quiet, one perceptual step below
+//           surface.
+//   Dark:   night-surface feel; grain masks OLED banding; accent shifts to a
+//           muted purple — same magenta hue family as the light rose (~50°
+//           rotation) so the two modes read as a transposed pair rather than
+//           different palettes; chroma compressed to prevent bloom.
 //
 // Reference survey: Linear, Vercel Geist, rauno.me, paco.me, emilkowal.ski,
 // Josh Comeau, Radix Colors.  None are pure inversions of their counterpart,
@@ -83,7 +87,11 @@ export const LIGHT_THEME: ThemePalette = {
 
   ink_secondary_t: 0.78,              // ≈ L 0.435 — body-adjacent
   ink_tertiary_t:  0.54,              // ≈ L 0.607 — metadata / placeholder
-  accent:          [0.55, 0.10, 220], // soft blue at L=0.55
+  // Pastel rose — OKLCH(L, C, H). L=0.88 sits one perceptual step below the
+  // surface (0.985), so the accent is audible without punching into body-text
+  // contrast.  C=0.08 is pastel (audible, not saturated).  H=15° is rose with
+  // a slight warm edge — harmonizes with the surface's faint warm cast.
+  accent:          [0.88, 0.08, 15],
   accent_chroma_scale: 1.0,
 };
 
@@ -99,8 +107,15 @@ export const DARK_THEME: ThemePalette = {
 
   ink_secondary_t: 0.78,              // same proportions as light
   ink_tertiary_t:  0.54,
-  accent:          [0.70, 0.10, 220], // brighter L for dark; chroma compressed below
-  accent_chroma_scale: 0.7,           // 30% chroma reduction masks OLED bloom
+  // Muted purple — OKLCH(L, C, H).  H=305° is magenta-leaning purple: only
+  // ~50° rotation from the light-mode rose, so the two modes feel like a
+  // transposition of the same harmonic family rather than different brands.
+  // L=0.72 pulls toward the ink endpoint so the accent reads as "light" on
+  // the dark surface.  Authored chroma is 0.08 like the light preset; the
+  // dark-mode chroma_scale below compresses to effective C≈0.06 — below the
+  // OLED bloom threshold for saturated hues against low-L backgrounds.
+  accent:          [0.72, 0.08, 305],
+  accent_chroma_scale: 0.75,          // 25% compression — OLED-safe purple
 };
 
 /** Pick the preset matching the user's system preference (SSR-safe fallback). */
