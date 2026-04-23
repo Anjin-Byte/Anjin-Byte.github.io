@@ -117,6 +117,18 @@ export const projects: Project[] = [
       { kind: 'source', href: 'https://github.com/Anjin-Byte/SIBR_SDF_Lattice_Generator' },
     ],
   },
+  {
+    title: 'Schmith',
+    blurb:
+      'A Python CLI that generates C# DataObjects from API specifications. ' +
+      'Supports deterministic and LLM-augmented (Anthropic, OpenAI) generation ' +
+      'with stable, reproducible output and partial regeneration that ' +
+      'preserves downstream hand-edits as specs evolve.',
+    tech: ['Python', 'C#', 'LLM', 'Anthropic', 'OpenAI', 'CLI'],
+    links: [
+      { kind: 'source', href: 'https://github.com/Anjin-Byte/Schmith' },
+    ],
+  },
 ];
 
 // ── Experience ──────────────────────────────────────────────────────────────
