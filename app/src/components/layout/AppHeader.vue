@@ -17,7 +17,7 @@ const isMenuOpen = ref(false);
 <template>
   <v-app-bar elevation="0" color="background" border="b">
     <v-app-bar-title class="header-title">
-      <span class="title-ink font-weight-bold">Anjin Byte</span>
+      <span class="title-ink font-weight-bold"></span>
     </v-app-bar-title>
     <template #append>
       <template v-if="smAndDown">

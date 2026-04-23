@@ -62,13 +62,25 @@ export interface Project {
 
 export const projects: Project[] = [
   {
+    title: 'fragile-canvas',
+    blurb:
+      'An SM83 CPU disassembler and emulator — translating Game Boy binaries ' +
+      'into readable assembly and a custom microcode format, rendered with a ' +
+      'WebGL2 LCD-substrate shader for material-grain authenticity.',
+    tech: ['Rust', 'WASM', 'WebGL2', 'Svelte', 'TypeScript'],
+    links: [
+      { kind: 'demo', href: 'https://anjin-byte.github.io/fragile-canvas/' },
+      { kind: 'source', href: 'https://github.com/Anjin-Byte/fragile-canvas' },
+    ],
+  },
+  {
     title: 'Anjin-Byte.github.io',
     blurb:
       'This site. Conway\'s Game of Life running as a WebGPU-rendered ' +
       'engineering-paper background, with a theme system parameterized in OKLab.',
     tech: ['Rust', 'WebGPU', 'WASM', 'Vue 3', 'TypeScript', 'WGSL'],
     links: [
-      { kind: 'demo', href: 'https://anjin-byte.github.io/' },
+      // Intentionally no `demo` link — you're already on it.
       { kind: 'source', href: 'https://github.com/Anjin-Byte/Anjin-Byte.github.io' },
     ],
   },
@@ -80,18 +92,6 @@ export const projects: Project[] = [
     links: [
       { kind: 'demo', href: 'https://anjin-byte.github.io/Gestalt/' },
       { kind: 'source', href: 'https://github.com/Anjin-Byte/Gestalt' },
-    ],
-  },
-  {
-    title: 'fragile-canvas',
-    blurb:
-      'An SM83 CPU disassembler and emulator — translating Game Boy binaries ' +
-      'into readable assembly and a custom microcode format, rendered with a ' +
-      'WebGL2 LCD-substrate shader for material-grain authenticity.',
-    tech: ['Rust', 'WASM', 'WebGL2', 'Svelte', 'TypeScript'],
-    links: [
-      { kind: 'demo', href: 'https://anjin-byte.github.io/fragile-canvas/' },
-      { kind: 'source', href: 'https://github.com/Anjin-Byte/fragile-canvas' },
     ],
   },
   {

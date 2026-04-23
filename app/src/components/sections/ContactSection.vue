@@ -10,8 +10,8 @@ import ContactStrip from '../layout/ContactStrip.vue';
           <span class="glass-chip section-kicker">Contact</span>
           <h2 class="contact-title">Open to interesting problems.</h2>
           <p class="contact-copy">
-            Best when the work sits somewhere between systems, interfaces, and
-            practical experimentation.
+            <!-- Best when the work sits somewhere between systems, interfaces, and
+            practical experimentation. -->
           </p>
         </div>
 

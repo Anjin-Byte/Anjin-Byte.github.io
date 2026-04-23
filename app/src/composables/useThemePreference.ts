@@ -11,10 +11,14 @@ export type ThemePreference = 'light' | 'system' | 'dark';
 
 const STORAGE_KEY = 'theme-preference';
 
+// First-visit default is `light` — the site is calibrated and tuned around
+// light mode as the primary experience; dark is available via the toggle and
+// is persisted in localStorage once chosen.  (Using `system` here would mean
+// users with OS dark-mode never see the intended presentation.)
 function readStored(): ThemePreference {
-  if (typeof window === 'undefined') return 'system';
+  if (typeof window === 'undefined') return 'light';
   const v = window.localStorage?.getItem(STORAGE_KEY);
-  return v === 'light' || v === 'dark' || v === 'system' ? v : 'system';
+  return v === 'light' || v === 'dark' || v === 'system' ? v : 'light';
 }
 
 const preferenceRef = ref<ThemePreference>(readStored());
