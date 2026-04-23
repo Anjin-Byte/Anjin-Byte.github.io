@@ -78,6 +78,7 @@ export const projects: Project[] = [
       'A GPU-driven voxel mesh renderer built with Rust + WASM + Svelte 5 + WebGPU.',
     tech: ['Rust', 'WASM', 'WebGPU', 'Svelte 5'],
     links: [
+      { kind: 'demo', href: 'https://anjin-byte.github.io/Gestalt/' },
       { kind: 'source', href: 'https://github.com/Anjin-Byte/Gestalt' },
     ],
   },
@@ -112,6 +113,7 @@ export const projects: Project[] = [
       'marching-cubes pipeline with Taubin smoothing and optional QEM decimation.',
     tech: ['Rust', 'SDF', 'Marching Cubes', 'Mesh Processing'],
     links: [
+      { kind: 'demo', href: 'https://anjin-byte.github.io/WoodwardFormanLatticeGen/' },
       { kind: 'source', href: 'https://github.com/Anjin-Byte/SIBR_SDF_Lattice_Generator' },
     ],
   },

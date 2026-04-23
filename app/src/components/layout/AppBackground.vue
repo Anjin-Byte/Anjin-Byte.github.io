@@ -20,6 +20,13 @@ const log = createLogger('AppBackground');
 const MAJOR_EVERY = 5;
 const TARGET_CELL_CSS_PX = 19;
 
+// Parallax tuning — the background drifts at PARALLAX_RATE × content velocity,
+// with PARALLAX_EASE controlling how softly `currentScroll` eases toward the
+// target each frame. Lower rate = more subtle drift; higher ease = snappier
+// but less smooth. Numbers here are tasteful defaults — tweak and reload.
+const PARALLAX_RATE = 0.3;
+const PARALLAX_EASE = 0.12;
+
 // ── Core composables ────────────────────────────────────────────────────────
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 const currentScrollCanvasPx = ref(0);
@@ -188,16 +195,41 @@ onMounted(() => {
   document.addEventListener('click', onDocumentClick);
   detachDrag = drag.attachListeners();
 
-  // Animation loop with scroll tracking
+  // Animation loop — frame tick + eased parallax scroll sync.
+  //
+  // We're deliberately NOT trying for 1:1 scroll lock (which the earlier
+  // implementation attempted and which produced visible shimmer because the
+  // cross-thread postMessage + GPU queue round-trip is always ≥1 frame
+  // behind DOM scroll).  Instead:
+  //
+  //   1. Compute `target` = DOM scrollTop scaled by PARALLAX_RATE, so the
+  //      background drifts at a fraction of content velocity.  This alone
+  //      hides cross-thread latency: a 16ms delay at 0.3× rate is ~5ms of
+  //      visual desync — below perception.
+  //
+  //   2. Ease `current` toward `target` by PARALLAX_EASE each frame.  This
+  //      makes the current value change smoothly regardless of source-side
+  //      jitter.  The motion is always continuous; no per-frame snap.
+  //
+  //   3. Only post `scroll` to the worker when `current` has meaningfully
+  //      changed — avoids emitting useless messages once motion settles.
   mainEl = document.querySelector<HTMLElement>('.v-main');
-  let lastScrollPx = -1;
+  let targetScroll = 0;
+  let currentScroll = 0;
   anim.start(() => {
     bridge.post({ type: 'frame' });
-    const rawPx = (mainEl?.scrollTop || window.scrollY);
-    if (rawPx !== lastScrollPx) {
-      lastScrollPx = rawPx;
-      currentScrollCanvasPx.value = rawPx * devicePixelRatio;
-      bridge.post({ type: 'scroll', scrollY: currentScrollCanvasPx.value });
+
+    // Vuetify 3 doesn't put overflow:auto on v-main by default — the document
+    // itself is the scroll container in this app, so mainEl.scrollTop is
+    // usually 0 and we want to fall back to window.scrollY.  Use `||` (not
+    // `??`) so a zero from mainEl still falls through.
+    const raw = mainEl?.scrollTop || window.scrollY;
+    targetScroll = raw * PARALLAX_RATE * devicePixelRatio;
+    currentScroll += (targetScroll - currentScroll) * PARALLAX_EASE;
+
+    if (Math.abs(currentScroll - currentScrollCanvasPx.value) > 0.1) {
+      currentScrollCanvasPx.value = currentScroll;
+      bridge.post({ type: 'scroll', scrollY: currentScroll });
     }
   });
 
