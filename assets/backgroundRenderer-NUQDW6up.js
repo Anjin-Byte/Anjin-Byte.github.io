@@ -28,9 +28,9 @@
         ink_secondary_t: .78,
         ink_tertiary_t: .54,
         accent: [
-            .55,
-            .1,
-            220
+            .88,
+            .08,
+            15
         ],
         accent_chroma_scale: 1
     };
