@@ -3141,7 +3141,7 @@ function gw() {
     if (u) for (const c of u) c(s);
   }
   function i(s, u) {
-    const c = new Worker(new URL("/assets/backgroundRenderer-JPvXVC9u.js", import.meta.url), { type: "module" });
+    const c = new Worker(new URL("/assets/backgroundRenderer-BUrRa-NX.js", import.meta.url), { type: "module" });
     c.onmessage = (d) => o(d.data), c.onerror = (d) => {
       vf.error("Worker uncaught exception:", d.message, `at ${d.filename}:${d.lineno}`);
     }, e = c, a({ type: "init", canvas: s, cellPx: u }, [s]);
@@ -3354,7 +3354,7 @@ const ww = false, xw = { key: 0, class: "zone-preview-text" }, Cw = { class: "zo
   const n = e.__vccOpts || e;
   for (const [a, l] of t) n[a] = l;
   return n;
-}, Tw = Kn(Aw, [["__scopeId", "data-v-223984b2"]]), hf = 210, Dw = { class: "hires-tab" }, Ew = { class: "text-caption text-medium-emphasis mb-2" }, Mw = { key: 0, class: "text-caption mt-1", style: { opacity: "0.7" } }, Bw = { class: "region-list" }, $w = { class: "d-flex align-center justify-space-between" }, Lw = { class: "text-body-2" }, Fw = { class: "text-caption text-medium-emphasis" }, Rw = { class: "d-flex align-center gap-2 mt-2 flex-wrap" }, Ow = { class: "mt-2" }, Nw = { class: "d-flex align-center justify-space-between" }, Hw = { class: "text-caption text-medium-emphasis" }, zw = { class: "mt-2" }, Ww = { class: "d-flex align-center justify-space-between" }, jw = { class: "text-caption text-medium-emphasis" }, Uw = { key: 0, class: "text-caption", style: { opacity: "0.7", padding: "6px 0" } }, Gw = ln({ __name: "GridHiResTab", props: { regions: {} }, emits: ["add-region", "update-region", "remove-region", "clear-regions", "hires-tool-change"], setup(e, { emit: t }) {
+}, Tw = Kn(Aw, [["__scopeId", "data-v-223984b2"]]), hf = 175, Dw = { class: "hires-tab" }, Ew = { class: "text-caption text-medium-emphasis mb-2" }, Mw = { key: 0, class: "text-caption mt-1", style: { opacity: "0.7" } }, Bw = { class: "region-list" }, $w = { class: "d-flex align-center justify-space-between" }, Lw = { class: "text-body-2" }, Fw = { class: "text-caption text-medium-emphasis" }, Rw = { class: "d-flex align-center gap-2 mt-2 flex-wrap" }, Ow = { class: "mt-2" }, Nw = { class: "d-flex align-center justify-space-between" }, Hw = { class: "text-caption text-medium-emphasis" }, zw = { class: "mt-2" }, Ww = { class: "d-flex align-center justify-space-between" }, jw = { class: "text-caption text-medium-emphasis" }, Uw = { key: 0, class: "text-caption", style: { opacity: "0.7", padding: "6px 0" } }, Gw = ln({ __name: "GridHiResTab", props: { regions: {} }, emits: ["add-region", "update-region", "remove-region", "clear-regions", "hires-tool-change"], setup(e, { emit: t }) {
   const n = e, a = t, l = q(false), o = _(() => n.regions.length < Ei);
   function i() {
     l.value = !l.value, a("hires-tool-change", { enabled: l.value });
