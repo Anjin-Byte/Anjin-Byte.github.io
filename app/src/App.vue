@@ -46,6 +46,10 @@ body {
   color: var(--theme-text-primary, var(--theme-ink));
   font-family: var(--font-ui);
   text-rendering: optimizeLegibility;
+  /* Clearance for iOS home-indicator / dynamic-island safe area. Requires
+     `viewport-fit=cover` in the <meta viewport> tag to return a non-zero
+     value; degrades to 0 on platforms that don't report a safe area. */
+  padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
 a {
