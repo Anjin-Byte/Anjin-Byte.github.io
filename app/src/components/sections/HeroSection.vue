@@ -63,11 +63,6 @@ const heroLinks = contactLinks.filter((link) =>
   position: relative;
   z-index: 1;
   width: 100%;
-  /* Pre-Safari-15.4 fallback; browsers that understand svh override below.
-     svh is "small viewport height" — stable against the iOS Safari URL bar
-     animation, so the hero height doesn't oscillate when the bar shows/hides
-     and content below doesn't cascade-shift. */
-  min-height: 100vh;
   min-height: 100svh;
   display: flex;
   align-items: center;

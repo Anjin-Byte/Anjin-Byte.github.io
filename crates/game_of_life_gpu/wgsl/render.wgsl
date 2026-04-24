@@ -642,21 +642,15 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     // grid_pitch_px is computed from canvas_width so cw = n_total * pitch_major exactly.
     // 2 major squares per margin → both left and right borders land on major lines.
     let margin = 0.0 * pitch_major;
-    // Horizontal: canvas width is guaranteed to be an integer number of major
-    // pitches (see alignedPitch on the TS side), so the right edge already
-    // lands on a major line — no partial major cells horizontally.
-    //
-    // Vertical: canvas height is NOT aligned (we don't resize the canvas to
-    // avoid a body-gap), so a residual strip exists below the last whole
-    // major row.  Clipping content_mask at that boundary (in canvas-Y, not
-    // world-Y, so the clip stays pinned to the viewport bottom regardless of
-    // parallax scroll) makes the grid end on a major boundary.  The strip
-    // below still renders paper_lit + side borders, just not grid/cells —
-    // reads as "aligned paper extends to the canvas edge" rather than
-    // "grid got cut off".
-    let content_bottom_py = floor(ch / pitch_major) * pitch_major;
+    // 0 inside margin band, 1 inside content area.
+    // Grid lines and cell ink are only drawn inside the content area.
+    // Horizontal is aligned via alignedPitch (canvas width is an integer
+    // number of major pitches).  Vertical is not — partial major cells are
+    // expected at the viewport bottom, which is natural when the page scrolls
+    // past a grid that extends infinitely.  A shader-level clip to hide them
+    // creates a visible paper/grid seam worse than the problem it solves.
     let in_cx = step(margin, px) * (1.0 - step(cw - margin, px));
-    let in_cy = step(margin, world_y) * (1.0 - step(content_bottom_py, py));
+    let in_cy = step(margin, world_y);
     let content_mask = in_cx * in_cy;
 
     // Fiber-dependent ink bleed: open fiber absorbs more dye, spreading the edge.
