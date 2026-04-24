@@ -8,14 +8,23 @@ export interface ContactLink {
   display?: string; // override text shown alongside icon
 }
 
+/*
+I build careful software: graphics systems, codegen tools, 
+integration work on short delivery cycles. My background spans 
+computer vision research, contract engineering, and full-stack web 
+development. I'm chasing elegance where low-level detail and 
+high-level design meet. At least once.
+*/
+
 export const profile = {
   name: 'Taylor Hale',
-  tagline: 'Systems Engineer · Rust · WebAssembly · TypeScript',
+  tagline: 'Engineer\u00A0\u00A0·\u00A0\u00A0Designer\u00A0\u00A0·\u00A0\u00A0Tinkerer',
   bio:
-    'I build systems-level software — WebGPU renderers, data pipelines, and ' +
-    'prototype AI tooling — with a focus on clean abstraction and code that ' +
-    'actually works. My background spans computer vision research, contract ' +
-    'engineering, and full-stack web development.',
+    'I build careful software: graphics systems, codegen tools, ' +
+    'integration work on short delivery cycles. My background spans ' +
+    'computer vision research, contract engineering, and full-stack web ' +
+    'development. I\'m chasing elegance where low-level detail and ' +
+    'high-level design meet. At least once.',
   location: 'Bentonville, AR',
   email: 'hale.taylor.dev@gmail.com',
   phone: '(615) 681-3779',

@@ -11,11 +11,7 @@ const heroLinks = contactLinks.filter((link) =>
     <v-container class="hero-container">
       <div class="hero-frame glass-panel glass-panel--strong">
         <div class="hero-main">
-          <span class="hero-kicker glass-chip section-kicker">Systems engineer</span>
-          <p class="hero-location">
-            <v-icon icon="mdi-map-marker-outline" class="hero-location-icon" />
-            {{ profile.location }}
-          </p>
+          <span class="hero-kicker glass-chip section-kicker"><v-icon icon="mdi-map-marker-outline" class="hero-location-icon" />{{ profile.location }}</span>
           <h1 class="hero-name section-heading">{{ profile.name }}</h1>
           <p class="hero-tagline">{{ profile.tagline }}</p>
           <p class="hero-bio">{{ profile.bio }}</p>
@@ -25,7 +21,7 @@ const heroLinks = contactLinks.filter((link) =>
               View selected work
               <v-icon icon="mdi-arrow-right" class="hero-link-icon" />
             </a>
-            <a href="#contact" class="hero-link">Get in touch</a>
+            <a href="#resume" class="hero-link">Resume</a>
           </div>
         </div>
 
