@@ -316,7 +316,7 @@
                         });
                     }
                     if (c) try {
-                        const { GpuGameOfLife: s } = await import("./game_of_life_gpu-CSw56Nrs.js").then(async (m)=>{
+                        const { GpuGameOfLife: s } = await import("./game_of_life_gpu-DerpHDsp.js").then(async (m)=>{
                             await m.__tla;
                             return m;
                         });

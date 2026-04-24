@@ -3141,7 +3141,7 @@ function gw() {
     if (u) for (const c of u) c(s);
   }
   function i(s, u) {
-    const c = new Worker(new URL("/assets/backgroundRenderer-C3qpQaPa.js", import.meta.url), { type: "module" });
+    const c = new Worker(new URL("/assets/backgroundRenderer-BWtIrcvX.js", import.meta.url), { type: "module" });
     c.onmessage = (d) => o(d.data), c.onerror = (d) => {
       vf.error("Worker uncaught exception:", d.message, `at ${d.filename}:${d.lineno}`);
     }, e = c, a({ type: "init", canvas: s, cellPx: u }, [s]);
@@ -5355,7 +5355,7 @@ const uC = ln({ __name: "ThemeToggle", setup(e) {
     const l = je("v-icon"), o = je("v-container");
     return Te(), Oe("section", yC, [p(o, { class: "hero-container" }, { default: Pe(() => [b("div", bC, [b("div", pC, [b("span", SC, [p(l, { icon: "mdi-map-marker-outline", class: "hero-location-icon" }), Ke(Ie(Re(Cn).location), 1)]), b("h1", kC, Ie(Re(Cn).name), 1), b("p", wC, Ie(Re(Cn).tagline), 1), b("p", xC, Ie(Re(Cn).bio), 1), b("div", CC, [b("a", _C, [a[0] || (a[0] = Ke(" View selected work ", -1)), p(l, { icon: "mdi-arrow-right", class: "hero-link-icon" })]), a[1] || (a[1] = b("a", { href: "#resume", class: "hero-link" }, "Resume", -1))])]), b("aside", VC, [b("section", IC, [a[2] || (a[2] = b("p", { class: "hero-note-label" }, "Capabilities", -1)), b("div", PC, [(Te(true), Oe(ge, null, Qt(Re(vC), (i) => (Te(), Oe("div", { key: i.label, class: "skill-group" }, [b("span", AC, Ie(i.label), 1), b("span", TC, Ie(i.items.join("  \xB7  ")), 1)]))), 128))])]), b("section", DC, [a[3] || (a[3] = b("p", { class: "hero-note-label" }, "Elsewhere", -1)), b("div", EC, [(Te(true), Oe(ge, null, Qt(Re(t), (i) => (Te(), Oe("a", { key: i.label, href: i.href, class: "hero-meta-link", target: "_blank", rel: "noopener noreferrer" }, [p(l, { icon: i.icon, class: "hero-meta-link-icon" }, null, 8, ["icon"]), b("span", null, Ie(i.display ?? i.label), 1)], 8, MC))), 128))])])])])]), _: 1 })]);
   };
-} }), $C = Kn(BC, [["__scopeId", "data-v-2de5d3f0"]]), Js = { demo: { ariaLabel: "Live demo", icon: "mdi-play-circle-outline", label: "Demo", priority: 0 }, source: { ariaLabel: "GitHub repository", icon: "mdi-github", label: "Source", priority: 1 }, writeup: { ariaLabel: "Project writeup", icon: "mdi-text-box-outline", label: "Writeup", priority: 2 }, video: { ariaLabel: "Project video", icon: "mdi-play-circle-outline", label: "Video", priority: 3 }, docs: { ariaLabel: "Project documentation", icon: "mdi-file-document-outline", label: "Docs", priority: 4 } };
+} }), $C = Kn(BC, [["__scopeId", "data-v-156c5ed8"]]), Js = { demo: { ariaLabel: "Live demo", icon: "mdi-play-circle-outline", label: "Demo", priority: 0 }, source: { ariaLabel: "GitHub repository", icon: "mdi-github", label: "Source", priority: 1 }, writeup: { ariaLabel: "Project writeup", icon: "mdi-text-box-outline", label: "Writeup", priority: 2 }, video: { ariaLabel: "Project video", icon: "mdi-play-circle-outline", label: "Video", priority: 3 }, docs: { ariaLabel: "Project documentation", icon: "mdi-file-document-outline", label: "Docs", priority: 4 } };
 function LC(e, t) {
   return Js[e].priority - Js[t].priority;
 }
