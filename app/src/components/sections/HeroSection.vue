@@ -67,7 +67,7 @@ const heroLinks = contactLinks.filter((link) =>
   position: relative;
   z-index: 1;
   width: 100%;
-  min-height: 100vh;
+  min-height: 100svh;
   display: flex;
   align-items: center;
   padding-block: 5rem;

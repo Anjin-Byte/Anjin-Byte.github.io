@@ -41,7 +41,7 @@ export interface SkillGroup {
 export const skills: SkillGroup[] = [
   { label: 'Languages',           items: ['Python', 'Java', 'Rust', 'C/C++', 'JavaScript', 'TypeScript', 'SQL'] },
   { label: 'Frameworks & Libraries', items: ['PyTorch', 'Pydantic', 'CUDA', 'OpenCV', 'Detectron2', 'React', 'Vue', 'OpenGL / WebGPU'] },
-  { label: 'Tools & Platforms',   items: ['Git', 'Docker', 'FFmpeg', 'Google Cloud APIs'] },
+  { label: 'Tools & Platforms',   items: ['Git', 'Cargo', 'wasm-pack', 'pnpm', 'Vite', 'Docker', 'FFmpeg', 'CMake', 'GitHub Actions', 'Postman'] },
 ];
 
 // ── Projects / demos ────────────────────────────────────────────────────────

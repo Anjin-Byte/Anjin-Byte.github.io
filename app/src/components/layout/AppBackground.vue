@@ -19,7 +19,7 @@ const log = createLogger('AppBackground');
 
 // ── Constants ───────────────────────────────────────────────────────────────
 const MAJOR_EVERY = 5;
-const TARGET_CELL_CSS_PX = 19;
+const TARGET_CELL_CSS_PX = 16;
 
 // Parallax tuning — the background drifts at PARALLAX_RATE × content velocity,
 // with PARALLAX_EASE controlling how softly `currentScroll` eases toward the

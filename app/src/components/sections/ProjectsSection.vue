@@ -34,7 +34,7 @@ const projectIndex: ProjectIndexItem[] = rawProjectIndex.map((project) => ({
       <div class="projects-head">
         <div class="projects-heading">
           <span class="glass-chip section-kicker">Selected work</span>
-          <h2 class="section-heading projects-title">Rendering systems, WASM, and interfaces with texture.</h2>
+          <h2 class="section-heading projects-title">Small things, built carefully.</h2>
         </div>
         <p class="section-intro projects-intro">
           Projects spanning graphics, emulation, mesh generation, and interface
