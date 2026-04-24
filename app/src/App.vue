@@ -68,6 +68,28 @@ a {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
+/* App footer: mirror the header treatment with a top border instead of a
+   bottom one.  Without these overrides Vuetify resolves `color="background"`
+   using its own (unconfigured, dark-by-default) theme — so the footer used
+   to stay dark even in our light mode. */
+.v-footer.bg-background {
+  background-color: color-mix(in oklab, var(--theme-surface) 84%, transparent) !important;
+  backdrop-filter: blur(14px) saturate(1.08);
+  -webkit-backdrop-filter: blur(14px) saturate(1.08);
+  border-top: 1px solid color-mix(in oklab, var(--theme-grid-border) 68%, white 12%) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: var(--theme-text-tertiary) !important;
+}
+
+/* Vuetify's `.text-medium-emphasis` utility applies its own `!important`
+   color referencing an unconfigured `--v-theme-on-surface` — which in our
+   setup resolves to the default Vuetify palette, not ours.  Rebind it for
+   text inside the footer so the copyright line follows the current theme. */
+.v-footer.bg-background .text-medium-emphasis {
+  color: var(--theme-text-tertiary) !important;
+  opacity: 1;
+}
+
 .glass-panel {
   background: color-mix(in oklab, var(--theme-surface) 84%, transparent);
   border: 1px solid color-mix(in oklab, var(--theme-grid-border) 62%, white 10%);
@@ -155,6 +177,14 @@ html[data-theme-mode="light"] .v-app-bar.bg-background {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.78),
     0 10px 30px rgba(120, 112, 98, 0.08);
+}
+
+html[data-theme-mode="light"] .v-footer.bg-background {
+  background-color: color-mix(in oklab, var(--theme-surface) 94%, white 6%) !important;
+  border-top-color: color-mix(in oklab, var(--theme-grid-major) 42%, white 46%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 -10px 30px rgba(120, 112, 98, 0.08);
 }
 
 html[data-theme-mode="light"] .glass-panel {
