@@ -1,7 +1,7 @@
 import { _ as z } from "./__vite-plugin-wasm-helper-oqf-7dtx.js";
 let y;
 let __tla = (async ()=>{
-    var E = "/assets/game_of_life_gpu_bg-Bjat_pUm.wasm";
+    var E = "/assets/game_of_life_gpu_bg-5K5But7t.wasm";
     y = class {
         static __wrap(_) {
             _ = _ >>> 0;
@@ -106,10 +106,10 @@ let __tla = (async ()=>{
         const t = v(_), n = g(t, c.__wbindgen_malloc, c.__wbindgen_realloc), r = s;
         i().setInt32(e + 4, r, !0), i().setInt32(e + 0, n, !0);
     }
-    function j(e) {
+    function F(e) {
         return typeof e == "function";
     }
-    function F(e) {
+    function j(e) {
         const _ = e;
         return typeof _ == "object" && _ !== null;
     }
@@ -280,10 +280,10 @@ let __tla = (async ()=>{
     function Me(e, _) {
         return e.finish(_);
     }
-    function je(e) {
+    function Fe(e) {
         return e.finish();
     }
-    function Fe(e, _) {
+    function je(e, _) {
         return e.finish(_);
     }
     function qe(e) {
@@ -495,10 +495,10 @@ let __tla = (async ()=>{
     function M_(e) {
         return e.maxStorageBufferBindingSize;
     }
-    function j_(e) {
+    function F_(e) {
         return e.maxStorageBuffersPerShaderStage;
     }
-    function F_(e) {
+    function j_(e) {
         return e.maxStorageTexturesPerShaderStage;
     }
     function q_(e) {
@@ -681,10 +681,10 @@ let __tla = (async ()=>{
     function Mt(e, _) {
         e.setPipeline(_);
     }
-    function jt(e, _) {
+    function Ft(e, _) {
         e.setPipeline(_);
     }
-    function Ft(e, _, t, n, r) {
+    function jt(e, _, t, n, r) {
         e.setScissorRect(_ >>> 0, t >>> 0, n >>> 0, r >>> 0);
     }
     function qt(e, _) {
@@ -1107,13 +1107,13 @@ ${e.stack}` : n;
             __wbg_popErrorScope_2869a89dd4626f0c: wt,
             __wbg_pushErrorScope_72e651b0f8f64c0e: mt,
             __wbg_drawIndexed_9c9719597507e735: Ce,
-            __wbg_setPipeline_f2cf83769bb33769: jt,
+            __wbg_setPipeline_f2cf83769bb33769: Ft,
             __wbg_setViewport_94128a2b1a708040: Yt,
             __wbg_setPipeline_481f34ae14c49d67: Rt,
             __wbg_drawIndirect_73df189881970a43: Ge,
             __wbg_draw_ce5e8b8ad56571cb: Le,
             __wbg_getCurrentTexture_6dc2cdde9bdc098d: He,
-            __wbg_setScissorRect_0578b1de90caf434: Ft,
+            __wbg_setScissorRect_0578b1de90caf434: jt,
             __wbg_dispatchWorkgroups_c122d0482fa3f389: ke,
             __wbg_resolveQuerySet_217f20ef3ebd6aed: vt,
             __wbg_drawIndexedIndirect_888ac46c4c23516f: Te,
@@ -1139,8 +1139,8 @@ ${e.stack}` : n;
             __wbg_maxDynamicStorageBuffersPerPipelineLayout_6974d29539996dc2: z_,
             __wbg_maxSampledTexturesPerShaderStage_e560c5b5b6029c57: U_,
             __wbg_maxSamplersPerShaderStage_28a8a2de2a3d656e: R_,
-            __wbg_maxStorageBuffersPerShaderStage_b81c4449fbcb39c3: j_,
-            __wbg_maxStorageTexturesPerShaderStage_175a5e42917aedd2: F_,
+            __wbg_maxStorageBuffersPerShaderStage_b81c4449fbcb39c3: F_,
+            __wbg_maxStorageTexturesPerShaderStage_175a5e42917aedd2: j_,
             __wbg_maxUniformBuffersPerShaderStage_b159f3442e264f35: Y_,
             __wbg_maxUniformBufferBindingSize_8fc7ea016caf650c: X_,
             __wbg_maxStorageBufferBindingSize_984825203efcccc6: M_,
@@ -1177,7 +1177,7 @@ ${e.stack}` : n;
             __wbg_createTexture_1a3ebeb1ddd7a035: pe,
             __wbg_requestDevice_6130c3ba10d633f9: Tt,
             __wbg_finish_35be15c58b55a95b: Me,
-            __wbg_finish_41491ca602373cde: je,
+            __wbg_finish_41491ca602373cde: Fe,
             __wbg_createQuerySet_6050df2adcb1f167: ge,
             __wbg_createBindGroup_876adbf7e329ce2e: fe,
             __wbg_requestAdapter_e4b32f2647c66726: It,
@@ -1195,7 +1195,7 @@ ${e.stack}` : n;
             __wbg_length_3d4ecd04bd8d22f1: m_,
             __wbg_clearBuffer_f24f8de43db597ec: ee,
             __wbg_clearBuffer_b08b15b7ee3c9d57: K,
-            __wbg_finish_eb06372cc93f8d50: Fe,
+            __wbg_finish_eb06372cc93f8d50: je,
             __wbg_finish_ee515f526784acd5: qe,
             __wbg_setIndexBuffer_f0ab50b0e1d8658c: Ut,
             __wbg_setIndexBuffer_5eb14c0c19ab80c2: Et,
@@ -1275,10 +1275,10 @@ ${e.stack}` : n;
             __wbg_random_ce7f6871aed001dd: St,
             __wbg___wbindgen_number_get_c7f42aed0525c451: $,
             __wbg___wbindgen_throw_6b64449b9b9ed33c: Q,
-            __wbg___wbindgen_is_object_63322ec0cd6ea4ef: F,
+            __wbg___wbindgen_is_object_63322ec0cd6ea4ef: j,
             __wbg___wbindgen_string_get_7ed5322991caaec5: N,
             __wbg___wbindgen_boolean_get_6ea149f0a8dcc5ff: R,
-            __wbg___wbindgen_is_function_3baa9db1a987f47d: j,
+            __wbg___wbindgen_is_function_3baa9db1a987f47d: F,
             __wbg___wbindgen_is_undefined_29a43b4d42920abd: q,
             __wbg___wbindgen_debug_string_ab4b34d23d6778bd: M,
             __wbg__wbg_cb_unref_b46c9b5a9f08ec37: X,
@@ -1290,12 +1290,12 @@ ${e.stack}` : n;
             __wbindgen_cast_0000000000000005: vn,
             __wbindgen_cast_0000000000000006: Pn
         }
-    }, E), jn = o.memory, Fn = o.__wbg_gpugameoflife_free, qn = o.gpugameoflife_add_hires_region, $n = o.gpugameoflife_clear_hires_regions, Nn = o.gpugameoflife_flush_and_render, Qn = o.gpugameoflife_grid_pitch, Xn = o.gpugameoflife_hires_tick_and_render, Yn = o.gpugameoflife_max_hires_tick_multiplier, Zn = o.gpugameoflife_new, Hn = o.gpugameoflife_new_offscreen, Jn = o.gpugameoflife_padded_rows, Kn = o.gpugameoflife_remove_hires_region, er = o.gpugameoflife_render_only, _r = o.gpugameoflife_resize, tr = o.gpugameoflife_screen_cols, nr = o.gpugameoflife_screen_rows, rr = o.gpugameoflife_set_hires_paused, cr = o.gpugameoflife_set_hires_tick_multiplier, or = o.gpugameoflife_set_scroll, ar = o.gpugameoflife_set_theme_json, fr = o.gpugameoflife_set_transition, ir = o.gpugameoflife_set_zones_json, br = o.gpugameoflife_tick_and_render, ur = o.gpugameoflife_toggle_cell, sr = o.gpugameoflife_update_hires_flags, gr = o.gpugameoflife_words_per_row, dr = o.wasm_bindgen__convert__closures_____invoke__hf7dda74a67d66216, wr = o.wasm_bindgen__convert__closures_____invoke__h5c8dd837cf00f20a, lr = o.wasm_bindgen__convert__closures_____invoke__h898172860a99d122, mr = o.wasm_bindgen__convert__closures_____invoke__h898172860a99d122_2, pr = o.__wbindgen_malloc, hr = o.__wbindgen_realloc, xr = o.__wbindgen_exn_store, yr = o.__externref_table_alloc, Br = o.__wbindgen_externrefs, Sr = o.__wbindgen_free, kr = o.__wbindgen_destroy_closure, Ir = o.__externref_table_dealloc, W = o.__wbindgen_start;
+    }, E), Fn = o.memory, jn = o.__wbg_gpugameoflife_free, qn = o.gpugameoflife_add_hires_region, $n = o.gpugameoflife_clear_hires_regions, Nn = o.gpugameoflife_flush_and_render, Qn = o.gpugameoflife_grid_pitch, Xn = o.gpugameoflife_hires_tick_and_render, Yn = o.gpugameoflife_max_hires_tick_multiplier, Zn = o.gpugameoflife_new, Hn = o.gpugameoflife_new_offscreen, Jn = o.gpugameoflife_padded_rows, Kn = o.gpugameoflife_remove_hires_region, er = o.gpugameoflife_render_only, _r = o.gpugameoflife_resize, tr = o.gpugameoflife_screen_cols, nr = o.gpugameoflife_screen_rows, rr = o.gpugameoflife_set_hires_paused, cr = o.gpugameoflife_set_hires_tick_multiplier, or = o.gpugameoflife_set_scroll, ar = o.gpugameoflife_set_theme_json, fr = o.gpugameoflife_set_transition, ir = o.gpugameoflife_set_zones_json, br = o.gpugameoflife_tick_and_render, ur = o.gpugameoflife_toggle_cell, sr = o.gpugameoflife_update_hires_flags, gr = o.gpugameoflife_words_per_row, dr = o.wasm_bindgen__convert__closures_____invoke__hf7dda74a67d66216, wr = o.wasm_bindgen__convert__closures_____invoke__h5c8dd837cf00f20a, lr = o.wasm_bindgen__convert__closures_____invoke__h898172860a99d122, mr = o.wasm_bindgen__convert__closures_____invoke__h898172860a99d122_2, pr = o.__wbindgen_malloc, hr = o.__wbindgen_realloc, xr = o.__wbindgen_exn_store, yr = o.__externref_table_alloc, Br = o.__wbindgen_externrefs, Sr = o.__wbindgen_free, kr = o.__wbindgen_destroy_closure, Ir = o.__externref_table_dealloc, W = o.__wbindgen_start;
     var Tr = Object.freeze({
         __proto__: null,
         __externref_table_alloc: yr,
         __externref_table_dealloc: Ir,
-        __wbg_gpugameoflife_free: Fn,
+        __wbg_gpugameoflife_free: jn,
         __wbindgen_destroy_closure: kr,
         __wbindgen_exn_store: xr,
         __wbindgen_externrefs: Br,
@@ -1327,7 +1327,7 @@ ${e.stack}` : n;
         gpugameoflife_toggle_cell: ur,
         gpugameoflife_update_hires_flags: sr,
         gpugameoflife_words_per_row: gr,
-        memory: jn,
+        memory: Fn,
         wasm_bindgen__convert__closures_____invoke__h5c8dd837cf00f20a: wr,
         wasm_bindgen__convert__closures_____invoke__h898172860a99d122: lr,
         wasm_bindgen__convert__closures_____invoke__h898172860a99d122_2: mr,
