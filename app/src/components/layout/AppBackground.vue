@@ -167,12 +167,21 @@ let mainEl: HTMLElement | null = null;
 let resizeObserver: ResizeObserver | null = null;
 let detachDrag: (() => void) | null = null;
 
+function readCanvasPixelSize(canvas: HTMLCanvasElement): { width: number; height: number } {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    width: Math.max(1, Math.round(rect.width * devicePixelRatio)),
+    height: Math.max(1, Math.round(rect.height * devicePixelRatio)),
+  };
+}
+
 onMounted(() => {
   const canvas = canvasRef.value;
   if (!canvas) return;
 
-  canvasW = Math.round(window.innerWidth * devicePixelRatio);
-  canvasH = Math.round(window.innerHeight * devicePixelRatio);
+  const initialSize = readCanvasPixelSize(canvas);
+  canvasW = initialSize.width;
+  canvasH = initialSize.height;
   canvas.width = canvasW;
   canvas.height = canvasH;
   log.debug('Canvas initialised', canvasW, 'x', canvasH, 'dpr', devicePixelRatio);
@@ -298,7 +307,9 @@ onUnmounted(() => {
   position: fixed;
   inset: 0;
   width: 100vw;
+  width: 100dvw;
   height: 100vh;
+  height: 100dvh;
   z-index: 0;
   pointer-events: none;
   opacity: 1;
