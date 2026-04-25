@@ -8,5 +8,6 @@ crates/*/pkg/
 wasm-pack.log
 app/node_modules/
 app/dist/
+docs/*
 .DS_Store
 
