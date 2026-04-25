@@ -20,9 +20,9 @@ const log = createLogger('AppBackground');
 // ── Constants ───────────────────────────────────────────────────────────────
 const MAJOR_EVERY = 5;
 const TARGET_CELL_CSS_PX = 16;
-const OVERSCAN_MAJOR_BANDS = 4;
-const SHRINK_DEBOUNCE_MS = 260;
-const SCROLL_ACTIVE_MS = 220;
+const OVERSCAN_MAJOR_BANDS = 6;
+const SHRINK_DEBOUNCE_MS = 0;
+const SCROLL_ACTIVE_MS = 300;
 
 // Parallax tuning — the background drifts at PARALLAX_RATE × content velocity,
 // with PARALLAX_EASE controlling how softly `currentScroll` eases toward the
