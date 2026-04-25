@@ -108,22 +108,6 @@ import { experience, education } from '../../data/profile';
   gap: 1.2rem;
 }
 
-.timeline::before {
-  content: '';
-  position: absolute;
-  left: 10.2rem;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: linear-gradient(
-    to bottom,
-    transparent,
-    var(--theme-grid-major) 8%,
-    var(--theme-grid-major) 92%,
-    transparent
-  );
-}
-
 .timeline-row {
   position: relative;
   display: grid;
@@ -266,10 +250,6 @@ import { experience, education } from '../../data/profile';
 @media (max-width: 960px) {
   .resume-head {
     grid-template-columns: 1fr;
-  }
-
-  .timeline::before {
-    display: none;
   }
 
   .timeline-row {
