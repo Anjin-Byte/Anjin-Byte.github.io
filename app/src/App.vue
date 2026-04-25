@@ -38,6 +38,7 @@ import ContactSection from '@/components/sections/ContactSection.vue';
   canvas is composited separately from the document.
 */
 html {
+  zoom: .875;
   scroll-behavior: smooth;
   background-color: var(--theme-surface, #0a0a0f);
   background-image:
