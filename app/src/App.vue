@@ -36,30 +36,34 @@ import ContactSection from '@/components/sections/ContactSection.vue';
   Root background owns the page edge and safe-area fill so iOS Safari can
   always paint a themed surface behind its bottom toolbar, even when the live
   canvas is composited separately from the document.
+
+  The fallbacks below match LIGHT_THEME (the first-visit default).  In the
+  normal path the inline script in index.html overrides these with the user's
+  resolved theme before paint, so these are only a last-resort defense.
 */
 html {
   zoom: .875;
   scroll-behavior: smooth;
-  background-color: var(--theme-surface, #0a0a0f);
+  background-color: var(--theme-surface, oklab(0.985 -0.001 0.004));
   background-image:
     linear-gradient(
       to right,
-      color-mix(in oklab, var(--theme-grid-minor, rgba(255, 255, 255, 0.08)) 44%, transparent) 1px,
+      color-mix(in oklab, var(--theme-grid-minor, rgba(0, 0, 0, 0.08)) 44%, transparent) 1px,
       transparent 1px
     ),
     linear-gradient(
       to bottom,
-      color-mix(in oklab, var(--theme-grid-minor, rgba(255, 255, 255, 0.08)) 44%, transparent) 1px,
+      color-mix(in oklab, var(--theme-grid-minor, rgba(0, 0, 0, 0.08)) 44%, transparent) 1px,
       transparent 1px
     ),
     linear-gradient(
       to right,
-      color-mix(in oklab, var(--theme-grid-major, rgba(255, 255, 255, 0.14)) 56%, transparent) 1px,
+      color-mix(in oklab, var(--theme-grid-major, rgba(0, 0, 0, 0.14)) 56%, transparent) 1px,
       transparent 1px
     ),
     linear-gradient(
       to bottom,
-      color-mix(in oklab, var(--theme-grid-major, rgba(255, 255, 255, 0.14)) 56%, transparent) 1px,
+      color-mix(in oklab, var(--theme-grid-major, rgba(0, 0, 0, 0.14)) 56%, transparent) 1px,
       transparent 1px
     );
   background-size: 16px 16px, 16px 16px, 80px 80px, 80px 80px;

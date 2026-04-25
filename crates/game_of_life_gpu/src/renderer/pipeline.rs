@@ -59,10 +59,19 @@ impl GpuRenderer {
     ) -> Self {
         let caps = surface.get_capabilities(adapter);
         let format = caps.formats.iter().copied().find(|f| !f.is_srgb()).unwrap_or(caps.formats[0]);
+        // Prefer PreMultiplied so the canvas composites over the themed page
+        // background.  With Opaque (Chrome's default first-listed mode), the
+        // freshly-allocated backing texture flashes black during resize before
+        // the next frame paints — masking the html background underneath.
+        // The shader emits alpha=1, so PreMultiplied is visually identical to
+        // Opaque for fully-painted frames.
+        let alpha_mode = caps.alpha_modes.iter().copied()
+            .find(|m| *m == wgpu::CompositeAlphaMode::PreMultiplied)
+            .unwrap_or(caps.alpha_modes[0]);
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT, format,
             width: grid.canvas_width, height: grid.canvas_height,
-            present_mode: wgpu::PresentMode::AutoVsync, alpha_mode: caps.alpha_modes[0],
+            present_mode: wgpu::PresentMode::AutoVsync, alpha_mode,
             view_formats: vec![], desired_maximum_frame_latency: 2,
         };
         surface.configure(device, &surface_config);
@@ -193,7 +202,14 @@ impl GpuRenderer {
                 view: &view,
                 resolve_target: None,
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    // Transparent clear so any unwritten pixel composites over
+                    // the themed html background (via PreMultiplied alpha mode
+                    // configured above).  The shader fills every pixel with
+                    // alpha=1, so the visible-frame result is unchanged; this
+                    // only matters in the gap between OffscreenCanvas resize
+                    // and the next presented frame, where opaque-black would
+                    // otherwise flash through.
+                    load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
                     store: wgpu::StoreOp::Store,
                 },
             })],

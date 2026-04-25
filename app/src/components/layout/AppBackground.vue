@@ -20,6 +20,9 @@ const log = createLogger('AppBackground');
 // ── Constants ───────────────────────────────────────────────────────────────
 const MAJOR_EVERY = 5;
 const TARGET_CELL_CSS_PX = 16;
+const OVERSCAN_MAJOR_BANDS = 4;
+const SHRINK_DEBOUNCE_MS = 260;
+const SCROLL_ACTIVE_MS = 220;
 
 // Parallax tuning — the background drifts at PARALLAX_RATE × content velocity,
 // with PARALLAX_EASE controlling how softly `currentScroll` eases toward the
@@ -164,9 +167,15 @@ function onDocumentClick(event: MouseEvent): void {
 // ── Lifecycle ───────────────────────────────────────────────────────────────
 let canvasW = 0;
 let canvasH = 0;
+let stableCanvasH = 0;
+let pendingShrinkH = 0;
 let mainEl: HTMLElement | null = null;
 let resizeObserver: ResizeObserver | null = null;
+let canvasHideTimer: number | null = null;
+let shrinkTimer: number | null = null;
 let detachDrag: (() => void) | null = null;
+let lastScrollSample = 0;
+let lastScrollActivityAt = 0;
 
 function readCanvasPixelSize(el: Element): { width: number; height: number } {
   const rect = el.getBoundingClientRect();
@@ -176,6 +185,64 @@ function readCanvasPixelSize(el: Element): { width: number; height: number } {
   };
 }
 
+function alignedGridPitch(widthPx: number): number {
+  return alignedPitch(widthPx, TARGET_CELL_CSS_PX, devicePixelRatio);
+}
+
+function overscanPx(widthPx: number): number {
+  return Math.round(alignedGridPitch(widthPx) * MAJOR_EVERY * OVERSCAN_MAJOR_BANDS);
+}
+
+function applyCanvasBox(canvas: HTMLCanvasElement, widthPx: number, heightPx: number): void {
+  canvas.style.width = `${(widthPx / devicePixelRatio).toFixed(2)}px`;
+  canvas.style.height = `${(heightPx / devicePixelRatio).toFixed(2)}px`;
+}
+
+function hideCanvasDuringResize(canvas: HTMLCanvasElement): void {
+  canvas.classList.add('app-bg--hidden');
+  if (canvasHideTimer !== null) clearTimeout(canvasHideTimer);
+  canvasHideTimer = window.setTimeout(() => {
+    canvasHideTimer = null;
+    canvas.classList.remove('app-bg--hidden');
+  }, 120);
+}
+
+function publishCanvasResize(
+  canvas: HTMLCanvasElement,
+  widthPx: number,
+  shellHeightPx: number,
+): void {
+  stableCanvasH = Math.max(stableCanvasH, shellHeightPx);
+  canvasW = widthPx;
+  canvasH = stableCanvasH + overscanPx(widthPx);
+
+  applyCanvasBox(canvas, canvasW, canvasH);
+  hideCanvasDuringResize(canvas);
+
+  const gp = alignedGridPitch(widthPx);
+  document.documentElement.style.setProperty('--grid-margin', `${(0.8 * gp * MAJOR_EVERY / devicePixelRatio).toFixed(1)}px`);
+  log.debug('Resize →', widthPx, 'x', canvasH, '(shell', shellHeightPx, ')');
+  bridge.post({ type: 'resize', width: canvasW, height: canvasH });
+}
+
+function queueShrinkResize(): void {
+  if (shrinkTimer !== null) clearTimeout(shrinkTimer);
+  shrinkTimer = window.setTimeout(() => {
+    shrinkTimer = null;
+    if (!canvasRef.value || pendingShrinkH <= 0) return;
+
+    const scrollAge = performance.now() - lastScrollActivityAt;
+    if (scrollAge < SCROLL_ACTIVE_MS) {
+      queueShrinkResize();
+      return;
+    }
+
+    stableCanvasH = pendingShrinkH;
+    publishCanvasResize(canvasRef.value, canvasW, stableCanvasH);
+    pendingShrinkH = 0;
+  }, SHRINK_DEBOUNCE_MS);
+}
+
 onMounted(() => {
   const shell = shellRef.value;
   const canvas = canvasRef.value;
@@ -183,13 +250,15 @@ onMounted(() => {
 
   const initialSize = readCanvasPixelSize(shell);
   canvasW = initialSize.width;
-  canvasH = initialSize.height;
+  stableCanvasH = initialSize.height;
+  canvasH = stableCanvasH + overscanPx(canvasW);
   canvas.width = canvasW;
   canvas.height = canvasH;
+  applyCanvasBox(canvas, canvasW, canvasH);
   log.debug('Canvas initialised', canvasW, 'x', canvasH, 'dpr', devicePixelRatio);
 
   const offscreen = canvas.transferControlToOffscreen();
-  const gridPitch = alignedPitch(canvasW, TARGET_CELL_CSS_PX, devicePixelRatio);
+  const gridPitch = alignedGridPitch(canvasW);
   const marginCss = 0.8 * gridPitch * MAJOR_EVERY / devicePixelRatio;
   document.documentElement.style.setProperty('--grid-margin', `${marginCss.toFixed(1)}px`);
 
@@ -249,6 +318,10 @@ onMounted(() => {
     // usually 0 and we want to fall back to window.scrollY.  Use `||` (not
     // `??`) so a zero from mainEl still falls through.
     const raw = mainEl?.scrollTop || window.scrollY;
+    if (Math.abs(raw - lastScrollSample) > 0.5) {
+      lastScrollSample = raw;
+      lastScrollActivityAt = performance.now();
+    }
     targetScroll = raw * PARALLAX_RATE * devicePixelRatio;
     currentScroll += (targetScroll - currentScroll) * PARALLAX_EASE;
 
@@ -260,15 +333,41 @@ onMounted(() => {
 
   // Resize observer
   resizeObserver = new ResizeObserver(([entry]) => {
+    if (!canvasRef.value) return;
     const w = Math.round(entry.contentRect.width * devicePixelRatio);
-    const h = Math.round(entry.contentRect.height * devicePixelRatio);
-    if (w === canvasW && h === canvasH) return;
-    canvasW = w;
-    canvasH = h;
-    const gp = alignedPitch(w, TARGET_CELL_CSS_PX, devicePixelRatio);
-    document.documentElement.style.setProperty('--grid-margin', `${(0.8 * gp * MAJOR_EVERY / devicePixelRatio).toFixed(1)}px`);
-    log.debug('Resize →', w, 'x', h);
-    bridge.post({ type: 'resize', width: w, height: h });
+    const shellH = Math.round(entry.contentRect.height * devicePixelRatio);
+    if (w <= 0 || shellH <= 0) return;
+
+    const canvas = canvasRef.value;
+    const widthChanged = w !== canvasW;
+    const heightGrew = shellH > stableCanvasH;
+    const heightShrank = shellH < stableCanvasH;
+
+    if (widthChanged) {
+      if (shrinkTimer !== null) {
+        clearTimeout(shrinkTimer);
+        shrinkTimer = null;
+      }
+      pendingShrinkH = 0;
+      stableCanvasH = shellH;
+      publishCanvasResize(canvas, w, shellH);
+      return;
+    }
+
+    if (heightGrew) {
+      if (shrinkTimer !== null) {
+        clearTimeout(shrinkTimer);
+        shrinkTimer = null;
+      }
+      pendingShrinkH = 0;
+      publishCanvasResize(canvas, w, shellH);
+      return;
+    }
+
+    if (!heightShrank) return;
+
+    pendingShrinkH = shellH;
+    queueShrinkResize();
   });
   resizeObserver.observe(shell);
 });
@@ -276,6 +375,14 @@ onMounted(() => {
 onUnmounted(() => {
   anim.stop();
   resizeObserver?.disconnect();
+  if (canvasHideTimer !== null) {
+    clearTimeout(canvasHideTimer);
+    canvasHideTimer = null;
+  }
+  if (shrinkTimer !== null) {
+    clearTimeout(shrinkTimer);
+    shrinkTimer = null;
+  }
   document.removeEventListener('click', onDocumentClick);
   detachDrag?.();
   bridge.terminate();
@@ -317,11 +424,18 @@ onUnmounted(() => {
 
 .app-bg {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   display: block;
   opacity: 1;
+  transition: opacity 180ms ease-out;
+}
+
+.app-bg--hidden {
+  opacity: 0;
+  transition: none;
 }
 
 .zone-preview-overlay {

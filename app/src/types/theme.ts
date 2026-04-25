@@ -75,6 +75,13 @@ export interface ThemePalette {
 // Josh Comeau, Radix Colors.  None are pure inversions of their counterpart,
 // and none run their backgrounds at the contrast level we started with.
 
+// NOTE: index.html contains an inline pre-paint script that mirrors the
+// `surface`, `minor_t`, and `major_t`-derived CSS values for both palettes
+// (so the page background matches the active theme before this module
+// loads).  If you change `surface`, `ink`, `minor_t`, or `major_t` in either
+// preset below, update the corresponding constants in index.html or returning
+// users will see a brief flash of the previous theme on load.
+
 /** Light palette: airy paper, ghostly cells, no grain needed. */
 export const LIGHT_THEME: ThemePalette = {
   surface: [0.985, -0.001,  0.004],   // ≈ #fafaf8 — faintly warm near-white
