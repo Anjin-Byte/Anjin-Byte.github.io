@@ -9,10 +9,10 @@ import ContactSection from '@/components/sections/ContactSection.vue';
 </script>
 
 <template>
-  <v-app>
+  <v-app class="app-shell">
     <AppBackground />
     <AppHeader />
-    <v-main>
+    <v-main class="app-main">
       <HeroSection />
       <ProjectsSection />
       <ResumeSection />
@@ -26,23 +26,58 @@ import ContactSection from '@/components/sections/ContactSection.vue';
 :root {
   --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
   --font-ui: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
 }
 
 /*
-  Strip Vuetify's opaque surface so the fixed canvas background shows through.
-  Body sets the base color; the canvas layer draws on top of it.
+  Root background owns the page edge and safe-area fill so iOS Safari can
+  always paint a themed surface behind its bottom toolbar, even when the live
+  canvas is composited separately from the document.
 */
 html {
   scroll-behavior: smooth;
+  background-color: var(--theme-surface, #0a0a0f);
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in oklab, var(--theme-grid-minor, rgba(255, 255, 255, 0.08)) 44%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--theme-grid-minor, rgba(255, 255, 255, 0.08)) 44%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to right,
+      color-mix(in oklab, var(--theme-grid-major, rgba(255, 255, 255, 0.14)) 56%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--theme-grid-major, rgba(255, 255, 255, 0.14)) 56%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 16px 16px, 16px 16px, 80px 80px, 80px 80px;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
 }
 
 html,
 body {
-  background-color: #0a0a0f;
   margin: 0;
 }
 
 body {
+  background: transparent;
   color: var(--theme-text-primary, var(--theme-ink));
   font-family: var(--font-ui);
   text-rendering: optimizeLegibility;
@@ -54,6 +89,15 @@ a {
 
 .v-application {
   background: transparent !important;
+}
+
+.app-shell {
+  position: relative;
+  isolation: isolate;
+}
+
+.app-main {
+  padding-bottom: calc(1.5rem + var(--safe-area-bottom));
 }
 
 /* App header uses the same content-surface treatment as body surfaces, but
@@ -79,6 +123,7 @@ a {
   border-top: 1px solid color-mix(in oklab, var(--theme-grid-border) 68%, white 12%) !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
   color: var(--theme-text-tertiary) !important;
+  padding-bottom: calc(0.75rem + var(--safe-area-bottom));
 }
 
 /* Vuetify's `.text-medium-emphasis` utility applies its own `!important`

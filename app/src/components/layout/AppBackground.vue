@@ -29,6 +29,7 @@ const PARALLAX_RATE = 0.3;
 const PARALLAX_EASE = 0.12;
 
 // ── Core composables ────────────────────────────────────────────────────────
+const shellRef = ref<HTMLDivElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 const currentScrollCanvasPx = ref(0);
 const bridge = useWorkerBridge();
@@ -167,8 +168,8 @@ let mainEl: HTMLElement | null = null;
 let resizeObserver: ResizeObserver | null = null;
 let detachDrag: (() => void) | null = null;
 
-function readCanvasPixelSize(canvas: HTMLCanvasElement): { width: number; height: number } {
-  const rect = canvas.getBoundingClientRect();
+function readCanvasPixelSize(el: Element): { width: number; height: number } {
+  const rect = el.getBoundingClientRect();
   return {
     width: Math.max(1, Math.round(rect.width * devicePixelRatio)),
     height: Math.max(1, Math.round(rect.height * devicePixelRatio)),
@@ -176,10 +177,11 @@ function readCanvasPixelSize(canvas: HTMLCanvasElement): { width: number; height
 }
 
 onMounted(() => {
+  const shell = shellRef.value;
   const canvas = canvasRef.value;
-  if (!canvas) return;
+  if (!shell || !canvas) return;
 
-  const initialSize = readCanvasPixelSize(canvas);
+  const initialSize = readCanvasPixelSize(shell);
   canvasW = initialSize.width;
   canvasH = initialSize.height;
   canvas.width = canvasW;
@@ -268,7 +270,7 @@ onMounted(() => {
     log.debug('Resize →', w, 'x', h);
     bridge.post({ type: 'resize', width: w, height: h });
   });
-  resizeObserver.observe(canvas);
+  resizeObserver.observe(shell);
 });
 
 onUnmounted(() => {
@@ -282,7 +284,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <canvas ref="canvasRef" class="app-bg" />
+  <div ref="shellRef" class="app-bg-shell">
+    <canvas ref="canvasRef" class="app-bg" />
+  </div>
   <div v-if="drag.previewStyle.value" class="zone-preview-overlay" :style="drag.previewStyle.value" />
   <GridBlankZonePanel
     :zones="blankZones.zones.value"
@@ -303,15 +307,20 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.app-bg {
+.app-bg-shell {
   position: fixed;
   inset: 0;
-  width: 100vw;
-  width: 100dvw;
-  height: 100vh;
-  height: 100dvh;
   z-index: 0;
   pointer-events: none;
+  overflow: hidden;
+}
+
+.app-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
   opacity: 1;
 }
 

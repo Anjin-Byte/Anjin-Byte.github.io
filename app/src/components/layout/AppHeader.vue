@@ -70,7 +70,11 @@ const isMenuOpen = ref(false);
 <style>
 /* Inset toolbar content to align with the canvas margin border */
 .v-app-bar .v-toolbar__content {
-  padding-inline: var(--grid-margin, 76px) !important;
+  min-height: calc(64px + var(--safe-area-top)) !important;
+  padding-top: var(--safe-area-top);
+  padding-inline:
+    calc(var(--grid-margin, 76px) + var(--safe-area-left))
+    calc(var(--grid-margin, 76px) + var(--safe-area-right)) !important;
 }
 
 .header-title {
@@ -114,13 +118,17 @@ const isMenuOpen = ref(false);
 
 @media (max-width: 960px) {
   .v-app-bar .v-toolbar__content {
-    padding-inline: 24px !important;
+    padding-inline:
+      calc(24px + var(--safe-area-left))
+      calc(24px + var(--safe-area-right)) !important;
   }
 }
 
 @media (max-width: 640px) {
   .v-app-bar .v-toolbar__content {
-    padding-inline: 16px !important;
+    padding-inline:
+      calc(16px + var(--safe-area-left))
+      calc(16px + var(--safe-area-right)) !important;
   }
 
   .title-ink {
