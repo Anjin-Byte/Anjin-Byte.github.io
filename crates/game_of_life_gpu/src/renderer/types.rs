@@ -109,29 +109,3 @@ impl ThemeParams {
     }
 }
 
-/// Hi-res region global meta.
-pub const MAX_HIRES_REGIONS: usize = 8;
-
-#[repr(C)]
-#[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy, Default)]
-pub struct HiResGlobalMetaGpu {
-    pub region_count: u32,
-    pub pad0: u32,
-    pub pad1: u32,
-    pub pad2: u32,
-}
-
-/// Hi-res region entry — binding 15 (array).
-#[repr(C)]
-#[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy, Default)]
-pub struct HiResRegionMetaGpu {
-    pub rect: [i32; 4],       // [x1, y1, x2, y2] base cell-space
-    pub multiplier: u32,
-    pub buffer_offset: u32,   // word offset into concatenated hires_cells buffer
-    pub cols: u32,
-    pub wpr: u32,             // fine-grid words per row (padded)
-    pub flags: u32,           // bit 0: show_grid
-    pub pad0: u32,
-    pub pad1: u32,
-    pub pad2: u32,
-}

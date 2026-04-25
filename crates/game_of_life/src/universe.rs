@@ -16,6 +16,12 @@ pub struct Universe {
     cells: Vec<Cell>,
 }
 
+impl Default for Universe {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Public methods exported to JavaScript.
 #[wasm_bindgen]
 impl Universe {

@@ -7,15 +7,12 @@ use crate::simulation::Simulation;
 use crate::zones::{ZoneEntryGpu, ZoneMetaGpu, MAX_BLANK_ZONES};
 
 use super::bindings::{
-    core_bind_group_layout, overlay_bind_group_layout, hires_bind_group_layout,
-    make_core_bind_group, make_overlay_bind_group, make_hires_bind_group,
-    CoreBindGroupResources, OverlayBindGroupResources, HiResBindGroupResources,
+    core_bind_group_layout, overlay_bind_group_layout,
+    make_core_bind_group, make_overlay_bind_group,
+    CoreBindGroupResources, OverlayBindGroupResources,
 };
 use super::noise::make_noise_texture;
-use super::types::{
-    HiResGlobalMetaGpu, HiResRegionMetaGpu, MAX_HIRES_REGIONS,
-    PaperParams, RenderUniforms, ThemeParams,
-};
+use super::types::{PaperParams, RenderUniforms, ThemeParams};
 
 pub struct GpuRenderer {
     pub surface: wgpu::Surface<'static>,
@@ -36,17 +33,11 @@ pub struct GpuRenderer {
     zone_meta_buf: wgpu::Buffer,
     zone_buf: wgpu::Buffer,
     overlay_bg: wgpu::BindGroup,
-    // Hi-res resources (group 2)
-    hires_meta_buf: wgpu::Buffer,
-    hires_regions_buf: wgpu::Buffer,
-    hires_cells_buf: wgpu::Buffer,
-    hires_cells_prev_buf: wgpu::Buffer,
-    hires_bgl: wgpu::BindGroupLayout,
-    hires_bg: wgpu::BindGroup,
     grid_pitch: f32,
 }
 
 impl GpuRenderer {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
@@ -95,12 +86,6 @@ impl GpuRenderer {
         let zone_meta_buf = mk_uniform("blank_zone_meta", bytes_of(&ZoneMetaGpu::default()));
         let zone_buf = mk_storage("blank_zone_entries", (MAX_BLANK_ZONES * std::mem::size_of::<ZoneEntryGpu>()) as u64);
 
-        // Hi-res resources
-        let hires_meta_buf = mk_uniform("hires_meta", bytes_of(&HiResGlobalMetaGpu::default()));
-        let hires_regions_buf = mk_storage("hires_regions", (MAX_HIRES_REGIONS * std::mem::size_of::<HiResRegionMetaGpu>()) as u64);
-        let hires_cells_buf = mk_storage("hires_cells", 4);
-        let hires_cells_prev_buf = mk_storage("hires_cells_prev", 4);
-
         // Seed prev_visible from buf_a
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("seed_prev_visible_cells"),
@@ -111,7 +96,6 @@ impl GpuRenderer {
         // Create bind group layouts
         let core_bgl = core_bind_group_layout(device);
         let overlay_bgl = overlay_bind_group_layout(device);
-        let hires_bgl = hires_bind_group_layout(device);
 
         // Create bind groups
         let core_bg_a = make_core_bind_group(device, &core_bgl, &CoreBindGroupResources {
@@ -129,12 +113,7 @@ impl GpuRenderer {
             zone_meta_buf: &zone_meta_buf, zone_buf: &zone_buf,
         }, "overlay_bg");
 
-        let hires_bg = make_hires_bind_group(device, &hires_bgl, &HiResBindGroupResources {
-            hires_meta_buf: &hires_meta_buf, hires_regions_buf: &hires_regions_buf,
-            hires_cells_buf: &hires_cells_buf, hires_cells_prev_buf: &hires_cells_prev_buf,
-        }, "hires_bg");
-
-        // Pipeline uses all 3 bind group layouts
+        // Pipeline uses 2 bind group layouts (core + overlay)
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("render_shader"),
             source: wgpu::ShaderSource::Wgsl(shaders::RENDER.into()),
@@ -142,7 +121,7 @@ impl GpuRenderer {
 
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("render_layout"),
-            bind_group_layouts: &[&core_bgl, &overlay_bgl, &hires_bgl],
+            bind_group_layouts: &[&core_bgl, &overlay_bgl],
             push_constant_ranges: &[],
         });
 
@@ -179,9 +158,6 @@ impl GpuRenderer {
             core_bgl, core_bg_a, core_bg_b,
             zone_meta_buf, zone_buf,
             overlay_bg,
-            hires_meta_buf, hires_regions_buf,
-            hires_cells_buf, hires_cells_prev_buf,
-            hires_bgl, hires_bg,
             grid_pitch,
         }
     }
@@ -220,7 +196,6 @@ impl GpuRenderer {
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, core_bg, &[]);
         pass.set_bind_group(1, &self.overlay_bg, &[]);
-        pass.set_bind_group(2, &self.hires_bg, &[]);
         pass.draw(0..3, 0..1);
         drop(pass);
 
@@ -297,38 +272,6 @@ impl GpuRenderer {
         queue.write_buffer(&self.theme_buf, 0, bytes_of(theme));
     }
 
-    pub fn hires_cells_buf(&self) -> &wgpu::Buffer { &self.hires_cells_buf }
-    pub fn hires_cells_prev_buf(&self) -> &wgpu::Buffer { &self.hires_cells_prev_buf }
-
-    pub fn set_hires(
-        &mut self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        meta: &HiResGlobalMetaGpu,
-        regions: &[HiResRegionMetaGpu],
-        cells_size: u64,
-    ) {
-        queue.write_buffer(&self.hires_meta_buf, 0, bytes_of(meta));
-        if !regions.is_empty() {
-            queue.write_buffer(&self.hires_regions_buf, 0, cast_slice(regions));
-        }
-        if cells_size > self.hires_cells_buf.size() {
-            let mk = |l| device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some(l), size: cells_size,
-                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            });
-            self.hires_cells_buf = mk("hires_cells");
-            self.hires_cells_prev_buf = mk("hires_cells_prev");
-            // Only rebuild hires bind group — core and overlay are unaffected
-            self.rebuild_hires_bind_group(device);
-        }
-    }
-
-    pub fn clear_hires(&self, queue: &wgpu::Queue) {
-        queue.write_buffer(&self.hires_meta_buf, 0, bytes_of(&HiResGlobalMetaGpu::default()));
-    }
-
     // ── Group-specific bind group rebuilds ──────────────────────────────────
 
     fn rebuild_core_bind_groups(
@@ -346,12 +289,5 @@ impl GpuRenderer {
         self.core_bg_a = make_core_bind_group(device, &self.core_bgl, &shared, "core_bg_a");
         let res_b = CoreBindGroupResources { current_buf: buf_b, ..shared };
         self.core_bg_b = make_core_bind_group(device, &self.core_bgl, &res_b, "core_bg_b");
-    }
-
-    fn rebuild_hires_bind_group(&mut self, device: &wgpu::Device) {
-        self.hires_bg = make_hires_bind_group(device, &self.hires_bgl, &HiResBindGroupResources {
-            hires_meta_buf: &self.hires_meta_buf, hires_regions_buf: &self.hires_regions_buf,
-            hires_cells_buf: &self.hires_cells_buf, hires_cells_prev_buf: &self.hires_cells_prev_buf,
-        }, "hires_bg");
     }
 }

@@ -7,11 +7,9 @@ import { PERF_ENABLED, PerfSampler } from '../perf';
 import { TICK_EVERY } from './rendererProtocol';
 import type { WorkerInMsg, WorkerOutMsg, GridInfo } from './rendererProtocol';
 import type { BlankZone } from '../types/blankZones';
-import type { HiResRegion } from '../types/hiresRegion';
 import type { ThemePalette } from '../types/theme';
 import { LIGHT_THEME, serializeTheme } from '../types/theme';
 import { BlankZoneState } from './BlankZoneState';
-import { HiResState } from './HiResState';
 import { makeCpuRenderer } from './cpuRenderer';
 
 const log = createLogger('Renderer');
@@ -23,13 +21,11 @@ const perf: PerfSampler | null = PERF_ENABLED ? new PerfSampler(log) : null;
 interface Renderer {
   tick(): void;
   renderOnly?(): void;
-  hiresTick?(): void;
   resize(w: number, h: number): void;
   setScroll?(scrollY: number): void;
   setTransition?(transitionT: number): void;
   toggleCell?(cx: number, cy: number): void;
   setZones?(zones: BlankZone[]): void;
-  setHiResRegions?(regions: HiResRegion[]): void;
   setTheme?(theme: ThemePalette): void;
   gridInfo?(): GridInfo;
   free(): void;
@@ -41,11 +37,7 @@ let renderer: Renderer | null = null;
 // the uniform buffer, resetting scroll_y to 0).
 let pendingScrollY = 0;
 let frameCount  = 0;
-// When a hi-res region has tick_multiplier > 1, we tick hi-res this often
-// (in frames) between base ticks. 0 = no intermediate hi-res ticks.
-let hiresTickInterval = 0;
 const zoneState  = new BlankZoneState();
-const hiresState = new HiResState();
 // Cached so the current theme survives renderer hand-offs (GPU→CPU fallback,
 // resize, etc). Defaults to light until the main thread sends `set_theme`.
 let currentTheme: ThemePalette = LIGHT_THEME;
@@ -66,11 +58,10 @@ function easeTransition(t: number): number {
 }
 
 /** Frame action resolved by the scheduler — separates "what frame" from "do thing". */
-type FrameAction = 'base_tick' | 'hires_tick' | 'render_only';
+type FrameAction = 'base_tick' | 'render_only';
 
-function resolveFrameAction(frame: number, hasHiresTick: boolean, interval: number): FrameAction {
+function resolveFrameAction(frame: number): FrameAction {
   if (frame % TICK_EVERY === 0) return 'base_tick';
-  if (hasHiresTick && interval > 0 && frame % interval === 0) return 'hires_tick';
   return 'render_only';
 }
 
@@ -91,10 +82,6 @@ function setZonesState(next: unknown): void {
   applyZonesToRenderer();
   postZonesState();
 }
-
-function postHiResState(): void { post({ type: 'hires_state', regions: hiresState.getAll() }); }
-function postHiResError(message: string): void { post({ type: 'error', phase: 'hires', message }); }
-function applyHiResToRenderer(): void { renderer?.setHiResRegions?.(hiresState.getAll()); }
 
 // ── Message handler ───────────────────────────────────────────────────────────
 
@@ -134,14 +121,6 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
           const gpuExt = gpu as unknown as {
             set_zones_json?: (zonesJson: string) => void;
             set_theme_json?: (themeJson: string) => void;
-            add_hires_region?: (id: number, x1: number, y1: number, x2: number, y2: number, m: number, showGrid: boolean, showBaseGrid: boolean, showBorder: boolean) => void;
-            remove_hires_region?: (id: number) => void;
-            update_hires_flags?: (id: number, showGrid: boolean, showBaseGrid: boolean, showBorder: boolean) => void;
-            set_hires_paused?: (id: number, paused: boolean) => void;
-            set_hires_tick_multiplier?: (id: number, multiplier: number) => void;
-            max_hires_tick_multiplier?: () => number;
-            hires_tick_and_render?: () => void;
-            clear_hires_regions?: () => void;
           };
           const setZonesOnGpu = (zones: BlankZone[]): void => {
             if (typeof gpuExt.set_zones_json !== 'function') return;
@@ -159,49 +138,6 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
               log.error('GPU theme update failed:', errorMessage(err));
             }
           };
-          // Track active region geometry per id so we can detect flag-only updates.
-          const activeHiResKeys = new Map<string, string>();
-          const hiresGeomKey = (r: HiResRegion): string =>
-            `${r.x1},${r.y1},${r.x2},${r.y2},${r.multiplier}`;
-          const hiresIdNum = (id: string): number => {
-            // Hash string id to a u32 for the Rust API
-            let h = 0;
-            for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
-            return h >>> 0;
-          };
-          const setHiResRegionsOnGpu = (regions: HiResRegion[]): void => {
-            const currentIds = new Set(regions.map((r) => r.id));
-            // Remove regions no longer present
-            for (const [id] of activeHiResKeys) {
-              if (!currentIds.has(id)) {
-                gpuExt.remove_hires_region?.(hiresIdNum(id));
-                activeHiResKeys.delete(id);
-              }
-            }
-            if (regions.length === 0) {
-              gpuExt.clear_hires_regions?.();
-              activeHiResKeys.clear();
-              hiresTickInterval = 0;
-              return;
-            }
-            for (const r of regions) {
-              const key = hiresGeomKey(r);
-              const nid = hiresIdNum(r.id);
-              if (activeHiResKeys.get(r.id) !== key) {
-                // Geometry changed or new — (re)create on GPU
-                gpuExt.remove_hires_region?.(nid);
-                gpuExt.add_hires_region?.(nid, r.x1, r.y1, r.x2, r.y2, r.multiplier, r.showGrid ?? true, r.showBaseGrid ?? true, r.showBorder ?? true);
-                activeHiResKeys.set(r.id, key);
-              } else {
-                gpuExt.update_hires_flags?.(nid, r.showGrid ?? true, r.showBaseGrid ?? true, r.showBorder ?? true);
-              }
-              gpuExt.set_hires_paused?.(nid, !r.enabled);
-              gpuExt.set_hires_tick_multiplier?.(nid, r.tickMultiplier ?? 1);
-            }
-            // Recalculate hi-res sub-tick interval from the GPU-side max.
-            const maxMult = gpuExt.max_hires_tick_multiplier?.() ?? 1;
-            hiresTickInterval = maxMult > 1 ? Math.max(1, Math.floor(TICK_EVERY / maxMult)) : 0;
-          };
           const getGridInfo = (): GridInfo => ({
             screenCols:  gpu.screen_cols(),
             screenRows:  gpu.screen_rows(),
@@ -213,13 +149,11 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
           renderer = {
             tick:       () => gpu.tick_and_render(),
             renderOnly: () => gpu.render_only(),
-            hiresTick:  () => gpuExt.hires_tick_and_render?.(),
             resize:     (w, h) => { canvas.width = w; canvas.height = h; gpu.resize(w, h); },
             setScroll:  (scrollY) => gpu.set_scroll(scrollY),
             setTransition: (transitionT) => gpu.set_transition(transitionT),
             toggleCell: (cx, cy) => { gpu.toggle_cell(cx, cy); gpu.flush_and_render(); },
             setZones:   (zones)  => setZonesOnGpu(zones),
-            setHiResRegions: (regions) => setHiResRegionsOnGpu(regions),
             setTheme:   (theme)  => setThemeOnGpu(theme),
             gridInfo:   getGridInfo,
             free:       () => gpu.free(),
@@ -229,7 +163,6 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
           renderer.setScroll?.(pendingScrollY);
           renderer.setTransition?.(1);
           renderer.setZones?.(zoneState.getAll());
-          renderer.setHiResRegions?.(hiresState.getAll());
           renderer.setTheme?.(currentTheme);
           log.info('GPU renderer ready');
           post({ type: 'ready', backend: 'gpu', gridInfo: getGridInfo() });
@@ -250,7 +183,6 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
         renderer = await makeCpuRenderer(canvas);
         renderer.setScroll?.(pendingScrollY);
         renderer.setZones?.(zoneState.getAll());
-        renderer.setHiResRegions?.(hiresState.getAll());
         renderer.setTheme?.(currentTheme);
         log.info('CPU renderer ready');
         // CPU renderer has no grid info; supply zeroed placeholder.
@@ -267,17 +199,12 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
       if (!renderer) break;
       perf?.beginFrame();
       frameCount++;
-      const action = resolveFrameAction(frameCount, !!renderer.hiresTick, hiresTickInterval);
+      const action = resolveFrameAction(frameCount);
       switch (action) {
         case 'base_tick':
           renderer.setTransition?.(0);
           if (perf) { perf.time('tick', () => renderer!.tick()); }
           else { renderer.tick(); }
-          break;
-        case 'hires_tick':
-          renderer.setTransition?.(easeTransition((frameCount % TICK_EVERY) / TICK_EVERY));
-          if (perf) { perf.time('hires_tick', () => renderer!.hiresTick!()); }
-          else { renderer.hiresTick!(); }
           break;
         case 'render_only':
           renderer.setTransition?.(easeTransition((frameCount % TICK_EVERY) / TICK_EVERY));
@@ -298,7 +225,6 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
       renderer?.setScroll?.(pendingScrollY);
       renderer?.setTransition?.(1);
       renderer?.setZones?.(zoneState.getAll());
-      renderer?.setHiResRegions?.(hiresState.getAll());
       renderer?.setTheme?.(currentTheme);
       // Grid dimensions change on resize; notify main thread.
       if (renderer?.gridInfo) {
@@ -328,20 +254,6 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
     }
     case 'remove_zone': zoneState.remove(e.data.id); applyZonesToRenderer(); postZonesState(); break;
     case 'clear_zones': zoneState.clear(); applyZonesToRenderer(); postZonesState(); break;
-
-    case 'set_hires_regions': hiresState.setAll(e.data.regions); applyHiResToRenderer(); postHiResState(); break;
-    case 'add_hires': {
-      const result = hiresState.add(e.data.region);
-      if (result.error) { postHiResError(result.error); break; }
-      applyHiResToRenderer(); postHiResState(); break;
-    }
-    case 'update_hires': {
-      const result = hiresState.update(e.data.region);
-      if (result.error) { postHiResError(result.error); break; }
-      applyHiResToRenderer(); postHiResState(); break;
-    }
-    case 'remove_hires': hiresState.remove(e.data.id); applyHiResToRenderer(); postHiResState(); break;
-    case 'clear_hires': hiresState.clear(); applyHiResToRenderer(); postHiResState(); break;
 
     case 'set_theme':
       currentTheme = e.data.theme;

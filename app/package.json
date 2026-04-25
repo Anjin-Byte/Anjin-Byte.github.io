@@ -7,8 +7,7 @@
     "build": "vue-tsc --noEmit && vite build",
     "typecheck": "vue-tsc --noEmit",
     "test:zones": "tsc -p tsconfig.tests.json && node ./.tests-dist/tests/blankZones.test.js",
-    "test:hires": "tsc -p tsconfig.tests.json && node ./.tests-dist/tests/hires.test.js",
-    "test": "tsc -p tsconfig.tests.json && node ./.tests-dist/tests/blankZones.test.js && node ./.tests-dist/tests/hires.test.js",
+    "test": "tsc -p tsconfig.tests.json && node ./.tests-dist/tests/blankZones.test.js",
     "format": "prettier --write \"src/**/*.{ts,vue}\"",
     "preview": "vite preview",
     "deploy": "gh-pages -d dist -b main -t true"

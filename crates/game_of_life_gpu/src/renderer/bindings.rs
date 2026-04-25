@@ -17,15 +17,6 @@ pub(super) struct OverlayBindGroupResources<'a> {
     pub zone_buf: &'a wgpu::Buffer,
 }
 
-/// Resources for the hi-res bind group (group 2):
-/// hires metadata, regions, cells, cells_prev.
-pub(super) struct HiResBindGroupResources<'a> {
-    pub hires_meta_buf: &'a wgpu::Buffer,
-    pub hires_regions_buf: &'a wgpu::Buffer,
-    pub hires_cells_buf: &'a wgpu::Buffer,
-    pub hires_cells_prev_buf: &'a wgpu::Buffer,
-}
-
 // ── Core bind group (group 0) ──────────────────────────────────────────────
 
 pub(super) fn core_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
@@ -88,38 +79,6 @@ pub(super) fn make_overlay_bind_group(
         entries: &[
             wgpu::BindGroupEntry { binding: 0, resource: res.zone_meta_buf.as_entire_binding() },
             wgpu::BindGroupEntry { binding: 1, resource: res.zone_buf.as_entire_binding() },
-        ],
-    })
-}
-
-// ── Hi-res bind group (group 2) ────────────────────────────────────────────
-
-pub(super) fn hires_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("hires_bgl"),
-        entries: &[
-            uniform_bgl_entry(0),   // hires_meta
-            storage_bgl_entry(1),   // hires_regions
-            storage_bgl_entry(2),   // hires_cells
-            storage_bgl_entry(3),   // hires_cells_prev
-        ],
-    })
-}
-
-pub(super) fn make_hires_bind_group(
-    device: &wgpu::Device,
-    bgl: &wgpu::BindGroupLayout,
-    res: &HiResBindGroupResources,
-    label: &str,
-) -> wgpu::BindGroup {
-    device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some(label),
-        layout: bgl,
-        entries: &[
-            wgpu::BindGroupEntry { binding: 0, resource: res.hires_meta_buf.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 1, resource: res.hires_regions_buf.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 2, resource: res.hires_cells_buf.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 3, resource: res.hires_cells_prev_buf.as_entire_binding() },
         ],
     })
 }

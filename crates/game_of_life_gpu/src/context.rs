@@ -3,8 +3,8 @@ use wasm_bindgen::prelude::*;
 /// Shared GPU infrastructure: device + queue.
 ///
 /// Owned by `GpuGameOfLife` and borrowed by subsystems (Simulation,
-/// GpuRenderer, HiResManager). Multiple renderers targeting different
-/// canvases can share one context.
+/// GpuRenderer). Multiple renderers targeting different canvases can
+/// share one context.
 pub struct GpuContext {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,

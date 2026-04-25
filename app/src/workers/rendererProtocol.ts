@@ -1,14 +1,12 @@
 // Shared message types between AppBackground (main thread) and backgroundRenderer (worker).
 
 import type { BlankZone } from '../types/blankZones';
-import type { HiResRegion } from '../types/hiresRegion';
 import type { ThemePalette } from '../types/theme';
 import type { FrameStats } from '../perf';
 
 export type RendererBackend = 'gpu' | 'cpu';
 
-/** Frames between base simulation ticks. At 60 Hz: ~3.5 s per tick.
- *  Hi-res tick multiplier ranges from 1 (same as base) to TICK_EVERY (every frame). */
+/** Frames between base simulation ticks. At 60 Hz: ~3.5 s per tick. */
 export const TICK_EVERY = 175;
 
 /** Grid dimensions needed by the main thread for pixel→cell coordinate mapping. */
@@ -34,11 +32,6 @@ export type WorkerInMsg =
   | { type: 'update_zone'; zone:  BlankZone   }
   | { type: 'remove_zone'; id:    string      }
   | { type: 'clear_zones' }
-  | { type: 'set_hires_regions'; regions: HiResRegion[] }
-  | { type: 'add_hires';        region: HiResRegion }
-  | { type: 'update_hires';     region: HiResRegion }
-  | { type: 'remove_hires';     id: string }
-  | { type: 'clear_hires' }
   | { type: 'set_theme'; theme: ThemePalette }
   | { type: 'perf_snapshot' }
   | { type: 'stop' };
@@ -49,7 +42,6 @@ export type WorkerOutMsg =
   | { type: 'grid_info'; gridInfo: GridInfo }
   | { type: 'zones_state';  zones: BlankZone[] }
   | { type: 'zones_error';  message: string }
-  | { type: 'hires_state';  regions: HiResRegion[] }
   | { type: 'perf_snapshot'; stats: FrameStats[] }
   // Non-fatal diagnostic: the named phase failed and a fallback was (or was not) attempted.
   | { type: 'error'; phase: string; message: string };

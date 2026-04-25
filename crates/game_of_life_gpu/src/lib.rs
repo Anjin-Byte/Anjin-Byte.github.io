@@ -1,7 +1,6 @@
 mod context;
 mod gpu;
 mod grid;
-mod hires;
 mod renderer;
 mod shaders;
 mod simulation;

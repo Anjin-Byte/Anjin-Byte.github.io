@@ -4,15 +4,11 @@ import { createLogger } from '../../logger';
 import { alignedPitch, screenToCell, wrapCell } from '../../utils/gridCoords';
 import { useBlankZones } from '../../composables/useBlankZones';
 import type { BlankZone, BlankZoneDraft, BlankZoneRect } from '../../types/blankZones';
-import { useHiRes } from '../../composables/useHiRes';
-import type { HiResRegion } from '../../types/hiresRegion';
-import { HIRES_MULTIPLIER } from '../../types/hiresRegion';
 import { useWorkerBridge } from '../../composables/useWorkerBridge';
 import { useCoordinateMapper } from '../../composables/useCoordinateMapper';
 import { useAnimationLoop } from '../../composables/useAnimationLoop';
 import { useDragTools } from '../../composables/useDragTools';
 import { useThemePreference } from '../../composables/useThemePreference';
-import { FEATURE_HIRES } from '../../config/features';
 import GridBlankZonePanel from './GridBlankZonePanel.vue';
 
 const log = createLogger('AppBackground');
@@ -55,27 +51,9 @@ const blankZones = useBlankZones({
   onRemoveZone: (id) => bridge.post({ type: 'remove_zone', id }),
   onClearZones: () => bridge.post({ type: 'clear_zones' }),
 });
-// Hi-res callbacks are no-ops when FEATURE_HIRES is off — the composable
-// still owns in-memory state so types stay simple, but nothing reaches the
-// worker or GPU. Vite strips the truthy branches at build time.
-const hiRes = useHiRes({
-  onAddRegion: (r) => {
-    if (FEATURE_HIRES) bridge.post({ type: 'add_hires', region: { ...r } });
-  },
-  onUpdateRegion: (r) => {
-    if (FEATURE_HIRES) bridge.post({ type: 'update_hires', region: { ...r } });
-  },
-  onRemoveRegion: (id) => {
-    if (FEATURE_HIRES) bridge.post({ type: 'remove_hires', id });
-  },
-  onClearRegions: () => {
-    if (FEATURE_HIRES) bridge.post({ type: 'clear_hires' });
-  },
-});
 // ── Tool state ──────────────────────────────────────────────────────────────
 const zoneToolEnabled = ref(false);
 const zoneSnapMajor = ref(false);
-const hiresToolEnabled = ref(false);
 const zoneDraft = ref<BlankZoneDraft>({
   mode: 'both',
   edge: { style: 'none', widthCells: 1, opacity: 1 },
@@ -112,40 +90,17 @@ drag.register('zone', {
   snapMajor: () => zoneSnapMajor.value,
   onCommit(rect) { blankZones.addZone(makeZoneFromRect(rect)); },
 });
-drag.register('hires', {
-  isEnabled: () => hiresToolEnabled.value,
-  priority: 3,
-  onCommit(rect) {
-    const now = Date.now();
-    hiRes.addRegion({
-      id: crypto.randomUUID(),
-      x1: rect.x1, y1: rect.y1, x2: rect.x2, y2: rect.y2,
-      multiplier: HIRES_MULTIPLIER, enabled: true,
-      showGrid: true, showBaseGrid: true, showBorder: true, tickMultiplier: 1,
-      createdAt: now, updatedAt: now,
-    });
-  },
-});
 // ── Panel event handlers ────────────────────────────────────────────────────
 function onAddZone(zone: BlankZone): void { blankZones.addZone(zone); }
 function onUpdateZone(zone: BlankZone): void { blankZones.updateZone(zone); }
 function onRemoveZone(id: string): void { blankZones.removeZone(id); }
 function onClearZones(): void { blankZones.clearZones(); }
-function onAddHiResRegion(region: HiResRegion): void { hiRes.addRegion(region); }
-function onUpdateHiResRegion(region: HiResRegion): void { hiRes.updateRegion(region); }
-function onRemoveHiResRegion(id: string): void { hiRes.removeRegion(id); }
-function onClearHiResRegions(): void { hiRes.clearRegions(); }
 function onDraftChange(draft: BlankZoneDraft): void { zoneDraft.value = draft; }
 
 function onToolChange(payload: { enabled: boolean; snapMajor: boolean }): void {
   zoneToolEnabled.value = payload.enabled;
   zoneSnapMajor.value = payload.snapMajor;
   if (!payload.enabled) drag.cancelActiveDrag('zone');
-}
-
-function onHiResToolChange(payload: { enabled: boolean }): void {
-  hiresToolEnabled.value = payload.enabled;
-  if (!payload.enabled) drag.cancelActiveDrag('hires');
 }
 
 // ── Click-to-toggle cell ────────────────────────────────────────────────────
@@ -270,13 +225,9 @@ onMounted(() => {
     log.info(`${msg.backend.toUpperCase()} renderer active`);
     bridge.post({ type: 'set_theme', theme: currentTheme.value });
     bridge.post({ type: 'set_zones', zones: toWorkerZones(blankZones.zones.value) });
-    if (FEATURE_HIRES && hiRes.regions.value.length > 0) {
-      bridge.post({ type: 'set_hires_regions', regions: hiRes.regions.value.map((r) => ({ ...r })) });
-    }
   });
   bridge.on('zones_state', (msg) => blankZones.syncFromWorker(msg.zones));
   bridge.on('zones_error', (msg) => log.error('Zone update rejected:', msg.message));
-  bridge.on('hires_state', (msg) => hiRes.syncFromWorker(msg.regions));
   bridge.on('error', (msg) => {
     if (msg.phase === 'gpu-init') {
       log.debug(`GPU unavailable (${msg.message}) — CPU fallback in progress`);
@@ -398,18 +349,12 @@ onUnmounted(() => {
   <GridBlankZonePanel
     :zones="blankZones.zones.value"
     :preview-rect="drag.previewRect.value"
-    :hires-regions="hiRes.regions.value"
     @add-zone="onAddZone"
     @update-zone="onUpdateZone"
     @remove-zone="onRemoveZone"
     @clear-zones="onClearZones"
     @tool-change="onToolChange"
     @draft-change="onDraftChange"
-    @add-hires-region="onAddHiResRegion"
-    @update-hires-region="onUpdateHiResRegion"
-    @remove-hires-region="onRemoveHiResRegion"
-    @clear-hires-regions="onClearHiResRegions"
-    @hires-tool-change="onHiResToolChange"
   />
 </template>
 

@@ -1,15 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import type { BlankZone, BlankZoneDraft, BlankZoneRect } from '../../types/blankZones';
-import type { HiResRegion } from '../../types/hiresRegion';
-import { FEATURE_HIRES } from '../../config/features';
 import GridZoneTab from './GridZoneTab.vue';
-import GridHiResTab from './GridHiResTab.vue';
 
 defineProps<{
   zones: BlankZone[];
   previewRect?: BlankZoneRect | null;
-  hiresRegions: HiResRegion[];
 }>();
 
 defineEmits<{
@@ -19,20 +15,11 @@ defineEmits<{
   (e: 'clear-zones'): void;
   (e: 'tool-change', payload: { enabled: boolean; snapMajor: boolean }): void;
   (e: 'draft-change', draft: BlankZoneDraft): void;
-  (e: 'add-hires-region', region: HiResRegion): void;
-  (e: 'update-hires-region', region: HiResRegion): void;
-  (e: 'remove-hires-region', id: string): void;
-  (e: 'clear-hires-regions'): void;
-  (e: 'hires-tool-change', payload: { enabled: boolean }): void;
 }>();
 
 const activeTab = ref('zones');
 const collapsed = ref(false);
 const showPanel = import.meta.env.DEV;
-// Track the flag as a local constant so the template can reference it via
-// v-if.  Stays a literal boolean so Vite can still dead-code-eliminate the
-// hi-res tab markup when FEATURE_HIRES is false.
-const hiresTabEnabled = FEATURE_HIRES;
 </script>
 
 <template>
@@ -50,7 +37,6 @@ const hiresTabEnabled = FEATURE_HIRES;
 
       <v-tabs v-model="activeTab" density="compact" grow>
         <v-tab value="zones">Zones</v-tab>
-        <v-tab v-if="hiresTabEnabled" value="hires">Hi-Res</v-tab>
       </v-tabs>
 
       <v-card-text class="pt-2">
@@ -67,18 +53,6 @@ const hiresTabEnabled = FEATURE_HIRES;
               @draft-change="$emit('draft-change', $event)"
             />
           </v-tabs-window-item>
-
-          <v-tabs-window-item v-if="hiresTabEnabled" value="hires">
-            <GridHiResTab
-              :regions="hiresRegions"
-              @add-region="$emit('add-hires-region', $event)"
-              @update-region="$emit('update-hires-region', $event)"
-              @remove-region="$emit('remove-hires-region', $event)"
-              @clear-regions="$emit('clear-hires-regions')"
-              @hires-tool-change="$emit('hires-tool-change', $event)"
-            />
-          </v-tabs-window-item>
-
         </v-tabs-window>
       </v-card-text>
     </v-card>
