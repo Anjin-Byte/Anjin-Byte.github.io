@@ -623,8 +623,7 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     // Orthogonal neighbor state — used to extend this cell's square SDF into
     // alive neighbors so adjacent alive cells share a seamless boundary. Uses
     // toroidal wrap (screen_cols-1 instead of -1) so left/top of column/row 0
-    // wrap cleanly without u32 underflow.  Hi-res cells keep their standard
-    // AA boundary — hi-res neighbor lookup is a separate concern.
+    // wrap cleanly without u32 underflow.
     //
     // Critical: we OR prev + curr so the extension stays active during a
     // neighbor's death animation.  Using curr alone would yank the extension
