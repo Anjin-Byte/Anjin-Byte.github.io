@@ -253,7 +253,7 @@
                         });
                     }
                     if (i) try {
-                        const { GpuGameOfLife: s } = await import("./game_of_life_gpu-CZ1DeHK2.js").then(async (m)=>{
+                        const { GpuGameOfLife: s } = await import("./game_of_life_gpu-F3hPVxO0.js").then(async (m)=>{
                             await m.__tla;
                             return m;
                         });

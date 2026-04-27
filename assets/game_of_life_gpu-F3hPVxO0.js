@@ -1,7 +1,7 @@
 import { _ as O } from "./__vite-plugin-wasm-helper-oqf-7dtx.js";
 let y;
 let __tla = (async ()=>{
-    var z = "/assets/game_of_life_gpu_bg-DE4xaoAs.wasm";
+    var z = "/assets/game_of_life_gpu_bg-DcgeIDGU.wasm";
     y = class {
         static __wrap(_) {
             _ = _ >>> 0;
@@ -1055,8 +1055,8 @@ ${e.stack}` : n;
     URL = globalThis.URL;
     const o = await O({
         "./game_of_life_gpu_bg.js": {
-            __wbg_gpugameoflife_new: n_,
             __wbg_new_typed_323f37fd55ab048d: ut,
+            __wbg_gpugameoflife_new: n_,
             __wbg_call_a24592a6f349a97e: H,
             __wbg_new_227d7c05414eb861: ot,
             __wbg_stack_3b0d974bbf31e44f: tn,
