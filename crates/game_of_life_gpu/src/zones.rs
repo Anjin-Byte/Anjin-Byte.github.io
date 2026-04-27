@@ -184,6 +184,8 @@ mod tests {
             screen_rows: rows,
             words_per_row: cols.div_ceil(32),
             padded_rows: rows.max(1).next_power_of_two(),
+            viewport_origin_x: 0,
+            viewport_origin_y: 0,
         }
     }
 

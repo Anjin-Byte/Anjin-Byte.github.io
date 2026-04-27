@@ -1,4 +1,5 @@
 use bytemuck::bytes_of;
+use game_of_life_core::World;
 use wgpu::util::DeviceExt;
 
 use crate::grid::Grid;
@@ -36,11 +37,18 @@ impl ComputeUniforms {
 pub struct Simulation {
     pub buf_a: wgpu::Buffer,
     pub buf_b: wgpu::Buffer,
+    // `frozen_buf`, `bgl`, `uniform_buf` back live bind groups (which hold
+    // their GPU handles).  After the world-decouple, resize no longer
+    // rebuilds bind groups, so these aren't read directly from Rust —
+    // the dead_code allow keeps them alive for ownership.
+    #[allow(dead_code)]
     pub frozen_buf: wgpu::Buffer,
     bind_group_a: wgpu::BindGroup, // a=read, b=write
     bind_group_b: wgpu::BindGroup, // b=read, a=write
     pipeline: wgpu::ComputePipeline,
+    #[allow(dead_code)]
     bgl: wgpu::BindGroupLayout,
+    #[allow(dead_code)]
     pub uniform_buf: wgpu::Buffer,
     pub frame: u32,
     /// Pending cell edits: each entry is a (word_index, xor_mask) pair.
@@ -61,8 +69,9 @@ pub struct Simulation {
 impl Simulation {
     pub fn new(
         device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        _queue: &wgpu::Queue,
         grid: &Grid,
+        world: &World,
     ) -> Self {
         let uniform_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("sim_uniforms"),
@@ -70,7 +79,7 @@ impl Simulation {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let (buf_a, buf_b) = make_cell_buffers(device, queue, grid);
+        let (buf_a, buf_b) = make_cell_buffers(device, world);
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("compute"),
@@ -149,35 +158,17 @@ impl Simulation {
         self.frame += 1;
     }
 
-    /// Rebuilds cell buffers for a new grid size, preserving the pipeline.
-    pub fn resize(
-        &mut self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        grid: &Grid,
-    ) {
-        queue.write_buffer(
-            &self.uniform_buf,
-            0,
-            bytes_of(&ComputeUniforms::from_grid(grid)),
-        );
-        let (buf_a, buf_b) = make_cell_buffers(device, queue, grid);
-        self.frozen_buf = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("frozen_cells"),
-            size: grid.buffer_bytes(),
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        self.bind_group_a = make_bind_group(
-            device, &self.bgl, &self.uniform_buf, &buf_a, &buf_b, &self.frozen_buf, "bg_a",
-        );
-        self.bind_group_b = make_bind_group(
-            device, &self.bgl, &self.uniform_buf, &buf_b, &buf_a, &self.frozen_buf, "bg_b",
-        );
-        self.buf_a = buf_a;
-        self.buf_b = buf_b;
-        self.frame = 0;
-        self.pending_edits.clear();
+    /// Overwrite the current visible GPU buffer with the World's bitmap.
+    /// Used after a stamp operation to push CPU-side world changes to the
+    /// GPU.  Both `world.buffer().len()` and the GPU buffer size must match
+    /// `grid.total_words()` — they do, because the World was the source of
+    /// the GPU layout at construction.
+    ///
+    /// Currently unused — Phase 3's auto-reseed loop is the first consumer.
+    #[allow(dead_code)]
+    pub fn sync_world_to_visible(&self, queue: &wgpu::Queue, world: &World) {
+        let target = self.current_visible_buffer();
+        queue.write_buffer(target, 0, bytemuck::cast_slice(world.buffer()));
     }
 
     /// Queue a cell toggle.  `cx` and `cy` must be pre-wrapped into
@@ -373,34 +364,28 @@ impl Simulation {
 
 fn make_cell_buffers(
     device: &wgpu::Device,
-    queue: &wgpu::Queue,
-    grid: &Grid,
+    world: &World,
 ) -> (wgpu::Buffer, wgpu::Buffer) {
-    let bytes = grid.buffer_bytes() as usize;
-    let mut rng_state: u32 = 0xdeadbeef;
-    let data: Vec<u32> = (0..grid.total_words())
-        .map(|_| {
-            rng_state = lcg(rng_state);
-            rng_state
-        })
-        .collect();
+    let bytes = world.buffer_bytes();
 
     let usage =
         wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC;
 
+    // buf_a is initialised from the World's bitmap (the canonical seed).
+    // The LCG-fill that used to happen here moved into World::from_seed
+    // so the same bytes can serve both CPU reference (Phase 2) and GPU.
     let buf_a = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("cells_a"),
-        contents: bytemuck::cast_slice(&data),
+        contents: bytemuck::cast_slice(world.buffer()),
         usage,
     });
     // buf_b starts zeroed; simulation will evolve from buf_a on frame 0.
     let buf_b = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("cells_b"),
-        size: bytes as u64,
+        size: bytes,
         usage,
         mapped_at_creation: false,
     });
-    let _ = queue; // queue available for future use
     (buf_a, buf_b)
 }
 
@@ -440,11 +425,6 @@ fn bgl_entry(
         },
         count: None,
     }
-}
-
-/// Simple LCG for deterministic random initialization.
-fn lcg(s: u32) -> u32 {
-    s.wrapping_mul(1664525).wrapping_add(1013904223)
 }
 
 /// Tiny compute shader that applies XOR edits to the cell buffer in-place.

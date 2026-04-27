@@ -263,7 +263,6 @@ const projectIndex: ProjectIndexItem[] = rawProjectIndex.map((project) => ({
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transform: translateY(1px);
   transition: color 120ms ease-out, background-color 120ms ease-out, transform 120ms ease-out;
 }
 

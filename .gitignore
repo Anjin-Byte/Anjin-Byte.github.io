@@ -10,4 +10,5 @@ app/node_modules/
 app/dist/
 docs/*
 .DS_Store
-
+.claude
+engineering-codex

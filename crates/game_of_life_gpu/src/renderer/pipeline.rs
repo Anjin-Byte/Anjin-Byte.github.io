@@ -3,7 +3,6 @@ use wgpu::util::DeviceExt;
 
 use crate::grid::Grid;
 use crate::shaders;
-use crate::simulation::Simulation;
 use crate::zones::{ZoneEntryGpu, ZoneMetaGpu, MAX_BLANK_ZONES};
 
 use super::bindings::{
@@ -18,14 +17,24 @@ pub struct GpuRenderer {
     pub surface: wgpu::Surface<'static>,
     surface_config: wgpu::SurfaceConfiguration,
     pipeline: wgpu::RenderPipeline,
-    // Core resources (group 0)
+    // Core resources (group 0).  `paper_buf`, `theme_buf`, `noise_view`,
+    // `noise_sampler`, `core_bgl`, `prev_visible_buf` are referenced by
+    // the bind groups (which hold them by GPU handle); the Rust fields
+    // hold ownership so the resources outlive the bind groups.  They're
+    // not read directly after construction now that resize doesn't
+    // rebuild bind groups, hence the dead_code allows.
     uniform_buf: wgpu::Buffer,
+    #[allow(dead_code)]
     paper_buf: wgpu::Buffer,
     theme_buf: wgpu::Buffer,
+    #[allow(dead_code)]
     prev_visible_buf: wgpu::Buffer,
     _noise_texture: wgpu::Texture,
+    #[allow(dead_code)]
     noise_view: wgpu::TextureView,
+    #[allow(dead_code)]
     noise_sampler: wgpu::Sampler,
+    #[allow(dead_code)]
     core_bgl: wgpu::BindGroupLayout,
     core_bg_a: wgpu::BindGroup,
     core_bg_b: wgpu::BindGroup,
@@ -33,6 +42,7 @@ pub struct GpuRenderer {
     zone_meta_buf: wgpu::Buffer,
     zone_buf: wgpu::Buffer,
     overlay_bg: wgpu::BindGroup,
+    #[allow(dead_code)]
     grid_pitch: f32,
 }
 
@@ -227,32 +237,16 @@ impl GpuRenderer {
         self.surface.configure(device, &self.surface_config);
     }
 
-    pub fn resize(
-        &mut self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        grid: &Grid,
-        grid_pitch: f32,
-        simulation: &Simulation,
-    ) {
-        self.grid_pitch = grid_pitch;
+    /// Update the WebGPU surface and viewport uniforms to match the new
+    /// canvas dimensions.  The world-sized buffers (`prev_visible_buf`,
+    /// the simulation's ping-pong) are unchanged — only the surface
+    /// configuration and the viewport-derived uniforms change.
+    pub fn resize(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, grid: &Grid) {
         self.surface_config.width = grid.canvas_width;
         self.surface_config.height = grid.canvas_height;
         self.surface.configure(device, &self.surface_config);
         queue.write_buffer(&self.uniform_buf, 0, bytes_of(&RenderUniforms::from_grid(grid)));
-        queue.write_buffer(&self.paper_buf, 0, bytes_of(&PaperParams::for_pitch(grid_pitch)));
-        self.prev_visible_buf = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("prev_visible_cells"),
-            size: grid.buffer_bytes(),
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        self.rebuild_core_bind_groups(device, &simulation.buf_a, &simulation.buf_b);
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("resize_prev_visible_cells"),
-        });
-        self.capture_previous_state(&mut encoder, simulation.current_visible_buffer(), grid);
-        queue.submit([encoder.finish()]);
+        // PaperParams pitch is constant now (CELL_PX), so no per-resize update.
     }
 
     pub fn set_zones(&self, queue: &wgpu::Queue, zones: &[ZoneEntryGpu]) {
@@ -272,22 +266,9 @@ impl GpuRenderer {
         queue.write_buffer(&self.theme_buf, 0, bytes_of(theme));
     }
 
-    // ── Group-specific bind group rebuilds ──────────────────────────────────
-
-    fn rebuild_core_bind_groups(
-        &mut self,
-        device: &wgpu::Device,
-        buf_a: &wgpu::Buffer,
-        buf_b: &wgpu::Buffer,
-    ) {
-        let shared = CoreBindGroupResources {
-            uniform_buf: &self.uniform_buf, current_buf: buf_a,
-            previous_buf: &self.prev_visible_buf, paper_buf: &self.paper_buf,
-            noise_view: &self.noise_view, noise_sampler: &self.noise_sampler,
-            theme_buf: &self.theme_buf,
-        };
-        self.core_bg_a = make_core_bind_group(device, &self.core_bgl, &shared, "core_bg_a");
-        let res_b = CoreBindGroupResources { current_buf: buf_b, ..shared };
-        self.core_bg_b = make_core_bind_group(device, &self.core_bgl, &res_b, "core_bg_b");
-    }
+    // (rebuild_core_bind_groups removed: previously called only from
+    // resize() to swap in newly-allocated cell buffers.  After the
+    // world-decouple, cell buffers are allocated once at startup and
+    // never reallocated, so the bind groups built in `new()` stay valid
+    // forever.)
 }

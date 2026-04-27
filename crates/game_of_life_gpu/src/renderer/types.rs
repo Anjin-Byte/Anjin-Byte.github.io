@@ -1,24 +1,41 @@
 use crate::grid::Grid;
 
+/// 64-byte uniform layout, must match the `RenderUniforms` struct in
+/// `render.wgsl`.  Fields are ordered so `scroll_y` (offset 28) and
+/// `transition_t` (offset 32) keep their byte positions — `set_scroll`
+/// and `set_transition` in pipeline.rs do partial uniform writes at
+/// those exact offsets.
+///
+/// Viewport fields are scalar `u32` × 4, not `vec2<u32>` × 2, because
+/// `vec2<u32>` in `var<uniform>` has 8-byte alignment and would shift
+/// downstream offsets unpredictably.  See CLAUDE.md "WGSL uniform
+/// alignment" gotcha.
 #[repr(C)]
 #[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy)]
 pub struct RenderUniforms {
-    pub screen_cols: u32,
-    pub screen_rows: u32,
-    pub padded_rows: u32,
-    pub words_per_row: u32,
-    pub cell_px: u32,
-    pub canvas_width: u32,
-    pub canvas_height: u32,
-    pub scroll_y: f32,
-    pub transition_t: f32,
-    pub pad0: f32,
-    pub pad1: f32,
-    pub pad2: f32,
+    pub screen_cols: u32,         // offset 0
+    pub screen_rows: u32,         // 4
+    pub padded_rows: u32,         // 8
+    pub words_per_row: u32,       // 12
+    pub cell_px: u32,             // 16
+    pub canvas_width: u32,        // 20  (viewport canvas width)
+    pub canvas_height: u32,       // 24  (viewport canvas height)
+    pub scroll_y: f32,            // 28  ← set_scroll() writes here
+    pub transition_t: f32,        // 32  ← set_transition() writes here
+    pub viewport_origin_x: u32,   // 36  (in world cells)
+    pub viewport_origin_y: u32,   // 40
+    pub viewport_size_x: u32,     // 44  (in world cells)
+    pub viewport_size_y: u32,     // 48
+    pub pad0: u32,                // 52
+    pub pad1: u32,                // 56
+    pub pad2: u32,                // 60
+    // total: 64 bytes (16-byte aligned)
 }
 
 impl RenderUniforms {
     pub fn from_grid(grid: &Grid) -> Self {
+        let viewport_size_x = grid.canvas_width.div_ceil(grid.cell_px.max(1));
+        let viewport_size_y = grid.canvas_height.div_ceil(grid.cell_px.max(1));
         RenderUniforms {
             screen_cols: grid.screen_cols,
             screen_rows: grid.screen_rows,
@@ -29,9 +46,13 @@ impl RenderUniforms {
             canvas_height: grid.canvas_height,
             scroll_y: 0.0,
             transition_t: 1.0,
-            pad0: 0.0,
-            pad1: 0.0,
-            pad2: 0.0,
+            viewport_origin_x: grid.viewport_origin_x,
+            viewport_origin_y: grid.viewport_origin_y,
+            viewport_size_x,
+            viewport_size_y,
+            pad0: 0,
+            pad1: 0,
+            pad2: 0,
         }
     }
 }

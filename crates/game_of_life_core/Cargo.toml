@@ -1,0 +1,16 @@
+[package]
+name = "game-of-life-core"
+version = "0.1.0"
+edition = "2021"
+
+# Pure-Rust core for the Game of Life simulation: bitpacked World, tick rule,
+# pattern stamping, alive-count.  No GPU dependencies; no JS-facing exports.
+# Both the CPU adapter (game_of_life crate, Phase 2) and the GPU adapter
+# (game_of_life_gpu crate) consume this as their cell-state representation.
+#
+# Tests run in plain `cargo test -p game-of-life-core` with no fixtures —
+# the crate is the codex's "pure core" surface (see engineering-codex
+# Pure Core, Effectful Edges).
+
+[lib]
+crate-type = ["rlib"]

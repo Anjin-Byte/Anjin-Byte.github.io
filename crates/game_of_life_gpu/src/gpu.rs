@@ -1,3 +1,4 @@
+use game_of_life_core::World;
 use wasm_bindgen::prelude::*;
 
 use crate::context::GpuContext;
@@ -7,16 +8,18 @@ use crate::renderer::types::ThemeParams;
 use crate::simulation::Simulation;
 use crate::zones::parse_zone_entries_json;
 
-// Major-grid divisor: 5 minor cells per major square (must match render.wgsl major_every).
-const MAJOR_EVERY: u32 = 5;
+/// World dimensions in cells.  Fixed at startup; never resize-derived.
+/// 1024×1024 cells = ~1M cells; 256 KB ping-pong total.  See
+/// docs/methuselah-seeding.md §9 (memory math) for sizing rationale.
+const WORLD_COLS: u32 = 1024;
+const WORLD_ROWS: u32 = 1024;
 
-/// Compute a float grid pitch so that `canvas_width` is an exact multiple of
-/// `pitch_major = MAJOR_EVERY * result`.  Both left and right margin borders then
-/// land exactly on major grid lines.
-fn aligned_pitch(canvas_width: u32, target: f32) -> f32 {
-    let n = ((canvas_width as f32 / (target * MAJOR_EVERY as f32)).round() as u32).max(1);
-    canvas_width as f32 / (n * MAJOR_EVERY) as f32
-}
+/// Physical size of one world cell in canvas device pixels.  Constant —
+/// no longer derived from canvas width via aligned_pitch.  At cell_px=32
+/// the world covers 32k × 32k device pixels, ~8× the largest reasonable
+/// viewport in each direction, so the viewport never sees the world edge
+/// in normal use.
+const CELL_PX: u32 = 32;
 
 /// WebGPU-accelerated Game of Life, exported to JavaScript.
 ///
@@ -26,15 +29,23 @@ fn aligned_pitch(canvas_width: u32, target: f32) -> f32 {
 ///   3. Adapter (compatible_surface = &surface)
 ///   4. Device + Queue
 ///
-/// `ctx` holds the shared device + queue.  Multiple `GpuRenderer`s can
-/// target different canvases while sharing one device and simulation.
+/// `ctx` holds the shared device + queue.  `world` owns the canonical
+/// cell state (CPU-side); `simulation` mirrors that state into GPU
+/// buffers and runs the compute shader.  Resize updates the renderer's
+/// viewport uniforms only — the World and its GPU buffers are never
+/// reallocated, which is what makes pattern stamps survive resize.
 #[wasm_bindgen]
 pub struct GpuGameOfLife {
     ctx: GpuContext,
     grid: Grid,
+    /// Canonical CPU-side cell state.  Owned here so future stamp
+    /// operations (Phase 3) can mutate it then sync to the GPU mirror
+    /// via `simulation.sync_world_to_visible(...)`.  Currently no
+    /// post-init reader, hence dead_code allow.
+    #[allow(dead_code)]
+    world: World,
     simulation: Simulation,
     renderers: Vec<GpuRenderer>,
-    target_pitch: f32,   // stored as reference for resize recomputation
     zones_json: String,  // latest sanitized zone payload from the app
 }
 
@@ -43,20 +54,21 @@ pub struct GpuGameOfLife {
 async fn from_surface(
     instance: wgpu::Instance,
     surface: wgpu::Surface<'static>,
-    width: u32,
-    height: u32,
-    target_pitch: f32,
+    viewport_canvas_w: u32,
+    viewport_canvas_h: u32,
 ) -> Result<GpuGameOfLife, JsValue> {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
 
     let (ctx, adapter) = GpuContext::from_compatible_surface(&instance, &surface).await?;
 
-    let grid_pitch = aligned_pitch(width, target_pitch);
-    let cell_px = grid_pitch.round() as u32;
-
-    let grid = Grid::new(width, height, cell_px);
-    let simulation = Simulation::new(&ctx.device, &ctx.queue, &grid);
+    // World is allocated once at startup; never reallocated on resize.
+    // The seed (0xdeadbeef) preserves visual continuity with the
+    // pre-decouple LCG-fill that produced the same bytes.
+    let world = World::from_seed(WORLD_COLS, WORLD_ROWS, 0xdeadbeef);
+    let grid = Grid::from_world(&world, viewport_canvas_w, viewport_canvas_h, CELL_PX);
+    let simulation = Simulation::new(&ctx.device, &ctx.queue, &grid, &world);
+    let grid_pitch = CELL_PX as f32;
     let renderer = GpuRenderer::new(
         &ctx.device,
         &ctx.queue,
@@ -71,9 +83,9 @@ async fn from_surface(
     Ok(GpuGameOfLife {
         ctx,
         grid,
+        world,
         simulation,
         renderers: vec![renderer],
-        target_pitch,
         zones_json: String::new(),
     })
 }
@@ -81,9 +93,14 @@ async fn from_surface(
 #[wasm_bindgen]
 impl GpuGameOfLife {
     /// Create from an HtmlCanvasElement (main-thread usage).
+    ///
+    /// `_grid_pitch` is preserved in the JS-facing signature for backward
+    /// compatibility but is now ignored — cell pixel size is fixed by the
+    /// CELL_PX constant.  Drop the parameter from the worker side in a
+    /// future cleanup.
     pub async fn new(
         canvas: web_sys::HtmlCanvasElement,
-        grid_pitch: f32,
+        _grid_pitch: f32,
     ) -> Result<GpuGameOfLife, JsValue> {
         let (width, height) = (canvas.width(), canvas.height());
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -94,13 +111,15 @@ impl GpuGameOfLife {
         let surface = instance
             .create_surface(wgpu::SurfaceTarget::Canvas(canvas))
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
-        from_surface(instance, surface, width, height, grid_pitch).await
+        from_surface(instance, surface, width, height).await
     }
 
     /// Create from an OffscreenCanvas (Web Worker usage).
+    ///
+    /// `_grid_pitch` ignored as in `new` — see comment there.
     pub async fn new_offscreen(
         canvas: web_sys::OffscreenCanvas,
-        grid_pitch: f32,
+        _grid_pitch: f32,
     ) -> Result<GpuGameOfLife, JsValue> {
         let (width, height) = (canvas.width(), canvas.height());
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -111,7 +130,7 @@ impl GpuGameOfLife {
         let surface = instance
             .create_surface(wgpu::SurfaceTarget::OffscreenCanvas(canvas))
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
-        from_surface(instance, surface, width, height, grid_pitch).await
+        from_surface(instance, surface, width, height).await
     }
 
     /// Presents the current simulation state without advancing a generation.
@@ -141,22 +160,22 @@ impl GpuGameOfLife {
         self.primary().set_transition(&self.ctx.queue, t.clamp(0.0, 1.0));
     }
 
-    /// Call whenever the canvas dimensions change.
+    /// Update the viewport when the canvas dimensions change.  The world
+    /// itself is fixed, so this only updates the renderer's viewport
+    /// uniforms — no buffer reallocation, no simulation reset.  Pattern
+    /// stamps survive resize unchanged.
     pub fn resize(&mut self, width: u32, height: u32) {
         if width == 0 || height == 0 {
             return;
         }
-        let grid_pitch = aligned_pitch(width, self.target_pitch);
-        let cell_px = grid_pitch.round() as u32;
-        self.grid = Grid::new(width, height, cell_px);
-        self.simulation.resize(&self.ctx.device, &self.ctx.queue, &self.grid);
-        self.renderers[0].resize(
-            &self.ctx.device,
-            &self.ctx.queue,
-            &self.grid,
-            grid_pitch,
-            &self.simulation,
-        );
+        // Viewport origin stays at (0, 0) for now — the world's top-left
+        // corner.  A future enhancement could pan the viewport based on
+        // scroll, but that's a Phase 3 concern.
+        self.grid.set_viewport(width, height, 0, 0);
+        self.renderers[0].resize(&self.ctx.device, &self.ctx.queue, &self.grid);
+        // Zones reference world cells, not canvas pixels — re-parse if the
+        // user-set zones list is non-empty so the renderer's bounds are
+        // updated against current grid dims.
         if self.zones_json.is_empty() {
             self.renderers[0].clear_zones(&self.ctx.queue);
         } else if let Ok(entries) = parse_zone_entries_json(&self.zones_json, &self.grid) {
@@ -198,7 +217,8 @@ impl GpuGameOfLife {
         self.grid.words_per_row
     }
     pub fn grid_pitch(&self) -> f32 {
-        aligned_pitch(self.grid.canvas_width, self.target_pitch)
+        // Now constant — cell pixel size is fixed at world creation.
+        CELL_PX as f32
     }
 
     /// Accepts a JSON array of blank-zone records and caches it for the next

@@ -20,18 +20,22 @@
 //   7. sRGB encode
 
 struct RenderUniforms {
-    screen_cols:   u32,
-    screen_rows:   u32,
-    padded_rows:   u32,
-    words_per_row: u32,
-    cell_px:       u32,
-    canvas_width:  u32,
-    canvas_height: u32,
-    scroll_y:      f32,   // vertical scroll offset in canvas pixels
-    transition_t:  f32,   // progress between previous/current generations
-    pad0:          f32,
-    pad1:          f32,
-    pad2:          f32,
+    screen_cols:        u32,  // = world cols (post-decouple semantics)
+    screen_rows:        u32,  // = world rows
+    padded_rows:        u32,
+    words_per_row:      u32,
+    cell_px:            u32,  // fixed; same for every fragment
+    canvas_width:       u32,  // viewport canvas width
+    canvas_height:      u32,  // viewport canvas height
+    scroll_y:           f32,
+    transition_t:       f32,
+    viewport_origin_x:  u32,  // viewport top-left in world cells
+    viewport_origin_y:  u32,
+    viewport_size_x:    u32,  // viewport width in world cells
+    viewport_size_y:    u32,
+    pad0:               u32,
+    pad1:               u32,
+    pad2:               u32,
 }
 
 struct PaperParams {
@@ -500,8 +504,16 @@ fn cell_fill(
 
 @fragment
 fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
-    let px       = frag_pos.x;
-    let py       = frag_pos.y;
+    // Translate fragment pixel coords into world pixel coords by adding
+    // the viewport origin (in cells) × cell_px.  At viewport origin (0,0)
+    // — the default — this is a no-op and behaviour matches the
+    // pre-decouple shader exactly.  Resize updates only the viewport
+    // uniforms, never the cell buffers; everything downstream computes
+    // in world space, so a moving viewport is just a sliding window.
+    let vp_off_x = f32(uniforms.viewport_origin_x * uniforms.cell_px);
+    let vp_off_y = f32(uniforms.viewport_origin_y * uniforms.cell_px);
+    let px       = frag_pos.x + vp_off_x;
+    let py       = frag_pos.y + vp_off_y;
     let world_y  = py + uniforms.scroll_y;   // world coordinate (scrolled)
 
     // ── 1. Paper fiber noise ──────────────────────────────────────────────────

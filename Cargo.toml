@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/game_of_life", "crates/game_of_life_gpu"]
+members = ["crates/game_of_life", "crates/game_of_life_core", "crates/game_of_life_gpu"]
 resolver = "2"
 
 [profile.release]
