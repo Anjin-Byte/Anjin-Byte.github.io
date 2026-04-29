@@ -16,6 +16,8 @@ js-sys               = "0.3"
 bytemuck             = { version = "1", features = ["derive"] }
 console_error_panic_hook = { version = "0.1", optional = true }
 game-of-life-core    = { path = "../game_of_life_core" }
+rand                 = { version = "0.8", default-features = false }
+rand_xoshiro         = { version = "0.6", default-features = false }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys = { version = "0.3", features = ["HtmlCanvasElement", "OffscreenCanvas", "Window", "console"] }

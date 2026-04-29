@@ -20,9 +20,8 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
 
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
+      "@/*": ["./src/*"],
       "@gpu-pkg/*": ["../crates/game_of_life_gpu/pkg/*"]
     }
   },

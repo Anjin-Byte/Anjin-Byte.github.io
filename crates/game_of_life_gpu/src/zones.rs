@@ -143,9 +143,9 @@ fn normalize_edge_style(style: Option<&str>) -> u32 {
 }
 
 fn normalize_rect_coords(x1: i64, y1: i64, x2: i64, y2: i64, grid: &Grid) -> [i32; 4] {
-    // Clamp X to [0, screen_cols - 1]. Wrapping both endpoints independently
-    // would invert a zone that straddles the viewport edge into a full-width zone.
-    let max_col = grid.screen_cols.saturating_sub(1) as i64;
+    // Clamp X to [0, world_cols - 1]. Wrapping both endpoints independently
+    // would invert a zone that straddles the world edge into a full-width zone.
+    let max_col = grid.world_cols.saturating_sub(1) as i64;
     let cx1 = x1.clamp(0, max_col) as i32;
     let cx2 = x2.clamp(0, max_col) as i32;
     let nx1 = cx1.min(cx2);
@@ -180,8 +180,8 @@ mod tests {
             canvas_width: cols * 5,
             canvas_height: rows * 5,
             cell_px: 5,
-            screen_cols: cols,
-            screen_rows: rows,
+            world_cols: cols,
+            world_rows: rows,
             words_per_row: cols.div_ceil(32),
             padded_rows: rows.max(1).next_power_of_two(),
             viewport_origin_x: 0,

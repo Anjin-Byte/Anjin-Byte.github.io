@@ -1,6 +1,14 @@
-// Coordinate mapping: screen pixel → simulation grid cell.
+// Coordinate mapping: screen pixel → world grid cell.
 //
-// Reverses the fragment shader's cell-index math (render.wgsl lines 433-435):
+// Coordinate spaces (mirrors the doc paragraph at the top of
+// crates/game_of_life_gpu/src/grid.rs):
+//
+//   1. CSS pixel    — MouseEvent.clientX/Y.
+//   2. Canvas pixel — CSS × devicePixelRatio.
+//   3. World pixel  — canvas pixel offset by current scroll.
+//   4. World cell   — world pixel ÷ gridPitch, mod world_cols/world_rows.
+//
+// Reverses the fragment shader's cell-index math (render.wgsl):
 //   cx = floor(px / grid_pitch_px)
 //   cy = floor((py + scroll_y) / grid_pitch_px)
 //
@@ -11,7 +19,7 @@
 const MAJOR_EVERY = 5;
 
 /**
- * Snapshot of every value needed to map a screen click to a grid cell.
+ * Snapshot of every value needed to map a screen click to a world cell.
  * Captured atomically at click time to prevent races between scroll
  * updates, resize events, and DPR changes.
  */
@@ -22,10 +30,10 @@ export interface CoordSnapshot {
   scrollCanvasPx: number;
   /** Device pixel ratio at the moment of the click. */
   dpr: number;
-  /** Visible cell columns (ceil(canvasW / round(gridPitch))). */
-  screenCols: number;
-  /** Visible cell rows (ceil(canvasH / round(gridPitch))). */
-  screenRows: number;
+  /** World cell columns; toroidal-wrap modulus for `cx`. Currently 1024. */
+  worldCols: number;
+  /** World cell rows; toroidal-wrap modulus for `cy`. Currently 1024. */
+  worldRows: number;
 }
 
 export interface CellCoord {
@@ -73,17 +81,17 @@ export function screenToCell(
 }
 
 /**
- * Wrap a cell coordinate into the simulation's visible grid.
+ * Wrap a cell coordinate into the world's toroidal cell space.
  *
- * The shader wraps with `cx % screen_cols` / `cy % screen_rows`.
+ * The shader wraps with `cx % world_cols` / `cy % world_rows`.
  * Clicks on the same visual cell at different scroll positions must
  * resolve to the same buffer location.
  */
 export function wrapCell(coord: CellCoord, snap: CoordSnapshot): CellCoord {
   // JS % can return negative for negative operands; this shouldn't happen
   // for click coordinates, but guard defensively.
-  const cx = ((coord.cx % snap.screenCols) + snap.screenCols) % snap.screenCols;
-  const cy = ((coord.cy % snap.screenRows) + snap.screenRows) % snap.screenRows;
+  const cx = ((coord.cx % snap.worldCols) + snap.worldCols) % snap.worldCols;
+  const cy = ((coord.cy % snap.worldRows) + snap.worldRows) % snap.worldRows;
   return { cx, cy };
 }
 
@@ -95,7 +103,7 @@ export function wrapCell(coord: CellCoord, snap: CoordSnapshot): CellCoord {
  *   bit_offset = cx & 31
  *
  * The safe_idx bitmask from the shader is NOT needed here because
- * the caller has already wrapped cx/cy into [0, screenCols/screenRows).
+ * the caller has already wrapped cx/cy into [0, worldCols)/[0, worldRows).
  * Those always fit inside the power-of-2 padded grid.
  */
 export interface BitAddress {

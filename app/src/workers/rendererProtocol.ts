@@ -9,10 +9,15 @@ export type RendererBackend = 'gpu' | 'cpu';
 /** Frames between base simulation ticks. At 60 Hz: ~3.5 s per tick. */
 export const TICK_EVERY = 175;
 
-/** Grid dimensions needed by the main thread for pixel→cell coordinate mapping. */
+/**
+ * Grid dimensions needed by the main thread for pixel → cell coordinate
+ * mapping. `worldCols` / `worldRows` are the toroidal-wrap modulus for
+ * world cell coordinates (currently 1024 × 1024); `paddedRows` /
+ * `wordsPerRow` describe the bitpacked buffer layout.
+ */
 export interface GridInfo {
-  screenCols:  number;
-  screenRows:  number;
+  worldCols:   number;
+  worldRows:   number;
   paddedRows:  number;
   wordsPerRow: number;
   gridPitch:   number;  // float, matches PaperParams.grid_pitch_px
@@ -23,9 +28,10 @@ export type WorkerInMsg =
   | { type: 'frame' }
   | { type: 'resize'; width: number; height: number }
   | { type: 'scroll'; scrollY: number }
-  // Toggle a cell's alive/dead state. cx/cy are already wrapped to the
-  // visible grid by the main thread. scrollCanvasPx is the scroll offset
-  // at click time so the worker can validate/log if needed.
+  // Toggle a cell's alive/dead state. cx/cy are world-cell coordinates
+  // already wrapped into [0, worldCols) × [0, worldRows) by the main
+  // thread. scrollCanvasPx is the scroll offset at click time so the
+  // worker can validate/log if needed.
   | { type: 'toggle_cell'; cx: number; cy: number; scrollCanvasPx: number }
   | { type: 'set_zones';    zones: BlankZone[] }
   | { type: 'add_zone';    zone:  BlankZone   }

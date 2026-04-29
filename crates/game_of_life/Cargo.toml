@@ -13,6 +13,7 @@ default = ["console_error_panic_hook"]
 [dependencies]
 wasm-bindgen = "0.2.84"
 console_error_panic_hook = { version = "0.1.7", optional = true }
+game-of-life-core = { path = "../game_of_life_core" }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.34"

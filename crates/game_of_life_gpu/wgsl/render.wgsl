@@ -20,8 +20,8 @@
 //   7. sRGB encode
 
 struct RenderUniforms {
-    screen_cols:        u32,  // = world cols (post-decouple semantics)
-    screen_rows:        u32,  // = world rows
+    world_cols:         u32,
+    world_rows:         u32,
     padded_rows:        u32,
     words_per_row:      u32,
     cell_px:            u32,  // fixed; same for every fragment
@@ -281,16 +281,16 @@ fn grid_line_aa(coord: f32, pitch: f32, half_w: f32) -> f32 {
 // ── Cell helpers ──────────────────────────────────────────────────────────────
 
 fn cell_alive_current(cx: u32, cy: u32) -> u32 {
-    let cx_w = cx % uniforms.screen_cols;
-    let cy_w = cy % uniforms.screen_rows;
+    let cx_w = cx % uniforms.world_cols;
+    let cy_w = cy % uniforms.world_rows;
     let word_idx = cy_w * uniforms.words_per_row + cx_w / 32u;
     let safe_idx = word_idx & (uniforms.words_per_row * uniforms.padded_rows - 1u);
     return (current_cells[safe_idx] >> (cx_w & 31u)) & 1u;
 }
 
 fn cell_alive_prev(cx: u32, cy: u32) -> u32 {
-    let cx_w = cx % uniforms.screen_cols;
-    let cy_w = cy % uniforms.screen_rows;
+    let cx_w = cx % uniforms.world_cols;
+    let cy_w = cy % uniforms.world_rows;
     let word_idx = cy_w * uniforms.words_per_row + cx_w / 32u;
     let safe_idx = word_idx & (uniforms.words_per_row * uniforms.padded_rows - 1u);
     return (previous_cells[safe_idx] >> (cx_w & 31u)) & 1u;
@@ -395,7 +395,7 @@ fn zone_mask_for_cell(cx: u32, world_row: i32) -> vec4f {
 fn zone_bold_major_edge_cov(px: f32, world_y: f32, pitch_minor: f32, half_px: f32) -> f32 {
     var edge_cov = 0.0;
     // Pre-compute integer cell coordinates for the interior-suppression inner loop.
-    let cell_x = u32(floor(px / pitch_minor)) % uniforms.screen_cols;
+    let cell_x = u32(floor(px / pitch_minor)) % uniforms.world_cols;
     let cell_y = i32(floor(world_y / pitch_minor));
 
     for (var i: u32 = 0u; i < zone_meta.zone_count; i = i + 1u) {
@@ -586,7 +586,7 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     let major_y = grid_line_aa(world_y, pitch_major, paper.major_half_px + fiber_bleed) * major_fade_y;
     var major_cov = max(major_x, major_y) * content_mask;
 
-    let zone_cx = u32(floor(px / pitch_minor)) % uniforms.screen_cols;
+    let zone_cx = u32(floor(px / pitch_minor)) % uniforms.world_cols;
     let zone_world_row = i32(floor(world_y / pitch_minor));
     let zone_mask = zone_mask_for_cell(zone_cx, zone_world_row);
     minor_cov *= zone_mask.x;
@@ -634,7 +634,7 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
 
     // Orthogonal neighbor state — used to extend this cell's square SDF into
     // alive neighbors so adjacent alive cells share a seamless boundary. Uses
-    // toroidal wrap (screen_cols-1 instead of -1) so left/top of column/row 0
+    // toroidal wrap (world_cols-1 instead of -1) so left/top of column/row 0
     // wrap cleanly without u32 underflow.
     //
     // Critical: we OR prev + curr so the extension stays active during a
@@ -645,8 +645,8 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     // (as its disk retreats past the boundary), which reads as a natural
     // fade rather than a hard pop.
     let right_cx = base_cx + 1u;
-    let left_cx  = base_cx + uniforms.screen_cols - 1u;
-    let top_cy   = base_cy + uniforms.screen_rows - 1u;
+    let left_cx  = base_cx + uniforms.world_cols - 1u;
+    let top_cy   = base_cy + uniforms.world_rows - 1u;
     let bot_cy   = base_cy + 1u;
     let right_alive  = cell_alive_current(right_cx, base_cy) | cell_alive_prev(right_cx, base_cy);
     let left_alive   = cell_alive_current(left_cx,  base_cy) | cell_alive_prev(left_cx,  base_cy);

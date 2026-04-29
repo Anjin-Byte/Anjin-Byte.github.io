@@ -32,10 +32,19 @@ interface Renderer {
 }
 
 let renderer: Renderer | null = null;
+// `canvas` is hoisted to module scope so the resize handler can update its
+// dimensions even before the renderer is initialised.  Writes to
+// `canvas.width/height` are observable by `from_surface` when it later
+// constructs the WebGPU surface, so a resize that arrives during the async
+// GPU-init window is no longer dropped silently.
+let canvas: OffscreenCanvas | null = null;
 // Latest scroll offset (canvas px). Cached so it can be re-applied when the
 // renderer becomes available (init is async) or after a resize (resize rewrites
 // the uniform buffer, resetting scroll_y to 0).
 let pendingScrollY = 0;
+// Latest resize dims received before the renderer materialised.  Drained by
+// the init handler after the renderer object is assigned.
+let pendingResize: { width: number; height: number } | null = null;
 let frameCount  = 0;
 const zoneState  = new BlankZoneState();
 // Cached so the current theme survives renderer hand-offs (GPU→CPU fallback,
@@ -89,7 +98,10 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
   switch (e.data.type) {
 
     case 'init': {
-      const { canvas, cellPx } = e.data;
+      // Hoist the OffscreenCanvas to module scope so the resize handler can
+      // update its dimensions even before the renderer is created.
+      canvas = e.data.canvas;
+      const { cellPx } = e.data;
       log.debug('Init received — canvas', canvas.width, 'x', canvas.height, 'cell_px', cellPx);
 
       // ── WebGPU pre-probe (no canvas involved) ─────────────────────────
@@ -115,7 +127,11 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
         try {
           const { GpuGameOfLife } = await import('@gpu-pkg/game_of_life_gpu.js');
           log.debug('GPU: module loaded, initialising surface...');
-          const gpu = await GpuGameOfLife.new_offscreen(canvas, cellPx);
+          // Per-session random seed for the auto-reseed RNG.  u32 range
+          // is enough variety; the Rust side widens it to u64.  A future
+          // URL-seeded mode would parse `?seed=` here instead.
+          const seed = Math.floor(Math.random() * 0x1_0000_0000);
+          const gpu = await GpuGameOfLife.new_offscreen(canvas, cellPx, seed);
           // Verify set_zones_json is present at init time so a future rename/removal
           // produces a visible warning rather than silently failing on every zone update.
           const gpuExt = gpu as unknown as {
@@ -139,8 +155,8 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
             }
           };
           const getGridInfo = (): GridInfo => ({
-            screenCols:  gpu.screen_cols(),
-            screenRows:  gpu.screen_rows(),
+            worldCols:   gpu.world_cols(),
+            worldRows:   gpu.world_rows(),
             paddedRows:  gpu.padded_rows(),
             wordsPerRow: gpu.words_per_row(),
             gridPitch:   gpu.grid_pitch(),
@@ -149,7 +165,10 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
           renderer = {
             tick:       () => gpu.tick_and_render(),
             renderOnly: () => gpu.render_only(),
-            resize:     (w, h) => { canvas.width = w; canvas.height = h; gpu.resize(w, h); },
+            // Canvas dim writes happen in the top-level 'resize' handler so
+            // they apply even when the renderer is mid-init.  This closure
+            // only updates the GPU surface and viewport uniforms.
+            resize:     (w, h) => gpu.resize(w, h),
             setScroll:  (scrollY) => gpu.set_scroll(scrollY),
             setTransition: (transitionT) => gpu.set_transition(transitionT),
             toggleCell: (cx, cy) => { gpu.toggle_cell(cx, cy); gpu.flush_and_render(); },
@@ -158,6 +177,13 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
             gridInfo:   getGridInfo,
             free:       () => gpu.free(),
           };
+          // A resize that arrived during the async init window updated
+          // canvas.width/height directly, but its `gpu.resize()` call was
+          // deferred — drain it now so the surface uniforms catch up.
+          if (pendingResize) {
+            renderer.resize(pendingResize.width, pendingResize.height);
+            pendingResize = null;
+          }
           // Scroll messages sent during async GPU init were dropped (renderer was null).
           // Re-apply the latest position now that the renderer is accepting commands.
           renderer.setScroll?.(pendingScrollY);
@@ -186,7 +212,7 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
         renderer.setTheme?.(currentTheme);
         log.info('CPU renderer ready');
         // CPU renderer has no grid info; supply zeroed placeholder.
-        post({ type: 'ready', backend: 'cpu', gridInfo: { screenCols: 0, screenRows: 0, paddedRows: 0, wordsPerRow: 0, gridPitch: 0 } });
+        post({ type: 'ready', backend: 'cpu', gridInfo: { worldCols: 0, worldRows: 0, paddedRows: 0, wordsPerRow: 0, gridPitch: 0 } });
       } catch (cpuErr) {
         const message = errorMessage(cpuErr);
         log.error('CPU init failed:', message);
@@ -218,19 +244,35 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
       break;
     }
 
-    case 'resize':
+    case 'resize': {
       log.debug('Resize →', e.data.width, 'x', e.data.height);
-      renderer?.resize(e.data.width, e.data.height);
+      // No 'init' yet — main thread should always send 'init' first, but
+      // bail safely if that contract is ever violated.
+      if (!canvas) break;
+      // Always update the canvas backing texture, even when the renderer
+      // hasn't materialised yet.  `from_surface` reads `canvas.width()` at
+      // construction time, so the GPU surface gets configured for the
+      // most-recent dims if init is still in flight.
+      canvas.width = e.data.width;
+      canvas.height = e.data.height;
+      if (!renderer) {
+        // Renderer may finish init *after* `from_surface` returned; drained
+        // by the init handler once the renderer object is assigned.
+        pendingResize = { width: e.data.width, height: e.data.height };
+        break;
+      }
+      renderer.resize(e.data.width, e.data.height);
       // resize() rewrites the uniform buffer (scroll_y resets to 0); re-apply.
-      renderer?.setScroll?.(pendingScrollY);
-      renderer?.setTransition?.(1);
-      renderer?.setZones?.(zoneState.getAll());
-      renderer?.setTheme?.(currentTheme);
+      renderer.setScroll?.(pendingScrollY);
+      renderer.setTransition?.(1);
+      renderer.setZones?.(zoneState.getAll());
+      renderer.setTheme?.(currentTheme);
       // Grid dimensions change on resize; notify main thread.
-      if (renderer?.gridInfo) {
+      if (renderer.gridInfo) {
         post({ type: 'grid_info', gridInfo: renderer.gridInfo() });
       }
       break;
+    }
 
     case 'scroll':
       pendingScrollY = e.data.scrollY;

@@ -16,9 +16,12 @@ const log = createLogger('AppBackground');
 // ── Constants ───────────────────────────────────────────────────────────────
 const MAJOR_EVERY = 5;
 const TARGET_CELL_CSS_PX = 16;
-const OVERSCAN_MAJOR_BANDS = 6;
-const SHRINK_DEBOUNCE_MS = 0;
-const SCROLL_ACTIVE_MS = 300;
+// Floor for the canvas backing-texture height: max(initial shell, screen
+// height × dpr, MIN_CANVAS_HEIGHT_DEVICE_PX).  The shell clips overflow so
+// excess height is purely fragment-shader overdraw; we pay sub-millisecond
+// per frame in exchange for never reconfiguring the surface on shell-height
+// changes (browser toolbar collapse, window-edge drag, iOS address bar).
+const MIN_CANVAS_HEIGHT_DEVICE_PX = 2160;
 
 // Parallax tuning — the background drifts at PARALLAX_RATE × content velocity,
 // with PARALLAX_EASE controlling how softly `currentScroll` eases toward the
@@ -121,16 +124,20 @@ function onDocumentClick(event: MouseEvent): void {
 
 // ── Lifecycle ───────────────────────────────────────────────────────────────
 let canvasW = 0;
+// Picked once at mount and recomputed only on DPR change.  Width is the only
+// dimension that triggers actual reconfigures; height is held constant at a
+// generous "exceeds any plausible viewport" value.
 let canvasH = 0;
-let stableCanvasH = 0;
-let pendingShrinkH = 0;
 let mainEl: HTMLElement | null = null;
 let resizeObserver: ResizeObserver | null = null;
 let canvasHideTimer: number | null = null;
-let shrinkTimer: number | null = null;
 let detachDrag: (() => void) | null = null;
-let lastScrollSample = 0;
-let lastScrollActivityAt = 0;
+// rAF coalescer for width changes — drag the window edge at 60+ events/s and
+// we still publish at most one resize per frame to the worker.
+let pendingWidth = 0;
+let resizeRafId: number | null = null;
+// Detach handle for the matchMedia DPR listener.
+let detachDprListener: (() => void) | null = null;
 
 function readCanvasPixelSize(el: Element): { width: number; height: number } {
   const rect = el.getBoundingClientRect();
@@ -140,12 +147,20 @@ function readCanvasPixelSize(el: Element): { width: number; height: number } {
   };
 }
 
-function alignedGridPitch(widthPx: number): number {
-  return alignedPitch(widthPx, TARGET_CELL_CSS_PX, devicePixelRatio);
+/** Read width in device pixels with sub-pixel precision when available. */
+function readWidthDevicePx(entry: ResizeObserverEntry): number {
+  const dp = entry.devicePixelContentBoxSize?.[0]?.inlineSize;
+  if (typeof dp === 'number' && dp > 0) return dp;
+  return Math.max(1, Math.round(entry.contentRect.width * devicePixelRatio));
 }
 
-function overscanPx(widthPx: number): number {
-  return Math.round(alignedGridPitch(widthPx) * MAJOR_EVERY * OVERSCAN_MAJOR_BANDS);
+function pickCanvasHeight(initialShellHeightDevicePx: number): number {
+  const screenDevicePx = Math.round(screen.height * devicePixelRatio);
+  return Math.max(initialShellHeightDevicePx, screenDevicePx, MIN_CANVAS_HEIGHT_DEVICE_PX);
+}
+
+function alignedGridPitch(widthPx: number): number {
+  return alignedPitch(widthPx, TARGET_CELL_CSS_PX, devicePixelRatio);
 }
 
 function applyCanvasBox(canvas: HTMLCanvasElement, widthPx: number, heightPx: number): void {
@@ -162,40 +177,51 @@ function hideCanvasDuringResize(canvas: HTMLCanvasElement): void {
   }, 120);
 }
 
-function publishCanvasResize(
-  canvas: HTMLCanvasElement,
-  widthPx: number,
-  shellHeightPx: number,
-): void {
-  stableCanvasH = Math.max(stableCanvasH, shellHeightPx);
-  canvasW = widthPx;
-  canvasH = stableCanvasH + overscanPx(widthPx);
+function applyGridMargin(widthPx: number): void {
+  const gp = alignedGridPitch(widthPx);
+  document.documentElement.style.setProperty(
+    '--grid-margin',
+    `${(0.8 * gp * MAJOR_EVERY / devicePixelRatio).toFixed(1)}px`,
+  );
+}
 
+function publishCanvasResize(canvas: HTMLCanvasElement, widthPx: number): void {
+  canvasW = widthPx;
   applyCanvasBox(canvas, canvasW, canvasH);
   hideCanvasDuringResize(canvas);
-
-  const gp = alignedGridPitch(widthPx);
-  document.documentElement.style.setProperty('--grid-margin', `${(0.8 * gp * MAJOR_EVERY / devicePixelRatio).toFixed(1)}px`);
-  log.debug('Resize →', widthPx, 'x', canvasH, '(shell', shellHeightPx, ')');
+  applyGridMargin(canvasW);
+  log.debug('Resize → width', canvasW, 'height', canvasH);
   bridge.post({ type: 'resize', width: canvasW, height: canvasH });
 }
 
-function queueShrinkResize(): void {
-  if (shrinkTimer !== null) clearTimeout(shrinkTimer);
-  shrinkTimer = window.setTimeout(() => {
-    shrinkTimer = null;
-    if (!canvasRef.value || pendingShrinkH <= 0) return;
+function scheduleResizePublish(canvas: HTMLCanvasElement): void {
+  if (resizeRafId !== null) return;
+  resizeRafId = requestAnimationFrame(() => {
+    resizeRafId = null;
+    if (pendingWidth === 0 || pendingWidth === canvasW) return;
+    publishCanvasResize(canvas, pendingWidth);
+  });
+}
 
-    const scrollAge = performance.now() - lastScrollActivityAt;
-    if (scrollAge < SCROLL_ACTIVE_MS) {
-      queueShrinkResize();
-      return;
-    }
-
-    stableCanvasH = pendingShrinkH;
-    publishCanvasResize(canvasRef.value, canvasW, stableCanvasH);
-    pendingShrinkH = 0;
-  }, SHRINK_DEBOUNCE_MS);
+/**
+ * Subscribe to device-pixel-ratio changes via matchMedia.  The query
+ * captures the current DPR at construction, so we re-arm after every
+ * fire — cleaner than polling.
+ */
+function watchDevicePixelRatio(onChange: () => void): () => void {
+  let detached = false;
+  const arm = (): void => {
+    if (detached) return;
+    const mql = matchMedia(`(resolution: ${devicePixelRatio}dppx)`);
+    const handler = (): void => {
+      if (detached) return;
+      onChange();
+      arm();
+    };
+    mql.addEventListener('change', handler, { once: true });
+  };
+  arm();
+  return () => { detached = true; };
 }
 
 onMounted(() => {
@@ -205,8 +231,7 @@ onMounted(() => {
 
   const initialSize = readCanvasPixelSize(shell);
   canvasW = initialSize.width;
-  stableCanvasH = initialSize.height;
-  canvasH = stableCanvasH + overscanPx(canvasW);
+  canvasH = pickCanvasHeight(initialSize.height);
   canvas.width = canvasW;
   canvas.height = canvasH;
   applyCanvasBox(canvas, canvasW, canvasH);
@@ -214,8 +239,7 @@ onMounted(() => {
 
   const offscreen = canvas.transferControlToOffscreen();
   const gridPitch = alignedGridPitch(canvasW);
-  const marginCss = 0.8 * gridPitch * MAJOR_EVERY / devicePixelRatio;
-  document.documentElement.style.setProperty('--grid-margin', `${marginCss.toFixed(1)}px`);
+  applyGridMargin(canvasW);
 
   bridge.init(offscreen, gridPitch);
   log.debug('Worker spawned, gridPitch', gridPitch.toFixed(2));
@@ -269,10 +293,6 @@ onMounted(() => {
     // usually 0 and we want to fall back to window.scrollY.  Use `||` (not
     // `??`) so a zero from mainEl still falls through.
     const raw = mainEl?.scrollTop || window.scrollY;
-    if (Math.abs(raw - lastScrollSample) > 0.5) {
-      lastScrollSample = raw;
-      lastScrollActivityAt = performance.now();
-    }
     targetScroll = raw * PARALLAX_RATE * devicePixelRatio;
     currentScroll += (targetScroll - currentScroll) * PARALLAX_EASE;
 
@@ -282,57 +302,45 @@ onMounted(() => {
     }
   });
 
-  // Resize observer
+  // Resize observer — width-only.  Shell-height changes are deliberately
+  // ignored: the canvas is fixed-positioned and clipped by the shell's
+  // overflow:hidden, so the canvas backing texture only needs to be at
+  // least as tall as any plausible viewport (handled by `pickCanvasHeight`
+  // at mount and on DPR change).  Width changes still feed through but
+  // are coalesced to one publish per animation frame to avoid swapchain-
+  // rebuild storms during window-edge drag.
   resizeObserver = new ResizeObserver(([entry]) => {
     if (!canvasRef.value) return;
-    const w = Math.round(entry.contentRect.width * devicePixelRatio);
-    const shellH = Math.round(entry.contentRect.height * devicePixelRatio);
-    if (w <= 0 || shellH <= 0) return;
-
-    const canvas = canvasRef.value;
-    const widthChanged = w !== canvasW;
-    const heightGrew = shellH > stableCanvasH;
-    const heightShrank = shellH < stableCanvasH;
-
-    if (widthChanged) {
-      if (shrinkTimer !== null) {
-        clearTimeout(shrinkTimer);
-        shrinkTimer = null;
-      }
-      pendingShrinkH = 0;
-      stableCanvasH = shellH;
-      publishCanvasResize(canvas, w, shellH);
-      return;
-    }
-
-    if (heightGrew) {
-      if (shrinkTimer !== null) {
-        clearTimeout(shrinkTimer);
-        shrinkTimer = null;
-      }
-      pendingShrinkH = 0;
-      publishCanvasResize(canvas, w, shellH);
-      return;
-    }
-
-    if (!heightShrank) return;
-
-    pendingShrinkH = shellH;
-    queueShrinkResize();
+    const w = readWidthDevicePx(entry);
+    if (w <= 0 || w === canvasW) return;
+    pendingWidth = w;
+    scheduleResizePublish(canvasRef.value);
   });
   resizeObserver.observe(shell);
+
+  // DPR listener — fires when the user moves the window between displays
+  // of different DPI or changes OS scaling.  Recomputes the constant
+  // canvas height for the new DPR and republishes the current width so
+  // the worker re-applies CSS dims and uniforms.
+  detachDprListener = watchDevicePixelRatio(() => {
+    if (!shellRef.value || !canvasRef.value) return;
+    const shellH = Math.round(shellRef.value.getBoundingClientRect().height * devicePixelRatio);
+    canvasH = pickCanvasHeight(shellH);
+    publishCanvasResize(canvasRef.value, canvasW);
+  });
 });
 
 onUnmounted(() => {
   anim.stop();
   resizeObserver?.disconnect();
+  detachDprListener?.();
   if (canvasHideTimer !== null) {
     clearTimeout(canvasHideTimer);
     canvasHideTimer = null;
   }
-  if (shrinkTimer !== null) {
-    clearTimeout(shrinkTimer);
-    shrinkTimer = null;
+  if (resizeRafId !== null) {
+    cancelAnimationFrame(resizeRafId);
+    resizeRafId = null;
   }
   document.removeEventListener('click', onDocumentClick);
   detachDrag?.();

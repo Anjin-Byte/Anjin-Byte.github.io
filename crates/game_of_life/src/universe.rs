@@ -1,19 +1,21 @@
-use std::fmt;
-
 use wasm_bindgen::prelude::*;
 
-use crate::cell::Cell;
+use game_of_life_core::World;
+
 use crate::utils::set_panic_hook;
 
-/// A toroidal grid of cells evolving under Conway's Game of Life rules.
+/// CPU-side Game of Life facade for the JavaScript fallback path.
 ///
-/// The grid wraps at edges — cells on the boundary treat the opposite edge
-/// as their neighbor.
+/// Wraps a `World` (the canonical bit-packed representation shared with
+/// the GPU adapter) and maintains a `Vec<u8>` byte mirror that JS can
+/// read directly via the `cells()` pointer.  The mirror is refreshed
+/// after every `tick()`.  Mirror length = `width × height` bytes,
+/// 1 byte per cell (0 = dead, 1 = alive) — matches the contract the
+/// JS-side `WasmBridge` and `cpuRenderer.ts` expect.
 #[wasm_bindgen]
 pub struct Universe {
-    width: u32,
-    height: u32,
-    cells: Vec<Cell>,
+    world: World,
+    cells: Vec<u8>,
 }
 
 impl Default for Universe {
@@ -22,101 +24,72 @@ impl Default for Universe {
     }
 }
 
-/// Public methods exported to JavaScript.
 #[wasm_bindgen]
 impl Universe {
+    /// Construct the production-default 128×128 Universe.  The initial
+    /// pattern (cells where `i % 2 == 0 || i % 7 == 0`) is preserved
+    /// from the pre-Phase-2 implementation so the CPU-fallback canvas
+    /// looks identical to before this refactor.
     pub fn new() -> Universe {
-        set_panic_hook();
-
-        let width = 128;
-        let height = 128;
-
-        let cells = (0..width * height)
-            .map(|i| {
-                if i % 2 == 0 || i % 7 == 0 {
-                    Cell::Alive
-                } else {
-                    Cell::Dead
-                }
-            })
-            .collect();
-
-        Universe { width, height, cells }
+        Self::with_dims(128, 128)
     }
 
     pub fn width(&self) -> u32 {
-        self.width
+        self.world.cols()
     }
 
     pub fn height(&self) -> u32 {
-        self.height
+        self.world.rows()
     }
 
-    /// Returns a pointer into WASM linear memory for direct JS access.
-    pub fn cells(&self) -> *const Cell {
+    /// Pointer to the byte-per-cell mirror in WASM linear memory.
+    /// JS reads it as `new Uint8Array(memory.buffer, ptr, w * h)`.
+    pub fn cells(&self) -> *const u8 {
         self.cells.as_ptr()
     }
 
-    pub fn render(&self) -> String {
-        self.to_string()
-    }
-
-    /// Advances the simulation by one generation.
+    /// Advance one generation.  Delegates to `World::tick()`, then
+    /// refreshes the byte mirror so the next `cells()` read sees the
+    /// new state.
     pub fn tick(&mut self) {
-        let mut next = self.cells.clone();
-
-        for row in 0..self.height {
-            for col in 0..self.width {
-                let idx = self.get_index(row, col);
-                let cell = self.cells[idx];
-                let live_neighbors = self.live_neighbor_count(row, col);
-
-                next[idx] = match (cell, live_neighbors) {
-                    (Cell::Alive, x) if x < 2 => Cell::Dead,
-                    (Cell::Alive, 2) | (Cell::Alive, 3) => Cell::Alive,
-                    (Cell::Alive, x) if x > 3 => Cell::Dead,
-                    (Cell::Dead, 3) => Cell::Alive,
-                    (otherwise, _) => otherwise,
-                };
-            }
-        }
-
-        self.cells = next;
+        self.world.tick();
+        self.refresh_mirror();
     }
 }
 
 impl Universe {
-    fn get_index(&self, row: u32, column: u32) -> usize {
-        (row * self.width + column) as usize
-    }
-
-    /// Counts live neighbors using wrapping (toroidal) coordinates.
-    fn live_neighbor_count(&self, row: u32, column: u32) -> u8 {
-        let mut count = 0;
-        for delta_row in [self.height - 1, 0, 1] {
-            for delta_col in [self.width - 1, 0, 1] {
-                if delta_row == 0 && delta_col == 0 {
-                    continue;
-                }
-                let neighbor_row = (row + delta_row) % self.height;
-                let neighbor_col = (column + delta_col) % self.width;
-                let idx = self.get_index(neighbor_row, neighbor_col);
-                count += self.cells[idx] as u8;
+    /// Construct with arbitrary dimensions.  Tests use this; production
+    /// goes through `Universe::new()` at 128×128.
+    pub fn with_dims(cols: u32, rows: u32) -> Universe {
+        set_panic_hook();
+        let mut world = World::new(cols, rows);
+        // Preserve the pre-refactor seed pattern so the CPU fallback
+        // produces visually-identical initial state to the pre-Phase-2
+        // implementation.  Iterating in row-major order matches the
+        // original index math (i % cols / i / cols).
+        for i in 0..(cols * rows) {
+            if i % 2 == 0 || i % 7 == 0 {
+                let cy = i / cols;
+                let cx = i % cols;
+                world.set_cell(cx, cy, true);
             }
         }
-        count
+        let mut universe = Universe {
+            world,
+            cells: vec![0; (cols * rows) as usize],
+        };
+        universe.refresh_mirror();
+        universe
     }
-}
 
-impl fmt::Display for Universe {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for line in self.cells.as_slice().chunks(self.width as usize) {
-            for &cell in line {
-                let symbol = if cell == Cell::Dead { '◻' } else { '◼' };
-                write!(f, "{}", symbol)?;
+    fn refresh_mirror(&mut self) {
+        let cols = self.world.cols();
+        let rows = self.world.rows();
+        for cy in 0..rows {
+            for cx in 0..cols {
+                let idx = (cy * cols + cx) as usize;
+                self.cells[idx] = self.world.cell_at(cx, cy) as u8;
             }
-            writeln!(f)?;
         }
-        Ok(())
     }
 }

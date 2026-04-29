@@ -128,18 +128,13 @@ impl World {
     }
 
     /// Stamp a pattern at world cell `(ox, oy)` with the given orientation.
-    /// Pattern-local coordinates are translated to world coordinates via
-    /// `transform.apply(...)`, then offset by `(ox, oy)` and wrapped into
-    /// the toroidal world.  Cells already alive in the world stay alive
-    /// (this is a "set" not a "toggle" — stamping is additive).
+    /// Cells already alive in the world stay alive — stamping is additive
+    /// (set, not toggle).  Geometric translation lives in
+    /// [`crate::seeding::stamp_cells`] so the GPU adapter and the CPU
+    /// world share one source of truth for "where does a stamp land?".
     pub fn stamp(&mut self, pattern: &Pattern, ox: u32, oy: u32, transform: Transform) {
-        let pw = pattern.width();
-        let ph = pattern.height();
-        for (px, py) in pattern.alive_cells() {
-            let (tx, ty) = transform.apply(px, py, pw, ph);
-            let wx = (ox + tx) % self.cols;
-            let wy = (oy + ty) % self.rows;
-            self.set_cell(wx, wy, true);
+        for (cx, cy) in crate::seeding::stamp_cells(pattern, ox, oy, transform, self.cols, self.rows) {
+            self.set_cell(cx, cy, true);
         }
     }
 

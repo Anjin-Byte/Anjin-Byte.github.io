@@ -1,3 +1,7 @@
+// See `app/src/utils/gridCoords.ts` for the four coordinate spaces
+// (CSS px → canvas px → world px → world cell) referenced throughout
+// this composable.
+
 import { type Ref } from 'vue';
 import {
   type CoordSnapshot,
@@ -19,7 +23,7 @@ export interface CoordinateMapper {
   normalizeRect(a: CellCoord, b: CellCoord): BlankZoneRect;
   snapRectToMajor(rect: BlankZoneRect, snap: CoordSnapshot): BlankZoneRect;
   isInteractiveTarget(target: EventTarget | null): boolean;
-  wrapXToViewport(x: number, snap: CoordSnapshot): number;
+  wrapXToWorld(x: number, snap: CoordSnapshot): number;
 }
 
 const INTERACTIVE_TAGS = new Set(['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'LABEL']);
@@ -36,13 +40,13 @@ export function useCoordinateMapper(
       gridPitch: info.gridPitch,
       scrollCanvasPx: scrollCanvasPx.value,
       dpr: devicePixelRatio,
-      screenCols: info.screenCols,
-      screenRows: info.screenRows,
+      worldCols: info.worldCols,
+      worldRows: info.worldRows,
     };
   }
 
-  function wrapXToViewport(x: number, snap: CoordSnapshot): number {
-    return ((x % snap.screenCols) + snap.screenCols) % snap.screenCols;
+  function wrapXToWorld(x: number, snap: CoordSnapshot): number {
+    return ((x % snap.worldCols) + snap.worldCols) % snap.worldCols;
   }
 
   function pointerToCell(event: PointerEvent): CellCoord | null {
@@ -50,7 +54,7 @@ export function useCoordinateMapper(
     if (!snap) return null;
     const cell = screenToCell(event.clientX, event.clientY, snap);
     return {
-      cx: wrapXToViewport(cell.cx, snap),
+      cx: wrapXToWorld(cell.cx, snap),
       cy: cell.cy,
     };
   }
@@ -68,9 +72,9 @@ export function useCoordinateMapper(
     const toStart = (v: number): number => Math.floor(v / MAJOR_EVERY) * MAJOR_EVERY;
     const toEnd = (v: number): number => toStart(v) + (MAJOR_EVERY - 1);
     return {
-      x1: Math.max(0, Math.min(snap.screenCols - 1, toStart(rect.x1))),
+      x1: Math.max(0, Math.min(snap.worldCols - 1, toStart(rect.x1))),
       y1: toStart(rect.y1),
-      x2: Math.max(0, Math.min(snap.screenCols - 1, toEnd(rect.x2))),
+      x2: Math.max(0, Math.min(snap.worldCols - 1, toEnd(rect.x2))),
       y2: toEnd(rect.y2),
     };
   }
@@ -95,6 +99,6 @@ export function useCoordinateMapper(
     normalizeRect,
     snapRectToMajor,
     isInteractiveTarget,
-    wrapXToViewport,
+    wrapXToWorld,
   };
 }

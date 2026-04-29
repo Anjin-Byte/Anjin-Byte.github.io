@@ -13,8 +13,8 @@ use crate::grid::Grid;
 #[repr(C)]
 #[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy)]
 pub struct RenderUniforms {
-    pub screen_cols: u32,         // offset 0
-    pub screen_rows: u32,         // 4
+    pub world_cols: u32,          // offset 0
+    pub world_rows: u32,          // 4
     pub padded_rows: u32,         // 8
     pub words_per_row: u32,       // 12
     pub cell_px: u32,             // 16
@@ -37,8 +37,8 @@ impl RenderUniforms {
         let viewport_size_x = grid.canvas_width.div_ceil(grid.cell_px.max(1));
         let viewport_size_y = grid.canvas_height.div_ceil(grid.cell_px.max(1));
         RenderUniforms {
-            screen_cols: grid.screen_cols,
-            screen_rows: grid.screen_rows,
+            world_cols: grid.world_cols,
+            world_rows: grid.world_rows,
             padded_rows: grid.padded_rows,
             words_per_row: grid.words_per_row,
             cell_px: grid.cell_px,

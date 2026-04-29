@@ -4,8 +4,8 @@
 // Wrapping uses power-of-2 bitmasks — no division, no ghost cells, fully branch-free.
 
 struct Uniforms {
-    screen_cols:   u32,
-    screen_rows:   u32,
+    world_cols:    u32,
+    world_rows:    u32,
     padded_rows:   u32,
     words_per_row: u32,
     cell_px:       u32,

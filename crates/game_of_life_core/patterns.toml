@@ -1,0 +1,575 @@
+# Pattern library configuration.  Read by build.rs at `cargo build` time:
+# each entry's RLE is fetched from the URL (or loaded from
+# patterns_cache/<ident>.rle if already cached), parsed, and emitted as
+# a `pub const Pattern` in the generated patterns module.
+#
+# Categories used to populate the per-category indices in the generated
+# code:
+#   methuselah  → ALL_METHUSELAHS  (chaos / unpredictable evolution)
+#   spaceship   → ALL_SPACESHIPS   (translates across the world)
+#   oscillator  → ALL_OSCILLATORS  (cycles forever)
+#   gun         → ALL_GUNS         (emits spaceships forever — excluded
+#                                   from auto-reseed pool, accumulates
+#                                   debris too aggressively)
+#   still_life  → ALL_STILL_LIFES  (excluded from auto-reseed pool —
+#                                   never decays)
+#
+# `ident` is the Rust constant name (uppercase snake-case).  Existing
+# tests reference R_PENTOMINO, ACORN, etc. — preserve those idents.
+#
+# `name` is the human-readable label baked into the Pattern at runtime.
+#
+# `url` is the LifeWiki RLE URL.  If the fetch fails (network, 404,
+# parse error), the pattern is skipped with a warning to stderr but
+# the build still succeeds — this keeps offline builds working as long
+# as patterns_cache/ is populated, and a single broken upstream URL
+# doesn't break the build.
+
+# ── Methuselahs ─────────────────────────────────────────────────────
+
+[[patterns]]
+ident = "R_PENTOMINO"
+name = "r-pentomino"
+category = "methuselah"
+url = "https://conwaylife.com/patterns/rpentomino.rle"
+
+[[patterns]]
+ident = "ACORN"
+name = "acorn"
+category = "methuselah"
+url = "https://conwaylife.com/patterns/acorn.rle"
+
+[[patterns]]
+ident = "DIEHARD"
+name = "diehard"
+category = "methuselah"
+url = "https://conwaylife.com/patterns/diehard.rle"
+
+[[patterns]]
+ident = "PI_HEPTOMINO"
+name = "pi-heptomino"
+category = "methuselah"
+url = "https://conwaylife.com/patterns/piheptomino.rle"
+
+[[patterns]]
+ident = "B_HEPTOMINO"
+name = "b-heptomino"
+category = "methuselah"
+url = "https://conwaylife.com/patterns/bheptomino.rle"
+
+[[patterns]]
+ident = "C_HEPTOMINO"
+name = "c-heptomino"
+category = "methuselah"
+url = "https://conwaylife.com/patterns/cheptomino.rle"
+
+[[patterns]]
+ident = "BUNNIES"
+name = "bunnies"
+category = "methuselah"
+url = "https://conwaylife.com/patterns/bunnies.rle"
+
+[[patterns]]
+ident = "RABBITS"
+name = "rabbits"
+category = "methuselah"
+url = "https://conwaylife.com/patterns/rabbits.rle"
+
+[[patterns]]
+ident = "THUNDERBIRD"
+name = "thunderbird"
+category = "methuselah"
+url = "https://conwaylife.com/patterns/thunderbird.rle"
+
+[[patterns]]
+ident = "IWONA"
+name = "iwona"
+category = "methuselah"
+url = "https://conwaylife.com/patterns/iwona.rle"
+
+[[patterns]]
+ident = "JUSTYNA"
+name = "justyna"
+category = "methuselah"
+url = "https://conwaylife.com/patterns/justyna.rle"
+
+[[patterns]]
+ident = "LIDKA"
+name = "lidka"
+category = "methuselah"
+url = "https://conwaylife.com/patterns/lidka.rle"
+
+[[patterns]]
+ident = "CENTURY"
+name = "century"
+category = "methuselah"
+url = "https://conwaylife.com/patterns/century.rle"
+
+[[patterns]]
+ident = "EDNA"
+name = "edna"
+category = "methuselah"
+url = "https://conwaylife.com/patterns/edna.rle"
+
+[[patterns]]
+ident = "FOX"
+name = "fox"
+category = "methuselah"
+url = "https://conwaylife.com/patterns/fox.rle"
+
+[[patterns]]
+ident = "JAWS"
+name = "jaws"
+category = "methuselah"
+url = "https://conwaylife.com/patterns/jaws.rle"
+
+[[patterns]]
+ident = "MULTUMINPARVO"
+name = "multuminparvo"
+category = "methuselah"
+url = "https://conwaylife.com/patterns/multuminparvo.rle"
+
+[[patterns]]
+ident = "BUNNIES9"
+name = "bunnies9"
+category = "methuselah"
+url = "https://conwaylife.com/patterns/bunnies9.rle"
+
+# ── Spaceships ──────────────────────────────────────────────────────
+
+[[patterns]]
+ident = "GLIDER"
+name = "glider"
+category = "spaceship"
+url = "https://conwaylife.com/patterns/glider.rle"
+
+[[patterns]]
+ident = "LWSS"
+name = "lwss"
+category = "spaceship"
+url = "https://conwaylife.com/patterns/lwss.rle"
+
+[[patterns]]
+ident = "MWSS"
+name = "mwss"
+category = "spaceship"
+url = "https://conwaylife.com/patterns/mwss.rle"
+
+[[patterns]]
+ident = "HWSS"
+name = "hwss"
+category = "spaceship"
+url = "https://conwaylife.com/patterns/hwss.rle"
+
+[[patterns]]
+ident = "COPPERHEAD"
+name = "copperhead"
+category = "spaceship"
+url = "https://conwaylife.com/patterns/copperhead.rle"
+
+[[patterns]]
+ident = "WEEKENDER"
+name = "weekender"
+category = "spaceship"
+url = "https://conwaylife.com/patterns/weekender.rle"
+
+[[patterns]]
+ident = "BRAIN"
+name = "brain"
+category = "spaceship"
+url = "https://conwaylife.com/patterns/brain.rle"
+
+[[patterns]]
+ident = "SWAN"
+name = "swan"
+category = "spaceship"
+url = "https://conwaylife.com/patterns/swan.rle"
+
+[[patterns]]
+ident = "DART"
+name = "dart"
+category = "spaceship"
+url = "https://conwaylife.com/patterns/dart.rle"
+
+[[patterns]]
+ident = "SIDECAR"
+name = "sidecar"
+category = "spaceship"
+url = "https://conwaylife.com/patterns/sidecar.rle"
+
+[[patterns]]
+ident = "PUSHALONG1"
+name = "pushalong-1"
+category = "spaceship"
+url = "https://conwaylife.com/patterns/pushalong1.rle"
+
+[[patterns]]
+ident = "COESHIP"
+name = "coe-ship"
+category = "spaceship"
+url = "https://conwaylife.com/patterns/coeship.rle"
+
+[[patterns]]
+ident = "DRAGON"
+name = "dragon"
+category = "spaceship"
+url = "https://conwaylife.com/patterns/dragon.rle"
+
+# `30p25` and `60p5h2v0` are LifeWiki's canonical names; idents are
+# prefixed with `SHIP_` because Rust idents cannot start with a digit.
+[[patterns]]
+ident = "SHIP_30P25"
+name = "30p25"
+category = "spaceship"
+url = "https://conwaylife.com/patterns/30p25.rle"
+
+[[patterns]]
+ident = "SHIP_60P5H2V0"
+name = "60p5h2v0"
+category = "spaceship"
+url = "https://conwaylife.com/patterns/60p5h2v0.rle"
+
+# ── Oscillators ─────────────────────────────────────────────────────
+
+[[patterns]]
+ident = "BLINKER"
+name = "blinker"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/blinker.rle"
+
+[[patterns]]
+ident = "TOAD"
+name = "toad"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/toad.rle"
+
+[[patterns]]
+ident = "BEACON"
+name = "beacon"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/beacon.rle"
+
+[[patterns]]
+ident = "PULSAR"
+name = "pulsar"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/pulsar.rle"
+
+[[patterns]]
+ident = "PENTADECATHLON"
+name = "pentadecathlon"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/pentadecathlon.rle"
+
+[[patterns]]
+ident = "CLOCK"
+name = "clock"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/clock.rle"
+
+[[patterns]]
+ident = "OCTAGON2"
+name = "octagon2"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/octagon2.rle"
+
+[[patterns]]
+ident = "MOLD"
+name = "mold"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/mold.rle"
+
+[[patterns]]
+ident = "TUMBLER"
+name = "tumbler"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/tumbler.rle"
+
+[[patterns]]
+ident = "PINWHEEL"
+name = "pinwheel"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/pinwheel.rle"
+
+[[patterns]]
+ident = "FIGURE_EIGHT"
+name = "figure-eight"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/figureeight.rle"
+
+[[patterns]]
+ident = "MAZING"
+name = "mazing"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/mazing.rle"
+
+[[patterns]]
+ident = "QUEEN_BEE_SHUTTLE"
+name = "queen-bee-shuttle"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/queenbeeshuttle.rle"
+
+[[patterns]]
+ident = "TWIN_BEES_SHUTTLE"
+name = "twin-bees-shuttle"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/twinbeesshuttle.rle"
+
+[[patterns]]
+ident = "JAM"
+name = "jam"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/jam.rle"
+
+[[patterns]]
+ident = "OCTAGON4"
+name = "octagon-4"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/octagon4.rle"
+
+[[patterns]]
+ident = "FUMAROLE"
+name = "fumarole"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/fumarole.rle"
+
+[[patterns]]
+ident = "SPARK_COIL"
+name = "spark-coil"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/sparkcoil.rle"
+
+[[patterns]]
+ident = "CAULDRON"
+name = "cauldron"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/cauldron.rle"
+
+[[patterns]]
+ident = "BLOCKER"
+name = "blocker"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/blocker.rle"
+
+[[patterns]]
+ident = "BIPOLE"
+name = "bipole"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/bipole.rle"
+
+[[patterns]]
+ident = "TRIPOLE"
+name = "tripole"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/tripole.rle"
+
+[[patterns]]
+ident = "QUADPOLE"
+name = "quadpole"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/quadpole.rle"
+
+[[patterns]]
+ident = "PENTAPOLE"
+name = "pentapole"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/pentapole.rle"
+
+[[patterns]]
+ident = "HEXAPOLE"
+name = "hexapole"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/hexapole.rle"
+
+[[patterns]]
+ident = "HEPTAPOLE"
+name = "heptapole"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/heptapole.rle"
+
+[[patterns]]
+ident = "X66"
+name = "x66"
+category = "oscillator"
+url = "https://conwaylife.com/patterns/x66.rle"
+
+# ── Guns ────────────────────────────────────────────────────────────
+
+[[patterns]]
+ident = "GOSPER_GLIDER_GUN"
+name = "gosper-glider-gun"
+category = "gun"
+url = "https://conwaylife.com/patterns/gosperglidergun.rle"
+
+[[patterns]]
+ident = "P46_GUN"
+name = "p46-gun"
+category = "gun"
+url = "https://conwaylife.com/patterns/p46gun.rle"
+
+[[patterns]]
+ident = "NEW_GUN_1"
+name = "new-gun-1"
+category = "gun"
+url = "https://conwaylife.com/patterns/newgun1.rle"
+
+[[patterns]]
+ident = "SIMKIN_GLIDER_GUN"
+name = "simkin-glider-gun"
+category = "gun"
+url = "https://conwaylife.com/patterns/simkinglidergun.rle"
+
+[[patterns]]
+ident = "BIGUN"
+name = "bi-gun"
+category = "gun"
+url = "https://conwaylife.com/patterns/bigun.rle"
+
+# Puffers belong here (not in spaceships) because they emit permanent
+# debris — including them in the auto-reseed pool would compound
+# alive-count over time, same hazard as guns.
+[[patterns]]
+ident = "BLINKER_PUFFER_1"
+name = "blinker-puffer-1"
+category = "gun"
+url = "https://conwaylife.com/patterns/blinkerpuffer1.rle"
+
+[[patterns]]
+ident = "PUFFERFISH"
+name = "pufferfish"
+category = "gun"
+url = "https://conwaylife.com/patterns/pufferfish.rle"
+
+[[patterns]]
+ident = "PUFFERFISH_SPACESHIP"
+name = "pufferfish-spaceship"
+category = "gun"
+url = "https://conwaylife.com/patterns/pufferfishspaceship.rle"
+
+# ── Still lifes ─────────────────────────────────────────────────────
+
+[[patterns]]
+ident = "BEEHIVE"
+name = "beehive"
+category = "still_life"
+url = "https://conwaylife.com/patterns/beehive.rle"
+
+[[patterns]]
+ident = "LOAF"
+name = "loaf"
+category = "still_life"
+url = "https://conwaylife.com/patterns/loaf.rle"
+
+[[patterns]]
+ident = "BOAT"
+name = "boat"
+category = "still_life"
+url = "https://conwaylife.com/patterns/boat.rle"
+
+[[patterns]]
+ident = "SHIP"
+name = "ship"
+category = "still_life"
+url = "https://conwaylife.com/patterns/ship.rle"
+
+[[patterns]]
+ident = "POND"
+name = "pond"
+category = "still_life"
+url = "https://conwaylife.com/patterns/pond.rle"
+
+[[patterns]]
+ident = "TUB"
+name = "tub"
+category = "still_life"
+url = "https://conwaylife.com/patterns/tub.rle"
+
+[[patterns]]
+ident = "AIRCRAFT_CARRIER"
+name = "aircraft-carrier"
+category = "still_life"
+url = "https://conwaylife.com/patterns/aircraftcarrier.rle"
+
+[[patterns]]
+ident = "BARGE"
+name = "barge"
+category = "still_life"
+url = "https://conwaylife.com/patterns/barge.rle"
+
+[[patterns]]
+ident = "LONG_BARGE"
+name = "long-barge"
+category = "still_life"
+url = "https://conwaylife.com/patterns/longbarge.rle"
+
+[[patterns]]
+ident = "LONG_BOAT"
+name = "long-boat"
+category = "still_life"
+url = "https://conwaylife.com/patterns/longboat.rle"
+
+[[patterns]]
+ident = "LONG_SHIP"
+name = "long-ship"
+category = "still_life"
+url = "https://conwaylife.com/patterns/longship.rle"
+
+[[patterns]]
+ident = "BIPOND"
+name = "bi-pond"
+category = "still_life"
+url = "https://conwaylife.com/patterns/bipond.rle"
+
+[[patterns]]
+ident = "CANOE"
+name = "canoe"
+category = "still_life"
+url = "https://conwaylife.com/patterns/canoe.rle"
+
+[[patterns]]
+ident = "HAT"
+name = "hat"
+category = "still_life"
+url = "https://conwaylife.com/patterns/hat.rle"
+
+[[patterns]]
+ident = "MANGO"
+name = "mango"
+category = "still_life"
+url = "https://conwaylife.com/patterns/mango.rle"
+
+[[patterns]]
+ident = "SNAKE"
+name = "snake"
+category = "still_life"
+url = "https://conwaylife.com/patterns/snake.rle"
+
+[[patterns]]
+ident = "INTEGRAL_SIGN"
+name = "integral-sign"
+category = "still_life"
+url = "https://conwaylife.com/patterns/integralsign.rle"
+
+[[patterns]]
+ident = "WING"
+name = "wing"
+category = "still_life"
+url = "https://conwaylife.com/patterns/wing.rle"
+
+[[patterns]]
+ident = "EATER_1"
+name = "eater-1"
+category = "still_life"
+url = "https://conwaylife.com/patterns/eater1.rle"
+
+[[patterns]]
+ident = "EATER_2"
+name = "eater-2"
+category = "still_life"
+url = "https://conwaylife.com/patterns/eater2.rle"
+
+[[patterns]]
+ident = "EATER_3"
+name = "eater-3"
+category = "still_life"
+url = "https://conwaylife.com/patterns/eater3.rle"

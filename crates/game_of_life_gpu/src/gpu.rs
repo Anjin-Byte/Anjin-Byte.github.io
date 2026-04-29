@@ -1,4 +1,11 @@
-use game_of_life_core::World;
+use std::collections::VecDeque;
+
+use game_of_life_core::{
+    pick_random_stamp_spaced, recommended_initial_count, seed_world_with_methuselahs, stamp_cells,
+    World, MAX_REJECTION_ATTEMPTS, MIN_PATTERN_DISTANCE,
+};
+use rand::SeedableRng;
+use rand_xoshiro::Xoshiro256StarStar;
 use wasm_bindgen::prelude::*;
 
 use crate::context::GpuContext;
@@ -21,6 +28,41 @@ const WORLD_ROWS: u32 = 1024;
 /// in normal use.
 const CELL_PX: u32 = 32;
 
+/// Base ticks between auto-reseed events.  At `TICK_EVERY = 175` frames
+/// per base tick (≈2.9 s on a 60 Hz display), an interval of 1 means
+/// the auto-reseed fires once per base tick.
+///
+/// Calibration rationale: world is 1024×1024 = ~1M cells, viewport is
+/// ≈8000 cells (≈0.77% of world).  Stamps land uniformly at random
+/// across the world (per docs/methuselah-seeding.md §7 — "no
+/// location-picking heuristic"), so most stamps are off-screen.
+/// To hit a visible-cadence target of ~1 stamp per minute in the
+/// viewport, we need ≈2 world-wide stamps/sec; with a 2.9-s base tick
+/// that's `RESEED_BATCH_SIZE = 6` stamps per reseed event.
+const RESEED_INTERVAL_TICKS: u32 = 1;
+
+/// Number of Methuselahs stamped per auto-reseed event.  Stamps are
+/// scattered with `MIN_PATTERN_DISTANCE` spacing where the rejection
+/// budget allows; visible cadence scales with this × visibility ratio.
+/// Calibration math (recognizable lifetime ~50 ticks, viewport ≈0.77%):
+///   visible_recognizable ≈ batch × 0.0077 × 50
+/// At batch=20 → ~8 visible recognizable; at batch=500 → ~190 (mostly
+/// chaos overlay); at the current value, the field is intentionally
+/// saturated.  Dial down for "named-pattern visibility" aesthetic.
+const RESEED_BATCH_SIZE: u32 = 50;
+
+/// Bound on remembered recent stamp positions used as the rejection
+/// set for `pick_random_stamp_spaced`.  Old stamps' chaos clouds
+/// outgrow `MIN_PATTERN_DISTANCE` well before falling out of this
+/// window, so trimming costs no spacing accuracy.  Sized to ~10× the
+/// batch size of the codex-recommended cadence; for very high
+/// `RESEED_BATCH_SIZE` values we just don't enforce spacing across
+/// the entire batch — the early stamps in a tick get spaced, later
+/// stamps may collide with them.  That's an acceptable degradation
+/// given the user has already opted into "saturated" by raising the
+/// batch this high.
+const RECENT_STAMP_MEMORY: usize = 200;
+
 /// WebGPU-accelerated Game of Life, exported to JavaScript.
 ///
 /// Init order required by wgpu ≥ 22:
@@ -38,34 +80,64 @@ const CELL_PX: u32 = 32;
 pub struct GpuGameOfLife {
     ctx: GpuContext,
     grid: Grid,
-    /// Canonical CPU-side cell state.  Owned here so future stamp
-    /// operations (Phase 3) can mutate it then sync to the GPU mirror
-    /// via `simulation.sync_world_to_visible(...)`.  Currently no
-    /// post-init reader, hence dead_code allow.
-    #[allow(dead_code)]
+    /// Canonical CPU-side cell state.  Used at construction to seed the
+    /// GPU buffers and consulted at runtime for `World::cols/rows`
+    /// during auto-reseed.  After init, the GPU buffer evolves
+    /// independently — `world` is intentionally not kept in sync with
+    /// per-tick GPU state.  Stamps update both: they queue OR-edits to
+    /// the GPU buffer (live) and call World::stamp on the CPU side
+    /// (so the stored seed-state stays semantically representative).
     world: World,
     simulation: Simulation,
     renderers: Vec<GpuRenderer>,
-    zones_json: String,  // latest sanitized zone payload from the app
+    zones_json: String,
+    /// RNG for auto-reseed pattern/position/orientation selection.
+    /// Seeded from a u32 supplied by the JS caller at construction.
+    rng: Xoshiro256StarStar,
+    /// Count of base ticks since construction.  Drives the periodic
+    /// auto-reseed in `tick_and_render`.
+    tick_count: u32,
+    /// Ring of recent stamp origins used as the rejection set for
+    /// `pick_random_stamp_spaced` so newly-stamped patterns don't
+    /// pile up on each other and immediately collide before
+    /// reaching their named-pattern recognizable phase.
+    recent_stamps: VecDeque<(u32, u32)>,
 }
 
 /// Shared init path: creates context + subsystems from a surface.
 /// Called by both `new` (HtmlCanvasElement) and `new_offscreen` (OffscreenCanvas).
+///
+/// `seed` is a u32 from the JS caller.  We widen it to u64 by
+/// concatenating `seed | (!seed << 32)` so all 64 bits of the
+/// Xoshiro256 internal state get non-zero contribution — a 0 seed
+/// would otherwise leave half the state zero, producing a less-mixed
+/// initial output.
 async fn from_surface(
     instance: wgpu::Instance,
     surface: wgpu::Surface<'static>,
     viewport_canvas_w: u32,
     viewport_canvas_h: u32,
+    seed: u32,
 ) -> Result<GpuGameOfLife, JsValue> {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
 
     let (ctx, adapter) = GpuContext::from_compatible_surface(&instance, &surface).await?;
 
-    // World is allocated once at startup; never reallocated on resize.
-    // The seed (0xdeadbeef) preserves visual continuity with the
-    // pre-decouple LCG-fill that produced the same bytes.
-    let world = World::from_seed(WORLD_COLS, WORLD_ROWS, 0xdeadbeef);
+    // RNG drives both the initial Methuselah scatter and the periodic
+    // auto-reseed.  Using one RNG for both makes the entire session
+    // reproducible from the JS-side seed (helpful for future URL-seeded
+    // determinism — see methuselah-seeding.md §10 q7).
+    let mut rng = Xoshiro256StarStar::seed_from_u64(
+        u64::from(seed) | (u64::from(!seed) << 32),
+    );
+
+    // World is allocated empty, then sprinkled with Methuselah patterns.
+    // Allocated once at startup; never reallocated on resize (Phase 1).
+    let mut world = World::new(WORLD_COLS, WORLD_ROWS);
+    let n_seeds = recommended_initial_count(WORLD_COLS, WORLD_ROWS);
+    seed_world_with_methuselahs(&mut world, &mut rng, n_seeds);
+
     let grid = Grid::from_world(&world, viewport_canvas_w, viewport_canvas_h, CELL_PX);
     let simulation = Simulation::new(&ctx.device, &ctx.queue, &grid, &world);
     let grid_pitch = CELL_PX as f32;
@@ -87,6 +159,9 @@ async fn from_surface(
         simulation,
         renderers: vec![renderer],
         zones_json: String::new(),
+        rng,
+        tick_count: 0,
+        recent_stamps: VecDeque::with_capacity(RECENT_STAMP_MEMORY),
     })
 }
 
@@ -96,11 +171,13 @@ impl GpuGameOfLife {
     ///
     /// `_grid_pitch` is preserved in the JS-facing signature for backward
     /// compatibility but is now ignored — cell pixel size is fixed by the
-    /// CELL_PX constant.  Drop the parameter from the worker side in a
-    /// future cleanup.
+    /// CELL_PX constant.  `seed` initialises the auto-reseed RNG; the JS
+    /// caller typically passes `Math.floor(Math.random() * 0x1_0000_0000)`
+    /// for per-session randomness, or a fixed value for reproducibility.
     pub async fn new(
         canvas: web_sys::HtmlCanvasElement,
         _grid_pitch: f32,
+        seed: u32,
     ) -> Result<GpuGameOfLife, JsValue> {
         let (width, height) = (canvas.width(), canvas.height());
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -111,15 +188,15 @@ impl GpuGameOfLife {
         let surface = instance
             .create_surface(wgpu::SurfaceTarget::Canvas(canvas))
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
-        from_surface(instance, surface, width, height).await
+        from_surface(instance, surface, width, height, seed).await
     }
 
-    /// Create from an OffscreenCanvas (Web Worker usage).
-    ///
-    /// `_grid_pitch` ignored as in `new` — see comment there.
+    /// Create from an OffscreenCanvas (Web Worker usage).  See `new`
+    /// for the `_grid_pitch` and `seed` parameter notes.
     pub async fn new_offscreen(
         canvas: web_sys::OffscreenCanvas,
         _grid_pitch: f32,
+        seed: u32,
     ) -> Result<GpuGameOfLife, JsValue> {
         let (width, height) = (canvas.width(), canvas.height());
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -130,7 +207,7 @@ impl GpuGameOfLife {
         let surface = instance
             .create_surface(wgpu::SurfaceTarget::OffscreenCanvas(canvas))
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
-        from_surface(instance, surface, width, height).await
+        from_surface(instance, surface, width, height, seed).await
     }
 
     /// Presents the current simulation state without advancing a generation.
@@ -144,10 +221,17 @@ impl GpuGameOfLife {
     ///
     /// Split into phases with separate `queue.submit()` calls so that
     /// storage buffer writes are guaranteed visible between phases.
+    /// Periodic auto-reseed (every `RESEED_INTERVAL_TICKS` base ticks)
+    /// queues a Methuselah stamp; the OR-edit shader applies it on the
+    /// next `flush_edits_if_pending()` call.
     pub fn tick_and_render(&mut self) {
         self.flush_edits_if_pending();
         self.snapshot_pre_tick();
         self.tick_base();
+        self.tick_count = self.tick_count.wrapping_add(1);
+        if self.tick_count.is_multiple_of(RESEED_INTERVAL_TICKS) {
+            self.auto_reseed();
+        }
         self.present();
     }
 
@@ -183,8 +267,9 @@ impl GpuGameOfLife {
         }
     }
 
-    /// Queue a cell toggle.  `cx` and `cy` are column/row indices already
-    /// wrapped into [0, screen_cols) / [0, screen_rows) by the JS caller.
+    /// Queue a cell toggle.  `cx` and `cy` are world-cell coordinates
+    /// already wrapped into `[0, world_cols) × [0, world_rows)` by the
+    /// JS caller (see `wrapCell` in `app/src/utils/gridCoords.ts`).
     ///
     /// The edit is deferred until the next `tick_and_render` or an explicit
     /// `flush_edits` call, so rapid clicks accumulate cheaply.
@@ -204,11 +289,11 @@ impl GpuGameOfLife {
     }
 
     /// Return grid dimensions for the main thread's coordinate mapping.
-    pub fn screen_cols(&self) -> u32 {
-        self.grid.screen_cols
+    pub fn world_cols(&self) -> u32 {
+        self.grid.world_cols
     }
-    pub fn screen_rows(&self) -> u32 {
-        self.grid.screen_rows
+    pub fn world_rows(&self) -> u32 {
+        self.grid.world_rows
     }
     pub fn padded_rows(&self) -> u32 {
         self.grid.padded_rows
@@ -259,8 +344,70 @@ impl GpuGameOfLife {
 impl GpuGameOfLife {
     /// Flush any pending cell edits to the GPU.
     fn flush_edits_if_pending(&mut self) {
-        if self.simulation.has_pending_edits() {
+        if self.simulation.has_pending_edits() || self.simulation.has_pending_set_edits() {
             self.simulation.flush_edits(&self.ctx.device, &self.ctx.queue);
+        }
+    }
+
+    /// Stamp `RESEED_BATCH_SIZE` random Methuselahs across the toroidal
+    /// world, with `MIN_PATTERN_DISTANCE` spacing enforced against the
+    /// most-recent stamps.  Spacing protects the "named-pattern
+    /// recognizable" phase — without it, two stamps landing within
+    /// ~5 cells of each other would collide before reaching gen 10
+    /// and immediately become noise.
+    ///
+    /// Per docs/methuselah-seeding.md §7: no bounding-region clearing,
+    /// no location-picking heuristic — just uniform random within the
+    /// rejection set's spacing budget.  When the batch size pushes the
+    /// rejection budget past saturation, `pick_random_stamp_spaced`
+    /// falls back to unconstrained random — better one collision than
+    /// a missing stamp.
+    fn auto_reseed(&mut self) {
+        let cols = self.world.cols();
+        let rows = self.world.rows();
+
+        // Build a single contiguous rejection set: cross-tick recent
+        // stamps + this-batch stamps as we place them.  Bounded to
+        // `RECENT_STAMP_MEMORY` so the per-stamp distance check stays
+        // O(constant) regardless of `RESEED_BATCH_SIZE`.  When the
+        // bound is exceeded mid-batch, we drop the oldest entry —
+        // those patterns have aged enough that their chaos clouds
+        // already extend past `MIN_PATTERN_DISTANCE` from their
+        // origin, so the spacing constraint doesn't bind any more.
+        let mut active: Vec<(u32, u32)> =
+            Vec::with_capacity(RECENT_STAMP_MEMORY.max(RESEED_BATCH_SIZE as usize));
+        active.extend(self.recent_stamps.iter().copied());
+
+        for _ in 0..RESEED_BATCH_SIZE {
+            let d = pick_random_stamp_spaced(
+                &mut self.rng,
+                cols,
+                rows,
+                &active,
+                MIN_PATTERN_DISTANCE,
+                MAX_REJECTION_ATTEMPTS,
+            );
+            let cells = stamp_cells(d.pattern, d.ox, d.oy, d.transform, cols, rows);
+            // Mirror the stamp on the CPU-side World so its state stays
+            // representative.  GPU side gets the same cells via the OR
+            // queue — flushed on the next `tick_and_render` cycle.
+            self.world.stamp(d.pattern, d.ox, d.oy, d.transform);
+            self.simulation.queue_pattern_stamp(&self.grid, cells);
+            // Add to active rejection set; trim from front when over
+            // budget so cost stays O(RECENT_STAMP_MEMORY) per stamp.
+            if active.len() >= RECENT_STAMP_MEMORY {
+                active.remove(0);
+            }
+            active.push((d.ox, d.oy));
+        }
+
+        // Persist the tail of `active` as cross-tick recent_stamps so
+        // the next reseed batch space-rejects against the newest
+        // patterns from this one.
+        self.recent_stamps.clear();
+        let tail_start = active.len().saturating_sub(RECENT_STAMP_MEMORY);
+        for &pos in &active[tail_start..] {
+            self.recent_stamps.push_back(pos);
         }
     }
 
