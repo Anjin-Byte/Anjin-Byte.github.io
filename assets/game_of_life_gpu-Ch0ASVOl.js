@@ -1,10 +1,9 @@
 import { _ as O } from "./__vite-plugin-wasm-helper-oqf-7dtx.js";
 let y;
 let __tla = (async ()=>{
-    var z = "/assets/game_of_life_gpu_bg-DcgeIDGU.wasm";
+    var z = "/assets/game_of_life_gpu_bg-BJhslP06.wasm";
     y = class {
         static __wrap(_) {
-            _ = _ >>> 0;
             const t = Object.create(y.prototype);
             return t.__wbg_ptr = _, D.register(t, t.__wbg_ptr, t), t;
         }
@@ -22,11 +21,11 @@ let __tla = (async ()=>{
         grid_pitch() {
             return c.gpugameoflife_grid_pitch(this.__wbg_ptr);
         }
-        static new(_, t) {
-            return c.gpugameoflife_new(_, t);
+        static new(_, t, n) {
+            return c.gpugameoflife_new(_, t, n);
         }
-        static new_offscreen(_, t) {
-            return c.gpugameoflife_new_offscreen(_, t);
+        static new_offscreen(_, t, n) {
+            return c.gpugameoflife_new_offscreen(_, t, n);
         }
         padded_rows() {
             return c.gpugameoflife_padded_rows(this.__wbg_ptr) >>> 0;
@@ -36,12 +35,6 @@ let __tla = (async ()=>{
         }
         resize(_, t) {
             c.gpugameoflife_resize(this.__wbg_ptr, _, t);
-        }
-        screen_cols() {
-            return c.gpugameoflife_screen_cols(this.__wbg_ptr) >>> 0;
-        }
-        screen_rows() {
-            return c.gpugameoflife_screen_rows(this.__wbg_ptr) >>> 0;
         }
         set_scroll(_) {
             c.gpugameoflife_set_scroll(this.__wbg_ptr, _);
@@ -65,6 +58,12 @@ let __tla = (async ()=>{
         }
         words_per_row() {
             return c.gpugameoflife_words_per_row(this.__wbg_ptr) >>> 0;
+        }
+        world_cols() {
+            return c.gpugameoflife_world_cols(this.__wbg_ptr) >>> 0;
+        }
+        world_rows() {
+            return c.gpugameoflife_world_rows(this.__wbg_ptr) >>> 0;
         }
     };
     Symbol.dispose && (y.prototype[Symbol.dispose] = y.prototype.free);
@@ -98,8 +97,8 @@ let __tla = (async ()=>{
     }
     function $(e, _) {
         const t = _, n = typeof t == "string" ? t : void 0;
-        var r = i(n) ? 0 : g(n, c.__wbindgen_malloc, c.__wbindgen_realloc), a = s;
-        b().setInt32(e + 4, a, !0), b().setInt32(e + 0, r, !0);
+        var r = i(n) ? 0 : g(n, c.__wbindgen_malloc, c.__wbindgen_realloc), f = s;
+        b().setInt32(e + 4, f, !0), b().setInt32(e + 0, r, !0);
     }
     function N(e, _) {
         throw new Error(w(e, _));
@@ -113,15 +112,15 @@ let __tla = (async ()=>{
     function Y(e, _) {
         return e.beginRenderPass(_);
     }
-    function Z(e) {
+    function J(e) {
         return e.buffer;
     }
-    function H() {
+    function Z() {
         return l(function(e, _, t) {
             return e.call(_, t);
         }, arguments);
     }
-    function J(e, _, t) {
+    function H(e, _, t) {
         e.clearBuffer(_, t);
     }
     function K(e, _, t, n) {
@@ -130,8 +129,8 @@ let __tla = (async ()=>{
     function ee(e, _) {
         e.configure(_);
     }
-    function _e(e, _, t, n, r, a) {
-        e.copyBufferToBuffer(_, t, n, r, a);
+    function _e(e, _, t, n, r, f) {
+        e.copyBufferToBuffer(_, t, n, r, f);
     }
     function te(e, _, t, n) {
         e.copyBufferToTexture(_, t, n);
@@ -148,10 +147,10 @@ let __tla = (async ()=>{
     function oe(e, _) {
         return e.createBindGroupLayout(_);
     }
-    function ae(e, _) {
+    function fe(e, _) {
         return e.createBindGroup(_);
     }
-    function fe(e, _) {
+    function ae(e, _) {
         return e.createBuffer(_);
     }
     function be(e, _) {
@@ -209,11 +208,11 @@ let __tla = (async ()=>{
     function Pe(e, _, t) {
         e.drawIndexedIndirect(_, t);
     }
-    function ve(e, _, t, n, r, a) {
-        e.drawIndexed(_ >>> 0, t >>> 0, n >>> 0, r, a >>> 0);
+    function ve(e, _, t, n, r, f) {
+        e.drawIndexed(_ >>> 0, t >>> 0, n >>> 0, r, f >>> 0);
     }
-    function ke(e, _, t, n, r, a) {
-        e.drawIndexed(_ >>> 0, t >>> 0, n >>> 0, r, a >>> 0);
+    function ke(e, _, t, n, r, f) {
+        e.drawIndexed(_ >>> 0, t >>> 0, n >>> 0, r, f >>> 0);
     }
     function Ce(e, _, t) {
         e.drawIndirect(_, t);
@@ -289,27 +288,27 @@ let __tla = (async ()=>{
             return i(n) ? 0 : d(n);
         }, arguments);
     }
-    function Ze(e) {
+    function Je(e) {
         return e.getCurrentTexture();
     }
-    function He(e, _, t) {
+    function Ze(e, _, t) {
         return e.getMappedRange(_, t);
     }
-    function Je(e) {
+    function He(e) {
         const _ = e.getPreferredCanvasFormat();
         return (On.indexOf(_) + 1 || 96) - 1;
     }
-    function Ke(e, _) {
-        const t = e[_ >>> 0];
-        return i(t) ? 0 : d(t);
-    }
-    function e_() {
+    function Ke() {
         return l(function(e, _) {
             return Reflect.get(e, _);
         }, arguments);
     }
-    function __(e, _) {
+    function e_(e, _) {
         return e[_ >>> 0];
+    }
+    function __(e, _) {
+        const t = e[_ >>> 0];
+        return i(t) ? 0 : d(t);
     }
     function t_(e) {
         return e.gpu;
@@ -326,7 +325,7 @@ let __tla = (async ()=>{
     function o_(e) {
         return e.height;
     }
-    function a_(e) {
+    function f_(e) {
         let _;
         try {
             _ = e instanceof GPUAdapter;
@@ -335,7 +334,7 @@ let __tla = (async ()=>{
         }
         return _;
     }
-    function f_(e) {
+    function a_(e) {
         let _;
         try {
             _ = e instanceof GPUCanvasContext;
@@ -498,13 +497,13 @@ let __tla = (async ()=>{
     function Y_(e) {
         return e.maxVertexAttributes;
     }
-    function Z_(e) {
+    function J_(e) {
         return e.maxVertexBufferArrayStride;
     }
-    function H_(e) {
+    function Z_(e) {
         return e.maxVertexBuffers;
     }
-    function J_(e, _) {
+    function H_(e, _) {
         const t = _.message, n = g(t, c.__wbindgen_malloc, c.__wbindgen_realloc), r = s;
         b().setInt32(e + 4, r, !0), b().setInt32(e + 0, n, !0);
     }
@@ -534,11 +533,11 @@ let __tla = (async ()=>{
     function ot() {
         return new Error;
     }
-    function at() {
-        return new Array;
-    }
     function ft() {
         return new Object;
+    }
+    function at() {
+        return new Array;
     }
     function bt(e, _) {
         return new Uint8Array(G(e, _));
@@ -548,11 +547,11 @@ let __tla = (async ()=>{
             var t = {
                 a: e,
                 b: _
-            }, n = (a, f)=>{
+            }, n = (f, a)=>{
                 const u = t.a;
                 t.a = 0;
                 try {
-                    return An(u, t.b, a, f);
+                    return An(u, t.b, f, a);
                 } finally{
                     t.a = u;
                 }
@@ -609,8 +608,8 @@ let __tla = (async ()=>{
     function It(e, _) {
         return _?.requiredLimits && delete _.requiredLimits.maxInterStageShaderComponents, e.requestDevice(_);
     }
-    function Tt(e, _, t, n, r, a) {
-        e.resolveQuerySet(_, t >>> 0, n >>> 0, r, a >>> 0);
+    function Tt(e, _, t, n, r, f) {
+        e.resolveQuerySet(_, t >>> 0, n >>> 0, r, f >>> 0);
     }
     function Pt(e) {
         return Promise.resolve(e);
@@ -618,17 +617,17 @@ let __tla = (async ()=>{
     function vt(e, _, t) {
         e.setBindGroup(_ >>> 0, t);
     }
-    function kt(e, _, t, n, r, a, f) {
-        e.setBindGroup(_ >>> 0, t, C(n, r), a, f >>> 0);
+    function kt(e, _, t, n, r, f, a) {
+        e.setBindGroup(_ >>> 0, t, C(n, r), f, a >>> 0);
     }
-    function Ct(e, _, t, n, r, a, f) {
-        e.setBindGroup(_ >>> 0, t, C(n, r), a, f >>> 0);
+    function Ct(e, _, t, n, r, f, a) {
+        e.setBindGroup(_ >>> 0, t, C(n, r), f, a >>> 0);
     }
     function Gt(e, _, t) {
         e.setBindGroup(_ >>> 0, t);
     }
-    function At(e, _, t, n, r, a, f) {
-        e.setBindGroup(_ >>> 0, t, C(n, r), a, f >>> 0);
+    function At(e, _, t, n, r, f, a) {
+        e.setBindGroup(_ >>> 0, t, C(n, r), f, a >>> 0);
     }
     function Dt(e, _, t) {
         e.setBindGroup(_ >>> 0, t);
@@ -675,24 +674,24 @@ let __tla = (async ()=>{
     function Nt(e, _, t, n) {
         e.setVertexBuffer(_ >>> 0, t, n);
     }
-    function Qt(e, _, t, n, r, a, f) {
-        e.setViewport(_, t, n, r, a, f);
+    function Qt(e, _, t, n, r, f, a) {
+        e.setViewport(_, t, n, r, f, a);
     }
-    function Xt() {
+    function Xt(e, _, t) {
+        e.set(_, t >>> 0);
+    }
+    function Yt() {
         return l(function(e, _, t) {
             return Reflect.set(e, _, t);
         }, arguments);
     }
-    function Yt(e, _, t) {
-        e.set(_, t >>> 0);
+    function Jt(e, _) {
+        e.height = _ >>> 0;
     }
     function Zt(e, _) {
         e.height = _ >>> 0;
     }
     function Ht(e, _) {
-        e.height = _ >>> 0;
-    }
-    function Jt(e, _) {
         e.onuncapturederror = _;
     }
     function Kt(e, _) {
@@ -709,11 +708,11 @@ let __tla = (async ()=>{
         b().setInt32(e + 4, r, !0), b().setInt32(e + 0, n, !0);
     }
     function nn() {
-        const e = typeof global > "u" ? null : global;
+        const e = typeof globalThis > "u" ? null : globalThis;
         return i(e) ? 0 : d(e);
     }
     function rn() {
-        const e = typeof globalThis > "u" ? null : globalThis;
+        const e = typeof global > "u" ? null : global;
         return i(e) ? 0 : d(e);
     }
     function cn() {
@@ -724,17 +723,17 @@ let __tla = (async ()=>{
         const e = typeof window > "u" ? null : window;
         return i(e) ? 0 : d(e);
     }
-    function an(e, _) {
+    function fn(e, _) {
         e.submit(_);
     }
-    function fn(e, _) {
+    function an(e, _) {
         return e.then(_);
     }
-    function bn(e, _, t) {
+    function bn(e, _) {
+        return e.then(_);
+    }
+    function un(e, _, t) {
         return e.then(_, t);
-    }
-    function un(e, _) {
-        return e.then(_);
     }
     function sn(e, _, t) {
         return e.then(_, t);
@@ -758,8 +757,8 @@ let __tla = (async ()=>{
     function pn(e) {
         return e.width;
     }
-    function xn(e, _, t, n, r, a) {
-        e.writeBuffer(_, t, n, r, a);
+    function xn(e, _, t, n, r, f) {
+        e.writeBuffer(_, t, n, r, f);
     }
     function hn(e, _, t, n, r) {
         e.writeTexture(_, t, n, r);
@@ -787,17 +786,17 @@ let __tla = (async ()=>{
         e.set(0, void 0), e.set(_ + 0, void 0), e.set(_ + 1, null), e.set(_ + 2, !0), e.set(_ + 3, !1);
     }
     function kn(e, _, t) {
-        c.wasm_bindgen__convert__closures_____invoke__h898172860a99d122(e, _, t);
+        c.wasm_bindgen__convert__closures_____invoke__h8ce5ce45e6255d0f(e, _, t);
     }
     function Cn(e, _, t) {
-        c.wasm_bindgen__convert__closures_____invoke__h898172860a99d122_2(e, _, t);
+        c.wasm_bindgen__convert__closures_____invoke__h8ce5ce45e6255d0f_2(e, _, t);
     }
     function Gn(e, _, t) {
-        const n = c.wasm_bindgen__convert__closures_____invoke__hf7dda74a67d66216(e, _, t);
+        const n = c.wasm_bindgen__convert__closures_____invoke__haeeeb3f4979a72f5(e, _, t);
         if (n[1]) throw k(n[0]);
     }
     function An(e, _, t, n) {
-        c.wasm_bindgen__convert__closures_____invoke__h5c8dd837cf00f20a(e, _, t, n);
+        c.wasm_bindgen__convert__closures_____invoke__h5f052b83621e37ce(e, _, t, n);
     }
     const Dn = [
         "error",
@@ -912,7 +911,7 @@ let __tla = (async ()=>{
     ], D = typeof FinalizationRegistry > "u" ? {
         register: ()=>{},
         unregister: ()=>{}
-    } : new FinalizationRegistry((e)=>c.__wbg_gpugameoflife_free(e >>> 0, 1));
+    } : new FinalizationRegistry((e)=>c.__wbg_gpugameoflife_free(e, 1));
     function d(e) {
         const _ = c.__externref_table_alloc();
         return c.__wbindgen_externrefs.set(_, e), _;
@@ -935,10 +934,10 @@ let __tla = (async ()=>{
         }
         if (Array.isArray(e)) {
             const r = e.length;
-            let a = "[";
-            r > 0 && (a += v(e[0]));
-            for(let f = 1; f < r; f++)a += ", " + v(e[f]);
-            return a += "]", a;
+            let f = "[";
+            r > 0 && (f += v(e[0]));
+            for(let a = 1; a < r; a++)f += ", " + v(e[a]);
+            return f += "]", f;
         }
         const t = /\[object ([^\]]+)\]/.exec(toString.call(e));
         let n;
@@ -963,7 +962,7 @@ ${e.stack}` : n;
         return (m === null || m.buffer.detached === !0 || m.buffer.detached === void 0 && m.buffer !== c.memory.buffer) && (m = new DataView(c.memory.buffer)), m;
     }
     function w(e, _) {
-        return e = e >>> 0, Vn(e, _);
+        return Vn(e >>> 0, _);
     }
     let B = null;
     function zn() {
@@ -989,14 +988,14 @@ ${e.stack}` : n;
             a: e,
             b: _,
             cnt: 1
-        }, r = (...a)=>{
+        }, r = (...f)=>{
             n.cnt++;
-            const f = n.a;
+            const a = n.a;
             n.a = 0;
             try {
-                return t(f, n.b, ...a);
+                return t(a, n.b, ...f);
             } finally{
-                n.a = f, r._wbg_cb_unref();
+                n.a = a, r._wbg_cb_unref();
             }
         };
         return r._wbg_cb_unref = ()=>{
@@ -1009,19 +1008,19 @@ ${e.stack}` : n;
             return x().subarray(p, p + u.length).set(u), s = u.length, p;
         }
         let n = e.length, r = _(n, 1) >>> 0;
-        const a = x();
-        let f = 0;
-        for(; f < n; f++){
-            const u = e.charCodeAt(f);
+        const f = x();
+        let a = 0;
+        for(; a < n; a++){
+            const u = e.charCodeAt(a);
             if (u > 127) break;
-            a[r + f] = u;
+            f[r + a] = u;
         }
-        if (f !== n) {
-            f !== 0 && (e = e.slice(f)), r = t(r, n, n = f + e.length * 3, 1) >>> 0;
-            const u = x().subarray(r + f, r + n), p = h.encodeInto(e, u);
-            f += p.written, r = t(r, n, f, 1) >>> 0;
+        if (a !== n) {
+            a !== 0 && (e = e.slice(a)), r = t(r, n, n = a + e.length * 3, 1) >>> 0;
+            const u = x().subarray(r + a, r + n), p = h.encodeInto(e, u);
+            a += p.written, r = t(r, n, a, 1) >>> 0;
         }
-        return s = f, r;
+        return s = a, r;
     }
     function k(e) {
         const _ = c.__wbindgen_externrefs.get(e);
@@ -1055,13 +1054,13 @@ ${e.stack}` : n;
     URL = globalThis.URL;
     const o = await O({
         "./game_of_life_gpu_bg.js": {
-            __wbg_new_typed_323f37fd55ab048d: ut,
+            __wbg_new_typed_1137602701dc87d4: ut,
             __wbg_gpugameoflife_new: n_,
-            __wbg_call_a24592a6f349a97e: H,
+            __wbg_call_a41d6421b30a32c5: Z,
             __wbg_new_227d7c05414eb861: ot,
             __wbg_stack_3b0d974bbf31e44f: tn,
             __wbg_error_a6fa202b58aa1cd3: ze,
-            __wbg_getMappedRange_11ec4cfce4df1e72: He,
+            __wbg_getMappedRange_11ec4cfce4df1e72: Ze,
             __wbg_instanceof_GpuValidationError_2828a9f6f4ea2c0b: i_,
             __wbg_instanceof_GpuOutOfMemoryError_ad32cc08223bf570: u_,
             __wbg_offset_164492575e959c94: st,
@@ -1085,7 +1084,7 @@ ${e.stack}` : n;
             __wbg_setPipeline_481f34ae14c49d67: Vt,
             __wbg_drawIndirect_73df189881970a43: Ce,
             __wbg_draw_ce5e8b8ad56571cb: De,
-            __wbg_getCurrentTexture_6dc2cdde9bdc098d: Ze,
+            __wbg_getCurrentTexture_6dc2cdde9bdc098d: Je,
             __wbg_setScissorRect_0578b1de90caf434: Mt,
             __wbg_dispatchWorkgroups_c122d0482fa3f389: Se,
             __wbg_resolveQuerySet_217f20ef3ebd6aed: Tt,
@@ -1100,8 +1099,8 @@ ${e.stack}` : n;
             __wbg_dispatchWorkgroupsIndirect_64be0198a6df9be7: Be,
             __wbg_drawIndexedIndirect_fcc6ecbd3d698094: Pe,
             __wbg_error_2acb88afe0ad9a3e: Oe,
-            __wbg_valueOf_9760e35383abbb01: ln,
-            __wbg_instanceof_GpuCanvasContext_8867fd6a49dfb80b: f_,
+            __wbg_valueOf_67fbc181e7e6159f: ln,
+            __wbg_instanceof_GpuCanvasContext_8867fd6a49dfb80b: a_,
             __wbg_maxTextureDimension1D_983c9a563c1855d9: q_,
             __wbg_maxTextureDimension2D_a0a2be37afbde706: $_,
             __wbg_maxTextureDimension3D_53aefd0d779b193e: N_,
@@ -1117,10 +1116,10 @@ ${e.stack}` : n;
             __wbg_maxUniformBuffersPerShaderStage_b159f3442e264f35: X_,
             __wbg_maxUniformBufferBindingSize_8fc7ea016caf650c: Q_,
             __wbg_maxStorageBufferBindingSize_984825203efcccc6: R_,
-            __wbg_maxVertexBuffers_e5cf174a3497d472: H_,
+            __wbg_maxVertexBuffers_e5cf174a3497d472: Z_,
             __wbg_maxBufferSize_8cef5a2e6fae09fa: P_,
             __wbg_maxVertexAttributes_9c129ee44a6fa783: Y_,
-            __wbg_maxVertexBufferArrayStride_1d0f177a1fdcdf3c: Z_,
+            __wbg_maxVertexBufferArrayStride_1d0f177a1fdcdf3c: J_,
             __wbg_minUniformBufferOffsetAlignment_327ef98e308ca208: nt,
             __wbg_minStorageBufferOffsetAlignment_fe964dbc6a6d7ff3: tt,
             __wbg_maxInterStageShaderComponents_d6dbbdabbd40588b: E_,
@@ -1134,27 +1133,27 @@ ${e.stack}` : n;
             __wbg_maxComputeWorkgroupsPerDimension_8cb3348843013a6b: W_,
             __wbg_has_2184fc4b845f2b5f: r_,
             __wbg_queue_6b07ccdd49a6ba90: yt,
-            __wbg_instanceof_GpuAdapter_8825bf3533b2dc81: a_,
+            __wbg_instanceof_GpuAdapter_8825bf3533b2dc81: f_,
             __wbg_Window_06e90eea4c7df280: E,
             __wbg_gpu_d9721d200584e919: t_,
             __wbg_WorkerGlobalScope_defda269b75e179a: V,
             __wbg_unmap_4aa38f8c5283cc1d: dn,
-            __wbg_submit_60f2469dc00130cc: an,
+            __wbg_submit_60f2469dc00130cc: fn,
             __wbg_mapAsync_8d0ffc031e86e9a0: S_,
             __wbg_configure_6e1ccd3ac31b721c: ee,
             __wbg_writeBuffer_b5e6e8f3f93629bc: xn,
             __wbg_writeTexture_57e41dd94bac65c4: hn,
             __wbg_createView_c227b9af7bd5f441: pe,
-            __wbg_createBuffer_e3f8b2bd8b492498: fe,
+            __wbg_createBuffer_e3f8b2bd8b492498: ae,
             __wbg_createSampler_cb4137c4e97c7098: we,
             __wbg_createTexture_1a3ebeb1ddd7a035: me,
             __wbg_requestDevice_6130c3ba10d633f9: It,
             __wbg_finish_35be15c58b55a95b: Re,
             __wbg_finish_41491ca602373cde: Me,
             __wbg_createQuerySet_6050df2adcb1f167: se,
-            __wbg_createBindGroup_876adbf7e329ce2e: ae,
+            __wbg_createBindGroup_876adbf7e329ce2e: fe,
             __wbg_requestAdapter_e4b32f2647c66726: St,
-            __wbg_set_onuncapturederror_729c2e42c36923f4: Jt,
+            __wbg_set_onuncapturederror_729c2e42c36923f4: Ht,
             __wbg_setBindGroup_f4d552dcef65a491: At,
             __wbg_setBindGroup_f930832baeb4279b: Dt,
             __wbg_setBindGroup_8d384b1c5ed329f4: Ct,
@@ -1165,9 +1164,9 @@ ${e.stack}` : n;
             __wbg_executeBundles_2905636f81aabf99: Ee,
             __wbg_getCompilationInfo_b41435ddc0bb40c8: Qe,
             __wbg_messages_4e98c7e63c5efe7b: _t,
-            __wbg_length_3d4ecd04bd8d22f1: l_,
+            __wbg_length_0a6ce016dc1460b0: l_,
             __wbg_clearBuffer_f24f8de43db597ec: K,
-            __wbg_clearBuffer_b08b15b7ee3c9d57: J,
+            __wbg_clearBuffer_b08b15b7ee3c9d57: H,
             __wbg_finish_eb06372cc93f8d50: Fe,
             __wbg_finish_ee515f526784acd5: je,
             __wbg_setIndexBuffer_f0ab50b0e1d8658c: Et,
@@ -1181,7 +1180,7 @@ ${e.stack}` : n;
             __wbg_setBlendConstant_257274277b0e3153: Lt,
             __wbg_createBindGroupLayout_e37f9323c278f93f: oe,
             __wbg_lost_2c34651e3317be8b: B_,
-            __wbg_then_6701bb8428537e07: fn,
+            __wbg_then_4d0dc09d0334f8a0: bn,
             __wbg_beginRenderPass_9a7bf53d588737dc: Y,
             __wbg_beginComputePass_5d05bddfd3eb7ba4: X,
             __wbg_createRenderBundleEncoder_a98ecb1771e99ab3: ge,
@@ -1196,64 +1195,64 @@ ${e.stack}` : n;
             __wbg_setVertexBuffer_c643d7ac0abf4554: $t,
             __wbg_setVertexBuffer_caad1ac6b71dea4a: Nt,
             __wbg_lineNum_24517b98f306fcae: y_,
-            __wbg_instanceof_Object_7c99480a1cdfb911: s_,
-            __wbg_get_8360291721e2339f: __,
-            __wbg_push_471a5b068a5295f6: mt,
-            __wbg_then_792e0c862b060889: bn,
-            __wbg_message_f762db05c1294eca: et,
-            __wbg_reason_d7f4ddcad86f8d99: Bt,
-            __wbg_message_1b27ea1ad3998a9f: J_,
+            __wbg_instanceof_Object_af9351f8f1c6f0c4: s_,
+            __wbg_get_652f640b3b0b6e3e: e_,
+            __wbg_push_60a5366c0bb22a7d: mt,
+            __wbg_then_5ef9b762bc91555c: un,
+            __wbg_label_cdc2b7a875dc5123: w_,
             __wbg_type_4b0a304ebc25e195: gn,
             __wbg_message_a77e1a9202609622: K_,
-            __wbg_label_cdc2b7a875dc5123: w_,
-            __wbg_getPreferredCanvasFormat_4314f4e4f5895771: Je,
-            __wbg_instanceof_Window_cc64c86c8ef9e02b: g_,
-            __wbg_document_7a41071f2f439323: Ie,
-            __wbg_navigator_bc077756492232c5: ct,
-            __wbg_querySelectorAll_e9e3fbd41310476e: pt,
-            __wbg_navigator_353318de944ca7f6: rt,
-            __wbg_set_height_24d07d982f176ac6: Zt,
-            __wbg_getContext_69ddc504535a2e7b: Xe,
-            __wbg_width_3aacf063073c2757: mn,
-            __wbg_height_fc2f1def9f6e7730: o_,
-            __wbg_set_width_adc925bca9c5351a: en,
-            __wbg_get_0cfbe604d86bac03: Ke,
-            __wbg_set_height_be9b2b920bd68401: Ht,
-            __wbg_getContext_fc146f8ec021d074: Ye,
-            __wbg_width_5adcb07d04d08bdf: pn,
-            __wbg_height_528848d067cc2221: c_,
-            __wbg_set_width_5cda41d4d06a14dd: Kt,
-            __wbg_new_682678e2f47e32bc: at,
-            __wbg_new_aa8d0fa9762c29bd: ft,
-            __wbg_length_9f1775224cf1d815: p_,
-            __wbg_new_from_slice_b5ea43e23f6008c0: bt,
-            __wbg_new_with_byte_offset_and_length_01848e8d6a3d49ad: it,
-            __wbg_set_d8f1efe557b9e7e1: Yt,
-            __wbg_buffer_d0f5ea0926a691fd: Z,
-            __wbg_prototypesetcall_a6b02eb00b0f4ce2: wt,
-            __wbg_then_8e16ee11f05e4827: un,
-            __wbg_from_0dbf29f09e7fb200: qe,
-            __wbg_isArray_c3109d14ffc06469: d_,
-            __wbg_static_accessor_GLOBAL_THIS_602256ae5c8f42cf: rn,
-            __wbg_static_accessor_SELF_e445c1c7484aecc3: cn,
-            __wbg_static_accessor_GLOBAL_8cfadc87a297ca02: nn,
-            __wbg_static_accessor_WINDOW_f20e8576ef1e0f17: on,
-            __wbg_then_a50dc2689b076063: sn,
-            __wbg_resolve_e6c466bc1052f16c: Pt,
-            __wbg_parse_1bbc9c053611d0a7: gt,
-            __wbg_get_6011fa3a58f61074: e_,
-            __wbg_set_022bee52d0b05b19: Xt,
-            __wbg_queueMicrotask_5d15a957e6aa920e: xt,
-            __wbg_queueMicrotask_f8819e5ffc402f36: ht,
-            __wbg___wbindgen_number_get_c7f42aed0525c451: q,
-            __wbg___wbindgen_throw_6b64449b9b9ed33c: N,
-            __wbg___wbindgen_is_object_63322ec0cd6ea4ef: F,
-            __wbg___wbindgen_string_get_7ed5322991caaec5: $,
-            __wbg___wbindgen_boolean_get_6ea149f0a8dcc5ff: U,
-            __wbg___wbindgen_is_function_3baa9db1a987f47d: M,
-            __wbg___wbindgen_is_undefined_29a43b4d42920abd: j,
-            __wbg___wbindgen_debug_string_ab4b34d23d6778bd: R,
-            __wbg__wbg_cb_unref_b46c9b5a9f08ec37: Q,
+            __wbg_message_f762db05c1294eca: et,
+            __wbg_reason_d7f4ddcad86f8d99: Bt,
+            __wbg_message_1b27ea1ad3998a9f: H_,
+            __wbg_getPreferredCanvasFormat_4314f4e4f5895771: He,
+            __wbg_instanceof_Window_4153c1818a1c0c0b: g_,
+            __wbg_document_69bb6a2f7927d532: Ie,
+            __wbg_navigator_f3468c6dc9006b7c: ct,
+            __wbg_querySelectorAll_a9cd19a1a678838e: pt,
+            __wbg_navigator_83daf29f5beb4064: rt,
+            __wbg_get_a6a7ef761f5bd232: __,
+            __wbg_set_height_89a4ecd0f9cc3dfa: Zt,
+            __wbg_getContext_f17252002286474d: Ye,
+            __wbg_width_73079be53f70e8ba: mn,
+            __wbg_height_f036cb27636625f6: o_,
+            __wbg_set_width_d2ec5d6689655fa9: Kt,
+            __wbg_set_height_77937c921db92223: Jt,
+            __wbg_getContext_5d4707454276e47f: Xe,
+            __wbg_width_bb0a84dddb1bba27: pn,
+            __wbg_height_900decaf28c42054: c_,
+            __wbg_set_width_da52058a27694474: en,
+            __wbg_new_3baa8d9866155c79: at,
+            __wbg_new_2fad8ca02fd00684: ft,
+            __wbg_length_ba3c032602efe310: p_,
+            __wbg_new_from_slice_5a173c243af2e823: bt,
+            __wbg_new_with_byte_offset_and_length_643e5e9e2fb6b1ad: it,
+            __wbg_set_0574e274b35c5501: Xt,
+            __wbg_buffer_9ee17426fe5a5d65: J,
+            __wbg_prototypesetcall_fd4050e806e1d519: wt,
+            __wbg_then_20a157d939b514f5: an,
+            __wbg_from_ff141b1e4c69b979: qe,
+            __wbg_isArray_c6c6ef8308995bcf: d_,
+            __wbg_static_accessor_GLOBAL_THIS_1c7f1bd6c6941fdb: nn,
+            __wbg_static_accessor_SELF_8bf8c48c28420ad5: cn,
+            __wbg_static_accessor_GLOBAL_e039bc914f83e74e: rn,
+            __wbg_static_accessor_WINDOW_6aeee9b51652ee0f: on,
+            __wbg_then_7ebd9021bf33072f: sn,
+            __wbg_resolve_9feb5d906ca62419: Pt,
+            __wbg_parse_342d5616e14beccc: gt,
+            __wbg_get_41476db20fef99a8: Ke,
+            __wbg_set_5337f8ac82364a3f: Yt,
+            __wbg_queueMicrotask_40ac6ffc2848ba77: xt,
+            __wbg_queueMicrotask_74d092439f6494c1: ht,
+            __wbg___wbindgen_number_get_dd6d69a6079f26f1: q,
+            __wbg___wbindgen_throw_9c75d47bf9e7731e: N,
+            __wbg___wbindgen_is_object_5b22ff2418063a9c: F,
+            __wbg___wbindgen_string_get_965592073e5d848c: $,
+            __wbg___wbindgen_boolean_get_c3dd5c39f1b5a12b: U,
+            __wbg___wbindgen_is_function_2f0fd7ceb86e64c5: M,
+            __wbg___wbindgen_is_undefined_244a92c34d3b6ec0: j,
+            __wbg___wbindgen_debug_string_07cb72cfcc952e2b: R,
+            __wbg__wbg_cb_unref_158e43e869788cdc: Q,
             __wbindgen_init_externref_table: vn,
             __wbindgen_cast_0000000000000001: yn,
             __wbindgen_cast_0000000000000002: Bn,
@@ -1262,7 +1261,7 @@ ${e.stack}` : n;
             __wbindgen_cast_0000000000000005: Tn,
             __wbindgen_cast_0000000000000006: Pn
         }
-    }, z), Rn = o.memory, Mn = o.__wbg_gpugameoflife_free, Fn = o.gpugameoflife_flush_and_render, jn = o.gpugameoflife_grid_pitch, qn = o.gpugameoflife_new, $n = o.gpugameoflife_new_offscreen, Nn = o.gpugameoflife_padded_rows, Qn = o.gpugameoflife_render_only, Xn = o.gpugameoflife_resize, Yn = o.gpugameoflife_screen_cols, Zn = o.gpugameoflife_screen_rows, Hn = o.gpugameoflife_set_scroll, Jn = o.gpugameoflife_set_theme_json, Kn = o.gpugameoflife_set_transition, er = o.gpugameoflife_set_zones_json, _r = o.gpugameoflife_tick_and_render, tr = o.gpugameoflife_toggle_cell, nr = o.gpugameoflife_words_per_row, rr = o.wasm_bindgen__convert__closures_____invoke__hf7dda74a67d66216, cr = o.wasm_bindgen__convert__closures_____invoke__h5c8dd837cf00f20a, or = o.wasm_bindgen__convert__closures_____invoke__h898172860a99d122, ar = o.wasm_bindgen__convert__closures_____invoke__h898172860a99d122_2, fr = o.__wbindgen_malloc, br = o.__wbindgen_realloc, ur = o.__wbindgen_exn_store, ir = o.__externref_table_alloc, sr = o.__wbindgen_externrefs, gr = o.__wbindgen_free, dr = o.__wbindgen_destroy_closure, wr = o.__externref_table_dealloc, W = o.__wbindgen_start;
+    }, z), Rn = o.memory, Mn = o.__wbg_gpugameoflife_free, Fn = o.gpugameoflife_flush_and_render, jn = o.gpugameoflife_grid_pitch, qn = o.gpugameoflife_new, $n = o.gpugameoflife_new_offscreen, Nn = o.gpugameoflife_padded_rows, Qn = o.gpugameoflife_render_only, Xn = o.gpugameoflife_resize, Yn = o.gpugameoflife_set_scroll, Jn = o.gpugameoflife_set_theme_json, Zn = o.gpugameoflife_set_transition, Hn = o.gpugameoflife_set_zones_json, Kn = o.gpugameoflife_tick_and_render, er = o.gpugameoflife_toggle_cell, _r = o.gpugameoflife_words_per_row, tr = o.gpugameoflife_world_cols, nr = o.gpugameoflife_world_rows, rr = o.wasm_bindgen__convert__closures_____invoke__haeeeb3f4979a72f5, cr = o.wasm_bindgen__convert__closures_____invoke__h5f052b83621e37ce, or = o.wasm_bindgen__convert__closures_____invoke__h8ce5ce45e6255d0f, fr = o.wasm_bindgen__convert__closures_____invoke__h8ce5ce45e6255d0f_2, ar = o.__wbindgen_malloc, br = o.__wbindgen_realloc, ur = o.__wbindgen_exn_store, ir = o.__externref_table_alloc, sr = o.__wbindgen_externrefs, gr = o.__wbindgen_free, dr = o.__wbindgen_destroy_closure, wr = o.__externref_table_dealloc, W = o.__wbindgen_start;
     var lr = Object.freeze({
         __proto__: null,
         __externref_table_alloc: ir,
@@ -1272,7 +1271,7 @@ ${e.stack}` : n;
         __wbindgen_exn_store: ur,
         __wbindgen_externrefs: sr,
         __wbindgen_free: gr,
-        __wbindgen_malloc: fr,
+        __wbindgen_malloc: ar,
         __wbindgen_realloc: br,
         __wbindgen_start: W,
         gpugameoflife_flush_and_render: Fn,
@@ -1282,20 +1281,20 @@ ${e.stack}` : n;
         gpugameoflife_padded_rows: Nn,
         gpugameoflife_render_only: Qn,
         gpugameoflife_resize: Xn,
-        gpugameoflife_screen_cols: Yn,
-        gpugameoflife_screen_rows: Zn,
-        gpugameoflife_set_scroll: Hn,
+        gpugameoflife_set_scroll: Yn,
         gpugameoflife_set_theme_json: Jn,
-        gpugameoflife_set_transition: Kn,
-        gpugameoflife_set_zones_json: er,
-        gpugameoflife_tick_and_render: _r,
-        gpugameoflife_toggle_cell: tr,
-        gpugameoflife_words_per_row: nr,
+        gpugameoflife_set_transition: Zn,
+        gpugameoflife_set_zones_json: Hn,
+        gpugameoflife_tick_and_render: Kn,
+        gpugameoflife_toggle_cell: er,
+        gpugameoflife_words_per_row: _r,
+        gpugameoflife_world_cols: tr,
+        gpugameoflife_world_rows: nr,
         memory: Rn,
-        wasm_bindgen__convert__closures_____invoke__h5c8dd837cf00f20a: cr,
-        wasm_bindgen__convert__closures_____invoke__h898172860a99d122: or,
-        wasm_bindgen__convert__closures_____invoke__h898172860a99d122_2: ar,
-        wasm_bindgen__convert__closures_____invoke__hf7dda74a67d66216: rr
+        wasm_bindgen__convert__closures_____invoke__h5f052b83621e37ce: cr,
+        wasm_bindgen__convert__closures_____invoke__h8ce5ce45e6255d0f: or,
+        wasm_bindgen__convert__closures_____invoke__h8ce5ce45e6255d0f_2: fr,
+        wasm_bindgen__convert__closures_____invoke__haeeeb3f4979a72f5: rr
     });
     Un(lr);
     W();
