@@ -138,6 +138,10 @@ let pendingWidth = 0;
 let resizeRafId: number | null = null;
 // Detach handle for the matchMedia DPR listener.
 let detachDprListener: (() => void) | null = null;
+// Cached "Chrome effective-zoom asymmetry" flag.  Refreshed at mount and on
+// DPR change.  See `probeEffectiveZoomAsymmetry` for what this detects and
+// `applyCanvasBox` for how it's compensated.
+let effectiveZoomActive = false;
 
 function readCanvasPixelSize(el: Element): { width: number; height: number } {
   const rect = el.getBoundingClientRect();
@@ -159,13 +163,51 @@ function pickCanvasHeight(initialShellHeightDevicePx: number): number {
   return Math.max(initialShellHeightDevicePx, screenDevicePx, MIN_CANVAS_HEIGHT_DEVICE_PX);
 }
 
+/**
+ * Detect whether this browser exhibits Chrome's "effective zoom" asymmetry
+ * under `html { zoom: !=1 }`:  `getBoundingClientRect` returns post-zoom
+ * (visual) CSS pixels while `style.width` writes are interpreted as pre-zoom
+ * (logical) CSS pixels and visually re-scaled by the html zoom factor.
+ * Round-tripping a value between the two then ends up scaled twice.
+ *
+ * Probe: write 100 logical CSS px to a hidden div, read its rect, compare.
+ * If they differ by more than a sub-pixel epsilon, the asymmetry is active.
+ * Safari (classic-zoom model) returns false; pages without `zoom` (or
+ * `zoom: 1`) also return false.
+ */
+function probeEffectiveZoomAsymmetry(): boolean {
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;left:-9999px;top:0;width:100px;height:100px;';
+  document.body.appendChild(probe);
+  const measured = probe.getBoundingClientRect().width;
+  probe.remove();
+  return Math.abs(measured - 100) > 0.1;
+}
+
 function alignedGridPitch(widthPx: number): number {
   return alignedPitch(widthPx, TARGET_CELL_CSS_PX, devicePixelRatio);
 }
 
 function applyCanvasBox(canvas: HTMLCanvasElement, widthPx: number, heightPx: number): void {
-  canvas.style.width = `${(widthPx / devicePixelRatio).toFixed(2)}px`;
-  canvas.style.height = `${(heightPx / devicePixelRatio).toFixed(2)}px`;
+  // The intended visual size is `widthPx / devicePixelRatio` CSS px.  Under
+  // Chrome's effective-zoom model with `html { zoom: !=1 }`, `style.width`
+  // is interpreted as pre-zoom logical CSS px and re-scaled by the html zoom
+  // factor on render — so we pre-divide by zoom to land at the right visual
+  // size.  Safari's classic-zoom model agrees on coord systems and skips
+  // this compensation (probe returns false).
+  const visualWCss = widthPx / devicePixelRatio;
+  const visualHCss = heightPx / devicePixelRatio;
+  let logicalWCss = visualWCss;
+  let logicalHCss = visualHCss;
+  if (effectiveZoomActive) {
+    const zoom = parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+    if (zoom > 0 && zoom !== 1) {
+      logicalWCss = visualWCss / zoom;
+      logicalHCss = visualHCss / zoom;
+    }
+  }
+  canvas.style.width = `${logicalWCss.toFixed(2)}px`;
+  canvas.style.height = `${logicalHCss.toFixed(2)}px`;
 }
 
 function hideCanvasDuringResize(canvas: HTMLCanvasElement): void {
@@ -229,13 +271,23 @@ onMounted(() => {
   const canvas = canvasRef.value;
   if (!shell || !canvas) return;
 
+  // Detect Chrome/Firefox effective-zoom asymmetry once at mount (refreshed
+  // in the DPR listener).  `applyCanvasBox` reads this cached flag to decide
+  // whether to compensate `canvas.style.{width,height}` for `html { zoom }`.
+  effectiveZoomActive = probeEffectiveZoomAsymmetry();
+
   const initialSize = readCanvasPixelSize(shell);
   canvasW = initialSize.width;
   canvasH = pickCanvasHeight(initialSize.height);
   canvas.width = canvasW;
   canvas.height = canvasH;
   applyCanvasBox(canvas, canvasW, canvasH);
-  log.debug('Canvas initialised', canvasW, 'x', canvasH, 'dpr', devicePixelRatio);
+  log.debug(
+    'Canvas initialised',
+    canvasW, 'x', canvasH,
+    'dpr', devicePixelRatio,
+    'effectiveZoom', effectiveZoomActive,
+  );
 
   const offscreen = canvas.transferControlToOffscreen();
   const gridPitch = alignedGridPitch(canvasW);
@@ -321,9 +373,12 @@ onMounted(() => {
   // DPR listener — fires when the user moves the window between displays
   // of different DPI or changes OS scaling.  Recomputes the constant
   // canvas height for the new DPR and republishes the current width so
-  // the worker re-applies CSS dims and uniforms.
+  // the worker re-applies CSS dims and uniforms.  Also re-runs the
+  // effective-zoom probe: OS scaling changes can flip the zoom-model
+  // asymmetry on some browser/host combinations.
   detachDprListener = watchDevicePixelRatio(() => {
     if (!shellRef.value || !canvasRef.value) return;
+    effectiveZoomActive = probeEffectiveZoomAsymmetry();
     const shellH = Math.round(shellRef.value.getBoundingClientRect().height * devicePixelRatio);
     canvasH = pickCanvasHeight(shellH);
     publishCanvasResize(canvasRef.value, canvasW);
