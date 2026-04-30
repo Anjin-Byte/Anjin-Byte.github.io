@@ -19,7 +19,7 @@ mod world;
 pub use pattern::{Pattern, Transform};
 pub use seeding::{
     pick_random_stamp, pick_random_stamp_spaced, recommended_initial_count,
-    seed_world_with_methuselahs, stamp_cells, StampDecision, MAX_REJECTION_ATTEMPTS,
-    MIN_PATTERN_DISTANCE,
+    seed_world_with_methuselahs, stamp_cells, SpatialGrid, StampDecision,
+    MAX_REJECTION_ATTEMPTS, MIN_PATTERN_DISTANCE, SPATIAL_BUCKET_SIZE,
 };
 pub use world::World;

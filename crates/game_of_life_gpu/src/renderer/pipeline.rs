@@ -176,11 +176,20 @@ impl GpuRenderer {
         &self,
         encoder: &mut wgpu::CommandEncoder,
         current_visible_is_a: bool,
+        timestamp_query_set: Option<&wgpu::QuerySet>,
     ) -> Result<wgpu::SurfaceTexture, wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         let core_bg = if current_visible_is_a { &self.core_bg_a } else { &self.core_bg_b };
+
+        let timestamp_writes = timestamp_query_set.map(|qs| {
+            wgpu::RenderPassTimestampWrites {
+                query_set: qs,
+                beginning_of_pass_write_index: Some(crate::perf::SLOT_RENDER_BEGIN),
+                end_of_pass_write_index: Some(crate::perf::SLOT_RENDER_END),
+            }
+        });
 
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("gol_render"),
@@ -200,7 +209,7 @@ impl GpuRenderer {
                 },
             })],
             depth_stencil_attachment: None,
-            timestamp_writes: None,
+            timestamp_writes,
             occlusion_query_set: None,
         });
         pass.set_pipeline(&self.pipeline);

@@ -42,6 +42,52 @@ export type WorkerInMsg =
   | { type: 'perf_snapshot' }
   | { type: 'stop' };
 
+/**
+ * One-shot perf signal emitted by the worker after the renderer is ready.
+ * Each phase is the wall-clock ms spent in that segment of the worker's
+ * `init` handler.  Sums to approximately `total`.  DEV-only.
+ *
+ * `newOffscreenPhases` (when present) splits the GPU `new_offscreen`
+ * call further into the Rust-side phases — populated only when the GPU
+ * path was taken, `null` for CPU-fallback sessions.
+ */
+export interface StartupBreakdown {
+  total:        number;
+  gpuProbe:     number;
+  wasmImport:   number;
+  newOffscreen: number;
+  readyPost:    number;
+  newOffscreenPhases: NewOffscreenPhases | null;
+}
+
+export interface NewOffscreenPhases {
+  /** Adapter request + device creation. */
+  deviceRequest:  number;
+  /** TimestampPanel creation (no-op when feature absent). */
+  panelInit:      number;
+  /** World allocation + Methuselah seeding. */
+  seeding:        number;
+  /** Grid + Simulation (compute pipeline build, ping-pong buffers). */
+  simulationInit: number;
+  /** GpuRenderer (render pipeline, paper/theme params, surface configure). */
+  rendererInit:   number;
+}
+
+/**
+ * Per-pass GPU times sampled via WebGPU `timestamp-query`.  Each field is
+ * milliseconds, or `null` when the corresponding pass did not run during
+ * the sampled frame (e.g. the OR-edit queue was empty).  Emitted on the
+ * same cadence as the worker's existing perf summary log.  DEV-only,
+ * gated on adapter feature support — `null` from end to end on browsers
+ * that don't grant `timestamp-query`.
+ */
+export interface GpuPassDurations {
+  computeTickMs: number | null;
+  xorEditMs:     number | null;
+  orEditMs:      number | null;
+  renderPassMs:  number | null;
+}
+
 export type WorkerOutMsg =
   | { type: 'ready'; backend: RendererBackend; gridInfo: GridInfo }
   // Sent after resize so the main thread can update its CoordSnapshot.
@@ -49,5 +95,8 @@ export type WorkerOutMsg =
   | { type: 'zones_state';  zones: BlankZone[] }
   | { type: 'zones_error';  message: string }
   | { type: 'perf_snapshot'; stats: FrameStats[] }
+  // DEV-only perf signals — see StartupBreakdown / GpuPassDurations.
+  | { type: 'startup_breakdown'; phases: StartupBreakdown }
+  | { type: 'gpu_pass_breakdown'; frame: number; durations: GpuPassDurations }
   // Non-fatal diagnostic: the named phase failed and a fallback was (or was not) attempted.
   | { type: 'error'; phase: string; message: string };

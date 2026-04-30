@@ -147,15 +147,31 @@ impl Simulation {
     }
 
     /// Advances simulation by one generation using the provided command encoder.
-    pub fn tick(&mut self, encoder: &mut wgpu::CommandEncoder, grid: &Grid) {
+    ///
+    /// `timestamp_query_set` opts the compute pass into per-pass GPU timing
+    /// when the perf panel is sampling this frame; pass `None` to skip.
+    pub fn tick(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        grid: &Grid,
+        timestamp_query_set: Option<&wgpu::QuerySet>,
+    ) {
         let wg_x = grid.words_per_row.div_ceil(8);
         let wg_y = grid.padded_rows.div_ceil(8);
 
         let bg = self.next_compute_bind_group();
 
+        let timestamp_writes = timestamp_query_set.map(|qs| {
+            wgpu::ComputePassTimestampWrites {
+                query_set: qs,
+                beginning_of_pass_write_index: Some(crate::perf::SLOT_COMPUTE_BEGIN),
+                end_of_pass_write_index: Some(crate::perf::SLOT_COMPUTE_END),
+            }
+        });
+
         let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some("gol_tick"),
-            timestamp_writes: None,
+            timestamp_writes,
         });
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, bg, &[]);
@@ -251,8 +267,20 @@ impl Simulation {
     /// GPU→CPU readback entirely — XOR is self-inverse and OR is
     /// idempotent, so both ops are correct given only the new mask
     /// (no need to know the current state).
-    pub fn flush_edits(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+    pub fn flush_edits(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        timestamp_query_set: Option<&wgpu::QuerySet>,
+    ) {
         if !self.pending_edits.is_empty() {
+            let timestamp_writes = timestamp_query_set.map(|qs| {
+                wgpu::ComputePassTimestampWrites {
+                    query_set: qs,
+                    beginning_of_pass_write_index: Some(crate::perf::SLOT_XOR_BEGIN),
+                    end_of_pass_write_index: Some(crate::perf::SLOT_XOR_END),
+                }
+            });
             dispatch_edit_shader(
                 device,
                 queue,
@@ -260,10 +288,18 @@ impl Simulation {
                 XOR_EDIT_SHADER,
                 "xor",
                 &self.pending_edits,
+                timestamp_writes,
             );
             self.pending_edits.clear();
         }
         if !self.pending_set_edits.is_empty() {
+            let timestamp_writes = timestamp_query_set.map(|qs| {
+                wgpu::ComputePassTimestampWrites {
+                    query_set: qs,
+                    beginning_of_pass_write_index: Some(crate::perf::SLOT_OR_BEGIN),
+                    end_of_pass_write_index: Some(crate::perf::SLOT_OR_END),
+                }
+            });
             dispatch_edit_shader(
                 device,
                 queue,
@@ -271,6 +307,7 @@ impl Simulation {
                 OR_EDIT_SHADER,
                 "or",
                 &self.pending_set_edits,
+                timestamp_writes,
             );
             self.pending_set_edits.clear();
         }
@@ -385,6 +422,7 @@ fn dispatch_edit_shader(
     shader_src: &str,
     label: &str,
     edits: &[(u32, u32)],
+    timestamp_writes: Option<wgpu::ComputePassTimestampWrites>,
 ) {
     let edit_data: Vec<u32> = edits
         .iter()
@@ -450,7 +488,7 @@ fn dispatch_edit_shader(
     {
         let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some(&format!("{label}_edit_pass")),
-            timestamp_writes: None,
+            timestamp_writes,
         });
         pass.set_pipeline(&pipeline);
         pass.set_bind_group(0, &bind_group, &[]);

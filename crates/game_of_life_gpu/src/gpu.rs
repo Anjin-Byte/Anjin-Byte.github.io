@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use game_of_life_core::{
     pick_random_stamp_spaced, recommended_initial_count, seed_world_with_methuselahs, stamp_cells,
-    World, MAX_REJECTION_ATTEMPTS, MIN_PATTERN_DISTANCE,
+    SpatialGrid, World, MAX_REJECTION_ATTEMPTS, MIN_PATTERN_DISTANCE, SPATIAL_BUCKET_SIZE,
 };
 use rand::SeedableRng;
 use rand_xoshiro::Xoshiro256StarStar;
@@ -10,6 +10,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::context::GpuContext;
 use crate::grid::Grid;
+use crate::perf::{self, TimestampPanel};
 use crate::renderer::GpuRenderer;
 use crate::renderer::types::ThemeParams;
 use crate::simulation::Simulation;
@@ -63,6 +64,15 @@ const RESEED_BATCH_SIZE: u32 = 50;
 /// batch this high.
 const RECENT_STAMP_MEMORY: usize = 200;
 
+/// Base ticks between GPU per-pass timestamp samples.  At
+/// `TICK_EVERY = 175` frames per base tick that's roughly one
+/// breakdown per `SAMPLE_INTERVAL_TICKS × TICK_EVERY` frames.  Set to
+/// 1 so the perf panel produces a fresh sample every base tick (~3 s
+/// at 60 Hz), aligning with the worker's existing perf-summary log
+/// cadence.  Sampling is gated by `TimestampPanel::enabled` and only
+/// activates when the adapter granted `TIMESTAMP_QUERY`.
+const SAMPLE_INTERVAL_TICKS: u32 = 1;
+
 /// WebGPU-accelerated Game of Life, exported to JavaScript.
 ///
 /// Init order required by wgpu ≥ 22:
@@ -102,6 +112,34 @@ pub struct GpuGameOfLife {
     /// pile up on each other and immediately collide before
     /// reaching their named-pattern recognizable phase.
     recent_stamps: VecDeque<(u32, u32)>,
+    /// Per-pass GPU timing collector.  Disabled (no-op) on browsers
+    /// that didn't grant `TIMESTAMP_QUERY`.
+    timestamp_panel: TimestampPanel,
+    /// Wall-clock ms spent in each phase of `from_surface`.  Read once
+    /// after construction by the worker and forwarded into the
+    /// `startup_breakdown` message; not used at runtime.
+    init_phases: InitPhases,
+}
+
+/// Wall-clock breakdown of `from_surface` phases.  All values in
+/// milliseconds, measured against `js_sys::Date::now()` (millisecond
+/// resolution — sufficient for 100s-of-ms-scale init phases).
+#[derive(Clone, Copy, Default)]
+struct InitPhases {
+    /// Adapter request + device creation (`GpuContext::from_compatible_surface`).
+    device_request_ms: f64,
+    /// `TimestampPanel::new` — query set + resolve/readback buffers
+    /// when the feature was granted, otherwise a no-op.
+    panel_init_ms: f64,
+    /// `World::new` allocation + `seed_world_with_methuselahs` (the
+    /// recommended_initial_count stamps with rejection sampling).
+    seeding_ms: f64,
+    /// `Grid::from_world` + `Simulation::new` (compute pipeline build,
+    /// ping-pong buffers, frozen buffer, bind groups).
+    simulation_init_ms: f64,
+    /// `GpuRenderer::new` (render pipeline build, paper / theme params,
+    /// noise texture, overlay bind groups, surface configure).
+    renderer_init_ms: f64,
 }
 
 /// Shared init path: creates context + subsystems from a surface.
@@ -122,7 +160,20 @@ async fn from_surface(
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
 
+    // Wall-clock phase markers — bracketed around each major step so the
+    // worker can post a sub-`new_offscreen` breakdown via the existing
+    // `startup_breakdown` message.  ms-resolution from `Date::now()` is
+    // fine; phases here are 10s-to-1000s of ms.
+    let t0 = js_sys::Date::now();
     let (ctx, adapter) = GpuContext::from_compatible_surface(&instance, &surface).await?;
+    let t1 = js_sys::Date::now();
+
+    let timestamp_panel = TimestampPanel::new(
+        &ctx.device,
+        &ctx.queue,
+        ctx.timestamp_query_supported,
+    );
+    let t2 = js_sys::Date::now();
 
     // RNG drives both the initial Methuselah scatter and the periodic
     // auto-reseed.  Using one RNG for both makes the entire session
@@ -137,9 +188,12 @@ async fn from_surface(
     let mut world = World::new(WORLD_COLS, WORLD_ROWS);
     let n_seeds = recommended_initial_count(WORLD_COLS, WORLD_ROWS);
     seed_world_with_methuselahs(&mut world, &mut rng, n_seeds);
+    let t3 = js_sys::Date::now();
 
     let grid = Grid::from_world(&world, viewport_canvas_w, viewport_canvas_h, CELL_PX);
     let simulation = Simulation::new(&ctx.device, &ctx.queue, &grid, &world);
+    let t4 = js_sys::Date::now();
+
     let grid_pitch = CELL_PX as f32;
     let renderer = GpuRenderer::new(
         &ctx.device,
@@ -151,6 +205,15 @@ async fn from_surface(
         &simulation.buf_a,
         &simulation.buf_b,
     );
+    let t5 = js_sys::Date::now();
+
+    let init_phases = InitPhases {
+        device_request_ms:  t1 - t0,
+        panel_init_ms:      t2 - t1,
+        seeding_ms:         t3 - t2,
+        simulation_init_ms: t4 - t3,
+        renderer_init_ms:   t5 - t4,
+    };
 
     Ok(GpuGameOfLife {
         ctx,
@@ -162,6 +225,8 @@ async fn from_surface(
         rng,
         tick_count: 0,
         recent_stamps: VecDeque::with_capacity(RECENT_STAMP_MEMORY),
+        timestamp_panel,
+        init_phases,
     })
 }
 
@@ -225,14 +290,74 @@ impl GpuGameOfLife {
     /// queues a Methuselah stamp; the OR-edit shader applies it on the
     /// next `flush_edits_if_pending()` call.
     pub fn tick_and_render(&mut self) {
-        self.flush_edits_if_pending();
+        // Drain any prior frame's timestamp readback into `latest`.
+        self.timestamp_panel.poll();
+
+        // Decide whether this frame samples GPU pass timings.  `try_start`
+        // also reserves the query set (returns false if a previous
+        // sample's readback hasn't completed yet).
+        let sample = self.tick_count.is_multiple_of(SAMPLE_INTERVAL_TICKS)
+            && self.timestamp_panel.try_start();
+
+        // Build the sample mask from passes that will actually fire this
+        // frame.  Edit passes only run when their queue is non-empty; we
+        // don't want to claim timestamps for skipped passes.
+        let mut mask = perf::PassMask::default();
+        if sample {
+            if self.simulation.has_pending_edits() {
+                mask.set(perf::PassMask::XOR_EDIT);
+            }
+            if self.simulation.has_pending_set_edits() {
+                mask.set(perf::PassMask::OR_EDIT);
+            }
+            mask.set(perf::PassMask::COMPUTE_TICK);
+            mask.set(perf::PassMask::RENDER_PASS);
+        }
+
+        // Each phase fetches a fresh query-set borrow so the &self borrows
+        // don't outlive their phase call (allowing the panel to be
+        // mutably borrowed for `finish` / `map_after_submit` later).
+        if self.simulation.has_pending_edits() || self.simulation.has_pending_set_edits() {
+            let qs = if sample { self.timestamp_panel.query_set() } else { None };
+            self.simulation.flush_edits(&self.ctx.device, &self.ctx.queue, qs);
+        }
         self.snapshot_pre_tick();
-        self.tick_base();
+        {
+            let mut enc = self.ctx.device.create_command_encoder(
+                &wgpu::CommandEncoderDescriptor { label: Some("gol_sim_tick") },
+            );
+            let qs = if sample { self.timestamp_panel.query_set() } else { None };
+            self.simulation.tick(&mut enc, &self.grid, qs);
+            self.ctx.queue.submit([enc.finish()]);
+        }
         self.tick_count = self.tick_count.wrapping_add(1);
         if self.tick_count.is_multiple_of(RESEED_INTERVAL_TICKS) {
             self.auto_reseed();
         }
-        self.present();
+        // Present + (optionally) resolve query set into the present's
+        // encoder so the resolve submit happens after all the timestamp
+        // writes are visible on the GPU timeline.
+        let mut enc = self.ctx.device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor { label: Some("gol_present") },
+        );
+        let visible_a = self.simulation.current_visible_is_a();
+        let qs = if sample { self.timestamp_panel.query_set() } else { None };
+        let render_result = self.renderers[0].render(&mut enc, visible_a, qs);
+        match render_result {
+            Ok(output) => {
+                if sample {
+                    self.timestamp_panel.finish(&mut enc, mask);
+                }
+                self.ctx.queue.submit([enc.finish()]);
+                output.present();
+                if sample {
+                    self.timestamp_panel.map_after_submit();
+                }
+            }
+            Err(_) => {
+                self.renderers[0].reconfigure(&self.ctx.device);
+            }
+        }
     }
 
     /// Updates the vertical scroll offset (canvas pixels). Call on every scroll event.
@@ -283,7 +408,9 @@ impl GpuGameOfLife {
     /// without waiting for the next simulation tick.
     pub fn flush_and_render(&mut self) {
         if self.simulation.has_pending_edits() {
-            self.simulation.flush_edits(&self.ctx.device, &self.ctx.queue);
+            // No timestamp sampling on the click-toggle path — it's
+            // user-driven and not on the perf-summary cadence.
+            self.simulation.flush_edits(&self.ctx.device, &self.ctx.queue, None);
         }
         self.render_only();
     }
@@ -305,6 +432,39 @@ impl GpuGameOfLife {
         // Now constant — cell pixel size is fixed at world creation.
         CELL_PX as f32
     }
+
+    /// True iff the adapter granted `TIMESTAMP_QUERY` and the panel is
+    /// actually sampling.  When false, the `last_*_pass_ms` getters
+    /// return `None` for every call.  The worker uses this to log a
+    /// one-time hint about enabling the dev flag.
+    pub fn timestamp_query_supported(&self) -> bool {
+        self.timestamp_panel.enabled()
+    }
+
+    /// Most-recent compute-tick GPU duration in milliseconds, or `None`
+    /// if no sample has completed yet (or the feature is unavailable).
+    pub fn last_compute_tick_ms(&self) -> Option<f64> {
+        self.timestamp_panel.latest().and_then(|d| d.compute_tick_ms())
+    }
+    pub fn last_xor_edit_ms(&self) -> Option<f64> {
+        self.timestamp_panel.latest().and_then(|d| d.xor_edit_ms())
+    }
+    pub fn last_or_edit_ms(&self) -> Option<f64> {
+        self.timestamp_panel.latest().and_then(|d| d.or_edit_ms())
+    }
+    pub fn last_render_pass_ms(&self) -> Option<f64> {
+        self.timestamp_panel.latest().and_then(|d| d.render_pass_ms())
+    }
+
+    /// Sub-phase wall-clock breakdown of `from_surface`.  Read once after
+    /// init by the worker for inclusion in the `startup_breakdown`
+    /// message; each value is ms.  See `InitPhases` field docs for what
+    /// each phase covers.
+    pub fn init_device_request_ms(&self) -> f64  { self.init_phases.device_request_ms }
+    pub fn init_panel_ms(&self) -> f64           { self.init_phases.panel_init_ms }
+    pub fn init_seeding_ms(&self) -> f64         { self.init_phases.seeding_ms }
+    pub fn init_simulation_ms(&self) -> f64      { self.init_phases.simulation_init_ms }
+    pub fn init_renderer_ms(&self) -> f64        { self.init_phases.renderer_init_ms }
 
     /// Accepts a JSON array of blank-zone records and caches it for the next
     /// renderer integration step (GPU mask upload in Phase 1 task 5).
@@ -342,13 +502,6 @@ impl GpuGameOfLife {
 // dispatches GPU work creates its own CommandEncoder and calls
 // `queue.submit()` to guarantee storage buffer visibility between phases.
 impl GpuGameOfLife {
-    /// Flush any pending cell edits to the GPU.
-    fn flush_edits_if_pending(&mut self) {
-        if self.simulation.has_pending_edits() || self.simulation.has_pending_set_edits() {
-            self.simulation.flush_edits(&self.ctx.device, &self.ctx.queue);
-        }
-    }
-
     /// Stamp `RESEED_BATCH_SIZE` random Methuselahs across the toroidal
     /// world, with `MIN_PATTERN_DISTANCE` spacing enforced against the
     /// most-recent stamps.  Spacing protects the "named-pattern
@@ -366,24 +519,22 @@ impl GpuGameOfLife {
         let cols = self.world.cols();
         let rows = self.world.rows();
 
-        // Build a single contiguous rejection set: cross-tick recent
-        // stamps + this-batch stamps as we place them.  Bounded to
-        // `RECENT_STAMP_MEMORY` so the per-stamp distance check stays
-        // O(constant) regardless of `RESEED_BATCH_SIZE`.  When the
-        // bound is exceeded mid-batch, we drop the oldest entry —
-        // those patterns have aged enough that their chaos clouds
-        // already extend past `MIN_PATTERN_DISTANCE` from their
-        // origin, so the spacing constraint doesn't bind any more.
-        let mut active: Vec<(u32, u32)> =
-            Vec::with_capacity(RECENT_STAMP_MEMORY.max(RESEED_BATCH_SIZE as usize));
-        active.extend(self.recent_stamps.iter().copied());
+        // Build the rejection set as a SpatialGrid: cross-tick recent
+        // stamps go in first, then we insert each new placement as we
+        // make it.  O(1) per check (versus the previous O(N) Vec scan)
+        // means batch size isn't bounded by `RECENT_STAMP_MEMORY` for
+        // performance reasons any more — only by aesthetic choice.
+        let mut grid = SpatialGrid::new(cols, rows, SPATIAL_BUCKET_SIZE);
+        for &(ox, oy) in &self.recent_stamps {
+            grid.insert(ox, oy);
+        }
 
         for _ in 0..RESEED_BATCH_SIZE {
             let d = pick_random_stamp_spaced(
                 &mut self.rng,
                 cols,
                 rows,
-                &active,
+                &grid,
                 MIN_PATTERN_DISTANCE,
                 MAX_REJECTION_ATTEMPTS,
             );
@@ -393,21 +544,13 @@ impl GpuGameOfLife {
             // queue — flushed on the next `tick_and_render` cycle.
             self.world.stamp(d.pattern, d.ox, d.oy, d.transform);
             self.simulation.queue_pattern_stamp(&self.grid, cells);
-            // Add to active rejection set; trim from front when over
-            // budget so cost stays O(RECENT_STAMP_MEMORY) per stamp.
-            if active.len() >= RECENT_STAMP_MEMORY {
-                active.remove(0);
+            grid.insert(d.ox, d.oy);
+            // Trim front of recent_stamps when over budget so the
+            // cross-tick rolling window stays bounded.
+            if self.recent_stamps.len() >= RECENT_STAMP_MEMORY {
+                self.recent_stamps.pop_front();
             }
-            active.push((d.ox, d.oy));
-        }
-
-        // Persist the tail of `active` as cross-tick recent_stamps so
-        // the next reseed batch space-rejects against the newest
-        // patterns from this one.
-        self.recent_stamps.clear();
-        let tail_start = active.len().saturating_sub(RECENT_STAMP_MEMORY);
-        for &pos in &active[tail_start..] {
-            self.recent_stamps.push_back(pos);
+            self.recent_stamps.push_back((d.ox, d.oy));
         }
     }
 
@@ -422,21 +565,14 @@ impl GpuGameOfLife {
         self.ctx.queue.submit([enc.finish()]);
     }
 
-    /// Tick base simulation (single step).
-    fn tick_base(&mut self) {
-        let mut enc = self.ctx.device.create_command_encoder(
-            &wgpu::CommandEncoderDescriptor { label: Some("gol_sim_tick") },
-        );
-        self.simulation.tick(&mut enc, &self.grid);
-        self.ctx.queue.submit([enc.finish()]);
-    }
-
-    /// Render the current state and present the frame.
+    /// Render the current state and present the frame.  Used by
+    /// `render_only` (not on the timestamp-sample path) and by
+    /// `flush_and_render` after a click-driven edit.
     fn present(&mut self) {
         let mut enc = self.ctx.device.create_command_encoder(
             &wgpu::CommandEncoderDescriptor { label: Some("gol_present") },
         );
-        match self.renderers[0].render(&mut enc, self.simulation.current_visible_is_a()) {
+        match self.renderers[0].render(&mut enc, self.simulation.current_visible_is_a(), None) {
             Ok(output) => {
                 self.ctx.queue.submit([enc.finish()]);
                 output.present();

@@ -4,6 +4,7 @@
 
 import { createLogger } from '../logger';
 import { PERF_ENABLED, PerfSampler } from '../perf';
+import { SUMMARY_INTERVAL_FRAMES } from '../perf/constants';
 import { TICK_EVERY } from './rendererProtocol';
 import type { WorkerInMsg, WorkerOutMsg, GridInfo } from './rendererProtocol';
 import type { BlankZone } from '../types/blankZones';
@@ -28,6 +29,15 @@ interface Renderer {
   setZones?(zones: BlankZone[]): void;
   setTheme?(theme: ThemePalette): void;
   gridInfo?(): GridInfo;
+  /** DEV-only: pull most recent per-pass GPU durations.  `null` when the
+   *  renderer doesn't support timestamp queries (CPU fallback, or
+   *  WebGPU adapter without `TIMESTAMP_QUERY` granted). */
+  pullGpuPassDurations?(): {
+    computeTickMs: number | null;
+    xorEditMs:     number | null;
+    orEditMs:      number | null;
+    renderPassMs:  number | null;
+  } | null;
   free(): void;
 }
 
@@ -104,6 +114,11 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
       const { cellPx } = e.data;
       log.debug('Init received — canvas', canvas.width, 'x', canvas.height, 'cell_px', cellPx);
 
+      // Tier 1 perf timing markers — capture a stamp before each major
+      // async phase of init so the main thread can render a startup
+      // breakdown.  DEV-only via PERF_ENABLED gate further down.
+      const startupT0 = performance.now();
+
       // ── WebGPU pre-probe (no canvas involved) ─────────────────────────
       // We must verify WebGPU works BEFORE calling new_offscreen(), because
       // create_surface() permanently claims the canvas as a WebGPU context.
@@ -120,18 +135,21 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
         log.info('GPU: probe failed, will use CPU renderer:', errorMessage(probeErr));
         post({ type: 'error', phase: 'gpu-probe', message: errorMessage(probeErr) });
       }
+      const startupT1 = performance.now();
 
       // ── GPU path (canvas committed here) ──────────────────────────────
       if (gpuProbeOk) {
         log.debug('GPU: loading wasm module...');
         try {
           const { GpuGameOfLife } = await import('@gpu-pkg/game_of_life_gpu.js');
+          const startupT2 = performance.now();
           log.debug('GPU: module loaded, initialising surface...');
           // Per-session random seed for the auto-reseed RNG.  u32 range
           // is enough variety; the Rust side widens it to u64.  A future
           // URL-seeded mode would parse `?seed=` here instead.
           const seed = Math.floor(Math.random() * 0x1_0000_0000);
           const gpu = await GpuGameOfLife.new_offscreen(canvas, cellPx, seed);
+          const startupT3 = performance.now();
           // Verify set_zones_json is present at init time so a future rename/removal
           // produces a visible warning rather than silently failing on every zone update.
           const gpuExt = gpu as unknown as {
@@ -162,6 +180,46 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
             gridPitch:   gpu.grid_pitch(),
           });
 
+          // Track if we've logged the timestamp-query availability hint
+          // already (one-shot — DEV log to point developers at the flag).
+          let timestampHintLogged = false;
+          const pullGpuPassDurations = (): {
+            computeTickMs: number | null;
+            xorEditMs:     number | null;
+            orEditMs:      number | null;
+            renderPassMs:  number | null;
+          } | null => {
+            if (!gpu.timestamp_query_supported()) {
+              if (!timestampHintLogged && PERF_ENABLED) {
+                timestampHintLogged = true;
+                log.info(
+                  'GPU timestamp queries unavailable (adapter did not grant ' +
+                  'TIMESTAMP_QUERY).  In Chrome, enable chrome://flags/' +
+                  '#enable-unsafe-webgpu to opt in.  Per-pass GPU breakdown ' +
+                  'will not be emitted.',
+                );
+              }
+              return null;
+            }
+            const computeTick = gpu.last_compute_tick_ms();
+            const xorEdit     = gpu.last_xor_edit_ms();
+            const orEdit      = gpu.last_or_edit_ms();
+            const renderPass  = gpu.last_render_pass_ms();
+            // Coerce undefined → null for the message contract; treat all-null
+            // as "no sample yet" and skip emitting upstream.
+            const out = {
+              computeTickMs: computeTick ?? null,
+              xorEditMs:     xorEdit ?? null,
+              orEditMs:      orEdit ?? null,
+              renderPassMs:  renderPass ?? null,
+            };
+            if (out.computeTickMs === null && out.xorEditMs === null
+              && out.orEditMs === null && out.renderPassMs === null) {
+              return null;
+            }
+            return out;
+          };
+
           renderer = {
             tick:       () => gpu.tick_and_render(),
             renderOnly: () => gpu.render_only(),
@@ -175,6 +233,7 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
             setZones:   (zones)  => setZonesOnGpu(zones),
             setTheme:   (theme)  => setThemeOnGpu(theme),
             gridInfo:   getGridInfo,
+            pullGpuPassDurations,
             free:       () => gpu.free(),
           };
           // A resize that arrived during the async init window updated
@@ -192,6 +251,26 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
           renderer.setTheme?.(currentTheme);
           log.info('GPU renderer ready');
           post({ type: 'ready', backend: 'gpu', gridInfo: getGridInfo() });
+          if (PERF_ENABLED) {
+            const startupT4 = performance.now();
+            post({
+              type: 'startup_breakdown',
+              phases: {
+                total:        startupT4 - startupT0,
+                gpuProbe:     startupT1 - startupT0,
+                wasmImport:   startupT2 - startupT1,
+                newOffscreen: startupT3 - startupT2,
+                readyPost:    startupT4 - startupT3,
+                newOffscreenPhases: {
+                  deviceRequest:  gpu.init_device_request_ms(),
+                  panelInit:      gpu.init_panel_ms(),
+                  seeding:        gpu.init_seeding_ms(),
+                  simulationInit: gpu.init_simulation_ms(),
+                  rendererInit:   gpu.init_renderer_ms(),
+                },
+              },
+            });
+          }
           break;
         } catch (gpuErr) {
           const message = errorMessage(gpuErr);
@@ -241,6 +320,21 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
           break;
       }
       perf?.endFrame();
+      // GPU pass breakdown: piggyback on the perf-summary cadence.
+      // Pull `last_*_pass_ms` from the renderer (Rust-side TimestampPanel)
+      // and post if a fresh sample arrived since the last poll.  Skipped
+      // when PERF is off, the renderer doesn't support the API, or the
+      // panel hasn't completed its first readback yet.
+      if (PERF_ENABLED && frameCount % SUMMARY_INTERVAL_FRAMES === 0) {
+        const durations = renderer.pullGpuPassDurations?.();
+        if (durations) {
+          post({
+            type: 'gpu_pass_breakdown',
+            frame: frameCount,
+            durations,
+          });
+        }
+      }
       break;
     }
 

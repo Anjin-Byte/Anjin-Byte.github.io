@@ -304,6 +304,38 @@ onMounted(() => {
   });
   bridge.on('zones_state', (msg) => blankZones.syncFromWorker(msg.zones));
   bridge.on('zones_error', (msg) => log.error('Zone update rejected:', msg.message));
+  bridge.on('startup_breakdown', (msg) => {
+    const fmt = (ms: number): string => `${ms.toFixed(0)}ms`;
+    const lines: string[] = [
+      `Startup breakdown:`,
+      `  total            ${fmt(msg.phases.total)}`,
+      `  gpu_probe        ${fmt(msg.phases.gpuProbe)}`,
+      `  wasm_import      ${fmt(msg.phases.wasmImport)}`,
+      `  new_offscreen    ${fmt(msg.phases.newOffscreen)}`,
+      `  ready_post       ${fmt(msg.phases.readyPost)}`,
+    ];
+    const sub = msg.phases.newOffscreenPhases;
+    if (sub) {
+      lines.push(`  new_offscreen sub-phases:`);
+      lines.push(`    device_request   ${fmt(sub.deviceRequest)}`);
+      lines.push(`    panel_init       ${fmt(sub.panelInit)}`);
+      lines.push(`    seeding          ${fmt(sub.seeding)}`);
+      lines.push(`    simulation_init  ${fmt(sub.simulationInit)}`);
+      lines.push(`    renderer_init    ${fmt(sub.rendererInit)}`);
+    }
+    log.info(lines.join('\n'));
+  });
+  bridge.on('gpu_pass_breakdown', (msg) => {
+    const fmt = (v: number | null): string => v === null ? '—' : `${v.toFixed(2)}ms`;
+    const d = msg.durations;
+    log.info(
+      `GPU pass breakdown (frame ${msg.frame}):\n` +
+      `  compute_tick   ${fmt(d.computeTickMs)}\n` +
+      `  xor_edit       ${fmt(d.xorEditMs)}\n` +
+      `  or_edit        ${fmt(d.orEditMs)}\n` +
+      `  render_pass    ${fmt(d.renderPassMs)}`,
+    );
+  });
   bridge.on('error', (msg) => {
     if (msg.phase === 'gpu-init') {
       log.debug(`GPU unavailable (${msg.message}) — CPU fallback in progress`);
