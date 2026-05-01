@@ -24,7 +24,11 @@ export interface GridInfo {
 }
 
 export type WorkerInMsg =
-  | { type: 'init'; canvas: OffscreenCanvas; cellPx: number }
+  // `theme` carries the resolved palette at boot so the worker can apply
+  // it to the GPU before the first frame, avoiding a light-flash on
+  // dark-OS users when their stored preference is `system`.  Subsequent
+  // theme changes flow through the `set_theme` message.
+  | { type: 'init'; canvas: OffscreenCanvas; cellPx: number; theme: ThemePalette }
   | { type: 'frame' }
   | { type: 'resize'; width: number; height: number }
   | { type: 'scroll'; scrollY: number }

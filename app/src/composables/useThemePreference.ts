@@ -11,14 +11,13 @@ export type ThemePreference = 'light' | 'system' | 'dark';
 
 const STORAGE_KEY = 'theme-preference';
 
-// First-visit default is `light` — the site is calibrated and tuned around
-// light mode as the primary experience; dark is available via the toggle and
-// is persisted in localStorage once chosen.  (Using `system` here would mean
-// users with OS dark-mode never see the intended presentation.)
+// First-visit default is `system` — follows the user's OS preference on
+// arrival.  Once the toggle in the header is used, the choice persists in
+// localStorage and overrides this default forever after.
 function readStored(): ThemePreference {
-  if (typeof window === 'undefined') return 'light';
+  if (typeof window === 'undefined') return 'system';
   const v = window.localStorage?.getItem(STORAGE_KEY);
-  return v === 'light' || v === 'dark' || v === 'system' ? v : 'light';
+  return v === 'light' || v === 'dark' || v === 'system' ? v : 'system';
 }
 
 const preferenceRef = ref<ThemePreference>(readStored());
@@ -92,6 +91,12 @@ if (typeof window !== 'undefined' && document?.documentElement) {
     s('--theme-selection-bg', oklchCss(t.accent, t.accent_chroma_scale, 0.20));
     // Also set `color-scheme` so native form controls follow along.
     s('color-scheme', t.surface[0] > 0.5 ? 'light' : 'dark');
+    // Mobile-browser chrome (iOS Safari URL bar + status-bar background
+    // spillover, mobile Chrome's URL bar, Edge mobile, etc.) reads the
+    // `theme-color` meta.  Keeping it on the active surface means the
+    // top stripe of the screen always feels coordinated with the page.
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) themeMeta.setAttribute('content', oklabCss(t.surface));
   };
   apply(themeRef.value);
   watch(themeRef, apply);

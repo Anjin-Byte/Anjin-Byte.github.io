@@ -1,6 +1,7 @@
 import { ref, type Ref } from 'vue';
 import { createLogger } from '../logger';
 import type { WorkerInMsg, WorkerOutMsg, GridInfo } from '../workers/rendererProtocol';
+import type { ThemePalette } from '../types/theme';
 
 const log = createLogger('WorkerBridge');
 
@@ -11,7 +12,7 @@ export interface WorkerBridge {
   gridInfo: Ref<GridInfo | null>;
   post(msg: WorkerInMsg, transfer?: Transferable[]): void;
   on<T extends OutMsgType>(type: T, handler: (data: Extract<WorkerOutMsg, { type: T }>) => void): () => void;
-  init(canvas: OffscreenCanvas, cellPx: number): void;
+  init(canvas: OffscreenCanvas, cellPx: number, theme: ThemePalette): void;
   terminate(): void;
 }
 
@@ -50,7 +51,7 @@ export function useWorkerBridge(): WorkerBridge {
     }
   }
 
-  function init(canvas: OffscreenCanvas, cellPx: number): void {
+  function init(canvas: OffscreenCanvas, cellPx: number, theme: ThemePalette): void {
     const w = new Worker(
       new URL('../workers/backgroundRenderer.ts', import.meta.url),
       { type: 'module' },
@@ -60,7 +61,7 @@ export function useWorkerBridge(): WorkerBridge {
       log.error('Worker uncaught exception:', e.message, `at ${e.filename}:${e.lineno}`);
     };
     worker = w;
-    post({ type: 'init', canvas, cellPx }, [canvas]);
+    post({ type: 'init', canvas, cellPx, theme }, [canvas]);
   }
 
   function terminate(): void {

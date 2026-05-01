@@ -4,6 +4,21 @@
     <meta charset="UTF-8" />
     <link rel="icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!--
+      `theme-color` colours the mobile-browser chrome strip (URL bar in iOS
+      Safari, the status-bar background spillover above it).  Initial value
+      below is the light surface; the inline pre-paint script overwrites it
+      to match the resolved theme, and `useThemePreference.ts`'s `apply`
+      keeps it in sync on live toggles.
+
+      `apple-mobile-web-app-status-bar-style="black-translucent"` only takes
+      effect when the user adds the page to their iOS home screen
+      (standalone/PWA mode).  Combined with `viewport-fit=cover` + the
+      `--safe-area-*` CSS vars set in App.vue, the GoL canvas extends under
+      the iOS status bar so the time/battery icons float over the background.
+    -->
+    <meta name="theme-color" content="oklab(0.9850 -0.0010 0.0040)" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>My Portfolio</title>
     <!--
       Pre-paint theme bridge.  Resolves the user's theme preference and writes
@@ -32,7 +47,7 @@
 
           var pref = (stored === 'light' || stored === 'dark' || stored === 'system')
             ? stored
-            : 'light';
+            : 'system';
           var isDark =
             pref === 'dark' ? true :
             pref === 'light' ? false :
@@ -41,10 +56,15 @@
           var root = document.documentElement;
           root.dataset.themeMode = isDark ? 'dark' : 'light';
           var s = root.style;
-          s.setProperty('--theme-surface',    isDark ? SURFACE_DARK : SURFACE_LIGHT);
+          var surface = isDark ? SURFACE_DARK : SURFACE_LIGHT;
+          s.setProperty('--theme-surface',    surface);
           s.setProperty('--theme-grid-minor', isDark ? MINOR_DARK   : MINOR_LIGHT);
           s.setProperty('--theme-grid-major', isDark ? MAJOR_DARK   : MAJOR_LIGHT);
           s.setProperty('color-scheme',       isDark ? 'dark'       : 'light');
+          // Coordinate iOS Safari's URL-bar / status-bar background with the
+          // resolved theme.  Live toggles re-apply this from useThemePreference.
+          var themeMeta = document.querySelector('meta[name="theme-color"]');
+          if (themeMeta) themeMeta.setAttribute('content', surface);
         } catch (_) { /* if anything fails, App.vue's CSS fallbacks take over */ }
       })();
     </script>

@@ -112,6 +112,12 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
       // update its dimensions even before the renderer is created.
       canvas = e.data.canvas;
       const { cellPx } = e.data;
+      // Take the resolved theme from the main thread before any GPU work,
+      // so the first `renderer.setTheme(currentTheme)` call below sends
+      // the correct palette and the first rendered frame doesn't flash
+      // light against a dark html background on dark-OS users with the
+      // `system` default.
+      currentTheme = e.data.theme;
       log.debug('Init received — canvas', canvas.width, 'x', canvas.height, 'cell_px', cellPx);
 
       // Tier 1 perf timing markers — capture a stamp before each major

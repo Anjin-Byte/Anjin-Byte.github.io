@@ -293,7 +293,7 @@ onMounted(() => {
   const gridPitch = alignedGridPitch(canvasW);
   applyGridMargin(canvasW);
 
-  bridge.init(offscreen, gridPitch);
+  bridge.init(offscreen, gridPitch, currentTheme.value);
   log.debug('Worker spawned, gridPitch', gridPitch.toFixed(2));
 
   // Worker message handlers
