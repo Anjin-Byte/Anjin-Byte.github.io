@@ -69,7 +69,7 @@
     function U(e, t, r) {
         return Math.min(r, Math.max(t, e));
     }
-    function w(e) {
+    function k(e) {
         return typeof e != "number" || !Number.isFinite(e) ? null : Math.trunc(e);
     }
     function v() {
@@ -79,7 +79,7 @@
         return typeof e == "string" && W.has(e) ? e : "both";
     }
     function te(e) {
-        const t = e && typeof e == "object" ? e : {}, r = typeof t.style == "string" && Q.has(t.style) ? t.style : "none", i = U(w(t.widthCells) ?? 1, 1, 4), l = typeof t.opacity == "number" ? t.opacity : 1, o = U(l, 0, 1), a = {
+        const t = e && typeof e == "object" ? e : {}, r = typeof t.style == "string" && Q.has(t.style) ? t.style : "none", i = U(k(t.widthCells) ?? 1, 1, 4), l = typeof t.opacity == "number" ? t.opacity : 1, o = U(l, 0, 1), a = {
             style: r,
             widthCells: i,
             opacity: o
@@ -88,7 +88,7 @@
             const u = typeof t.fadeStrength == "number" ? t.fadeStrength : .6;
             a.fadeStrength = U(u, 0, 1);
         }
-        return r === "noted" && (a.notePitchCells = Math.max(1, w(t.notePitchCells) ?? 2)), (r === "bold-major" || r === "noted") && (a.hideInteriorBorder = typeof t.hideInteriorBorder == "boolean" ? t.hideInteriorBorder : !1), a;
+        return r === "noted" && (a.notePitchCells = Math.max(1, k(t.notePitchCells) ?? 2)), (r === "bold-major" || r === "noted") && (a.hideInteriorBorder = typeof t.hideInteriorBorder == "boolean" ? t.hideInteriorBorder : !1), a;
     }
     function re(e) {
         return typeof e == "boolean" ? e : !0;
@@ -98,13 +98,13 @@
     }
     function F(e, t = Date.now()) {
         if (!e || typeof e != "object") return null;
-        const r = e, i = w(r.x1), l = w(r.y1), o = w(r.x2), a = w(r.y2);
+        const r = e, i = k(r.x1), l = k(r.y1), o = k(r.x2), a = k(r.y2);
         if (i === null || l === null || o === null || a === null) return null;
-        const u = Math.min(i, o), s = Math.max(i, o), k = Math.min(l, a), p = Math.max(l, a);
+        const u = Math.min(i, o), s = Math.max(i, o), z = Math.min(l, a), p = Math.max(l, a);
         return {
             id: typeof r.id == "string" && r.id.length > 0 ? r.id : v(),
             x1: u,
-            y1: k,
+            y1: z,
             x2: s,
             y2: p,
             mode: ee(r.mode),
@@ -172,11 +172,11 @@
         e.width = o, e.height = a, ie.debug("CPU: bridge ready, grid", i.width, "x", i.height);
         let u = t.createImageData(o, a), s = new Uint32Array(u.data.buffer);
         s.fill(Y);
-        function k() {
-            const p = i.getCells(), z = i.width, T = i.height, M = o;
+        function z() {
+            const p = i.getCells(), A = i.width, T = i.height, M = o;
             for(let y = 0; y < T; y++){
-                const j = y * z, c = y * l + 1;
-                for(let d = 0; d < z; d++){
+                const j = y * A, c = y * l + 1;
+                for(let d = 0; d < A; d++){
                     const S = p[j + d] === 0 ? ae : ce, G = d * l + 1;
                     for(let h = 0; h < C; h++){
                         const q = (c + h) * M + G;
@@ -188,12 +188,12 @@
         }
         return {
             tick () {
-                i.tick(), k();
+                i.tick(), z();
             },
             renderOnly () {
-                k();
+                z();
             },
-            resize (p, z) {
+            resize (p, A) {
                 (e.width !== o || e.height !== a) && (e.width = o, e.height = a, u = t.createImageData(o, a), s = new Uint32Array(u.data.buffer), s.fill(Y));
             },
             setZones (p) {},
@@ -201,13 +201,13 @@
         };
     }
     const f = $("Renderer"), V = self;
-    let n = null, g = null, A = 0, E = null, D = 0;
+    let n = null, g = null, E = 0, I = null, D = 0;
     const m = new se;
-    let I = H;
+    let b = H;
     function _(e) {
         V.postMessage(e);
     }
-    function b(e) {
+    function w(e) {
         return e instanceof Error ? e.message : String(e);
     }
     function de(e) {
@@ -241,17 +241,17 @@
                 {
                     g = e.data.canvas;
                     const { cellPx: t } = e.data;
-                    f.debug("Init received — canvas", g.width, "x", g.height, "cell_px", t);
+                    b = e.data.theme, f.debug("Init received — canvas", g.width, "x", g.height, "cell_px", t);
                     const r = performance.now();
                     let i = !1;
                     try {
                         if (!(await navigator.gpu?.requestAdapter() ?? null)) throw new Error("No WebGPU adapter");
                         i = !0, f.debug("GPU: probe passed — adapter found");
                     } catch (o) {
-                        f.info("GPU: probe failed, will use CPU renderer:", b(o)), _({
+                        f.info("GPU: probe failed, will use CPU renderer:", w(o)), _({
                             type: "error",
                             phase: "gpu-probe",
-                            message: b(o)
+                            message: w(o)
                         });
                     }
                     const l = performance.now();
@@ -261,17 +261,17 @@
                             return m;
                         }), a = performance.now();
                         f.debug("GPU: module loaded, initialising surface...");
-                        const u = Math.floor(Math.random() * 4294967296), s = await o.new_offscreen(g, t, u), k = performance.now(), p = s, z = (c)=>{
+                        const u = Math.floor(Math.random() * 4294967296), s = await o.new_offscreen(g, t, u), z = performance.now(), p = s, A = (c)=>{
                             if (typeof p.set_zones_json == "function") try {
                                 p.set_zones_json(JSON.stringify(c));
                             } catch (d) {
-                                Z(`GPU zone update failed: ${b(d)}`);
+                                Z(`GPU zone update failed: ${w(d)}`);
                             }
                         }, T = (c)=>{
                             if (typeof p.set_theme_json == "function") try {
                                 p.set_theme_json(X(c));
                             } catch (d) {
-                                f.error("GPU theme update failed:", b(d));
+                                f.error("GPU theme update failed:", w(d));
                             }
                         }, M = ()=>({
                                 worldCols: s.world_cols(),
@@ -290,7 +290,7 @@
                             toggleCell: (c, d)=>{
                                 s.toggle_cell(c, d), s.flush_and_render();
                             },
-                            setZones: (c)=>z(c),
+                            setZones: (c)=>A(c),
                             setTheme: (c)=>T(c),
                             gridInfo: M,
                             pullGpuPassDurations: ()=>{
@@ -304,14 +304,14 @@
                                 return h.computeTickMs === null && h.xorEditMs === null && h.orEditMs === null && h.renderPassMs === null ? null : h;
                             },
                             free: ()=>s.free()
-                        }, E && (n.resize(E.width, E.height), E = null), n.setScroll?.(A), n.setTransition?.(1), n.setZones?.(m.getAll()), n.setTheme?.(I), f.info("GPU renderer ready"), _({
+                        }, I && (n.resize(I.width, I.height), I = null), n.setScroll?.(E), n.setTransition?.(1), n.setZones?.(m.getAll()), n.setTheme?.(b), f.info("GPU renderer ready"), _({
                             type: "ready",
                             backend: "gpu",
                             gridInfo: M()
                         });
                         break;
                     } catch (o) {
-                        const a = b(o);
+                        const a = w(o);
                         f.error("GPU init failed after probe passed (canvas may be locked):", a), _({
                             type: "error",
                             phase: "gpu-init",
@@ -320,7 +320,7 @@
                         break;
                     }
                     try {
-                        n = await le(g), n.setScroll?.(A), n.setZones?.(m.getAll()), n.setTheme?.(I), f.info("CPU renderer ready"), _({
+                        n = await le(g), n.setScroll?.(E), n.setZones?.(m.getAll()), n.setTheme?.(b), f.info("CPU renderer ready"), _({
                             type: "ready",
                             backend: "cpu",
                             gridInfo: {
@@ -332,7 +332,7 @@
                             }
                         });
                     } catch (o) {
-                        const a = b(o);
+                        const a = w(o);
                         f.error("CPU init failed:", a), _({
                             type: "error",
                             phase: "cpu-init",
@@ -358,20 +358,20 @@
                 {
                     if (f.debug("Resize →", e.data.width, "x", e.data.height), !g) break;
                     if (g.width = e.data.width, g.height = e.data.height, !n) {
-                        E = {
+                        I = {
                             width: e.data.width,
                             height: e.data.height
                         };
                         break;
                     }
-                    n.resize(e.data.width, e.data.height), n.setScroll?.(A), n.setTransition?.(1), n.setZones?.(m.getAll()), n.setTheme?.(I), n.gridInfo && _({
+                    n.resize(e.data.width, e.data.height), n.setScroll?.(E), n.setTransition?.(1), n.setZones?.(m.getAll()), n.setTheme?.(b), n.gridInfo && _({
                         type: "grid_info",
                         gridInfo: n.gridInfo()
                     });
                     break;
                 }
             case "scroll":
-                A = e.data.scrollY, n?.setScroll?.(A);
+                E = e.data.scrollY, n?.setScroll?.(E);
                 break;
             case "toggle_cell":
                 n?.toggleCell?.(e.data.cx, e.data.cy);
@@ -406,7 +406,7 @@
                 m.clear(), P(), x();
                 break;
             case "set_theme":
-                I = e.data.theme, n?.setTheme?.(I);
+                b = e.data.theme, n?.setTheme?.(b);
                 break;
             case "perf_snapshot":
                 break;
