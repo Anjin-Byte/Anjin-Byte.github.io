@@ -3083,7 +3083,7 @@ function Gk() {
     if (u) for (const c of u) c(s);
   }
   function i(s, u, c) {
-    const d = new Worker(new URL("/assets/backgroundRenderer-BF-NsoXI.js", import.meta.url), { type: "module" });
+    const d = new Worker(new URL("/assets/backgroundRenderer-DE72mVYc.js", import.meta.url), { type: "module" });
     d.onmessage = (f) => o(f.data), d.onerror = (f) => {
       tf.error("Worker uncaught exception:", f.message, `at ${f.filename}:${f.lineno}`);
     }, e = d, a({ type: "init", canvas: s, cellPx: u, theme: c }, [s]);
@@ -3419,7 +3419,12 @@ const ew = { key: 0, class: "zone-preview-text" }, tw = { class: "zone-list" }, 
     const $ = he.transferControlToOffscreen(), R = W(k);
     se(k), o.init($, R, m.value), t.debug("Worker spawned, gridPitch", R.toFixed(2)), o.on("ready", (Q) => {
       t.info(`${Q.backend.toUpperCase()} renderer active`), o.post({ type: "set_theme", theme: m.value }), o.post({ type: "set_zones", zones: c(d.zones.value) });
-    }), o.on("zones_state", (Q) => d.syncFromWorker(Q.zones)), o.on("zones_error", (Q) => t.error("Zone update rejected:", Q.message)), o.on("startup_breakdown", (Q) => {
+    }), o.on("zones_state", (Q) => d.syncFromWorker(Q.zones)), o.on("zones_error", (Q) => t.error("Zone update rejected:", Q.message)), o.on("first_frame_painted", () => {
+      a.value && (a.value.classList.add("app-bg--visible"), window.setTimeout(() => {
+        var _a3;
+        (_a3 = a.value) == null ? void 0 : _a3.classList.add("app-bg--snappy-transition");
+      }, 800));
+    }), o.on("startup_breakdown", (Q) => {
       const le = (U) => `${U.toFixed(0)}ms`, pe = ["Startup breakdown:", `  total            ${le(Q.phases.total)}`, `  gpu_probe        ${le(Q.phases.gpuProbe)}`, `  wasm_import      ${le(Q.phases.wasmImport)}`, `  new_offscreen    ${le(Q.phases.newOffscreen)}`, `  ready_post       ${le(Q.phases.readyPost)}`], de = Q.phases.newOffscreenPhases;
       de && (pe.push("  new_offscreen sub-phases:"), pe.push(`    device_request   ${le(de.deviceRequest)}`), pe.push(`    panel_init       ${le(de.panelInit)}`), pe.push(`    seeding          ${le(de.seeding)}`), pe.push(`    simulation_init  ${le(de.simulationInit)}`), pe.push(`    renderer_init    ${le(de.rendererInit)}`));
     }), o.on("gpu_pass_breakdown", (Q) => {
@@ -3448,7 +3453,7 @@ const ew = { key: 0, class: "zone-preview-text" }, tw = { class: "zone-list" }, 
   }), dr(() => {
     r.stop(), E == null ? void 0 : E.disconnect(), z == null ? void 0 : z(), D !== null && (clearTimeout(D), D = null), F !== null && (cancelAnimationFrame(F), F = null), document.removeEventListener("click", C), M == null ? void 0 : M(), o.terminate();
   }), (ie, he) => (Te(), ze(be, null, [p("div", { ref_key: "shellRef", ref: n, class: "app-bg-shell" }, [p("canvas", { ref_key: "canvasRef", ref: a, class: "app-bg" }, null, 512)], 512), Ue(s).previewStyle.value ? (Te(), ze("div", { key: 0, class: "zone-preview-overlay", style: ge(Ue(s).previewStyle.value) }, null, 4)) : Cn("", true), b(uw, { zones: Ue(d).zones.value, "preview-rect": Ue(s).previewRect.value, onAddZone: h, onUpdateZone: w, onRemoveZone: I, onClearZones: V, onToolChange: g, onDraftChange: x }, null, 8, ["zones", "preview-rect"])], 64));
-} }), gw = Kn(hw, [["__scopeId", "data-v-5e622e22"]]);
+} }), gw = Kn(hw, [["__scopeId", "data-v-e467751d"]]);
 function rh(e, t) {
   t = Array.isArray(t) ? t.slice(0, -1).map((n) => `'${n}'`).join(", ") + ` or '${t.at(-1)}'` : `'${t}'`;
 }

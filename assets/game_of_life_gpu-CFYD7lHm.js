@@ -1,7 +1,7 @@
 import { _ as O } from "./__vite-plugin-wasm-helper-oqf-7dtx.js";
 let y;
 let __tla = (async ()=>{
-    var z = "/assets/game_of_life_gpu_bg-Cr_UzT_I.wasm";
+    var z = "/assets/game_of_life_gpu_bg-CbPGzsoU.wasm";
     y = class {
         static __wrap(_) {
             const t = Object.create(y.prototype);
@@ -66,6 +66,9 @@ let __tla = (async ()=>{
         }
         resize(_, t) {
             c.gpugameoflife_resize(this.__wbg_ptr, _, t);
+        }
+        set_init_fade(_) {
+            c.gpugameoflife_set_init_fade(this.__wbg_ptr, _);
         }
         set_scroll(_) {
             c.gpugameoflife_set_scroll(this.__wbg_ptr, _);
@@ -1092,8 +1095,8 @@ ${e.stack}` : n;
     const o = await O({
         "./game_of_life_gpu_bg.js": {
             __wbg_gpugameoflife_new: n_,
-            __wbg_new_typed_1137602701dc87d4: st,
             __wbg_call_a41d6421b30a32c5: H,
+            __wbg_new_typed_1137602701dc87d4: st,
             __wbg_new_227d7c05414eb861: ot,
             __wbg_stack_3b0d974bbf31e44f: nn,
             __wbg_error_a6fa202b58aa1cd3: ze,
@@ -1299,18 +1302,18 @@ ${e.stack}` : n;
             __wbindgen_cast_0000000000000005: vn,
             __wbindgen_cast_0000000000000006: Pn
         }
-    }, z), qn = o.memory, Mn = o.__wbg_gpugameoflife_free, Fn = o.gpugameoflife_flush_and_render, jn = o.gpugameoflife_grid_pitch, $n = o.gpugameoflife_init_device_request_ms, Nn = o.gpugameoflife_init_panel_ms, Qn = o.gpugameoflife_init_renderer_ms, Xn = o.gpugameoflife_init_seeding_ms, Yn = o.gpugameoflife_init_simulation_ms, Zn = o.gpugameoflife_last_compute_tick_ms, Hn = o.gpugameoflife_last_or_edit_ms, Jn = o.gpugameoflife_last_render_pass_ms, Kn = o.gpugameoflife_last_xor_edit_ms, er = o.gpugameoflife_new, _r = o.gpugameoflife_new_offscreen, tr = o.gpugameoflife_padded_rows, nr = o.gpugameoflife_render_only, rr = o.gpugameoflife_resize, cr = o.gpugameoflife_set_scroll, or = o.gpugameoflife_set_theme_json, fr = o.gpugameoflife_set_transition, ar = o.gpugameoflife_set_zones_json, ir = o.gpugameoflife_tick_and_render, sr = o.gpugameoflife_timestamp_query_supported, ur = o.gpugameoflife_toggle_cell, br = o.gpugameoflife_words_per_row, gr = o.gpugameoflife_world_cols, dr = o.gpugameoflife_world_rows, wr = o.wasm_bindgen__convert__closures_____invoke__haeeeb3f4979a72f5, lr = o.wasm_bindgen__convert__closures_____invoke__h5f052b83621e37ce, mr = o.wasm_bindgen__convert__closures_____invoke__h8ce5ce45e6255d0f, pr = o.wasm_bindgen__convert__closures_____invoke__h8ce5ce45e6255d0f_2, xr = o.__wbindgen_malloc, hr = o.__wbindgen_realloc, yr = o.__wbindgen_exn_store, Br = o.__externref_table_alloc, Sr = o.__wbindgen_externrefs, Ir = o.__wbindgen_free, Tr = o.__wbindgen_destroy_closure, vr = o.__externref_table_dealloc, W = o.__wbindgen_start;
-    var Pr = Object.freeze({
+    }, z), qn = o.memory, Mn = o.__wbg_gpugameoflife_free, Fn = o.gpugameoflife_flush_and_render, jn = o.gpugameoflife_grid_pitch, $n = o.gpugameoflife_init_device_request_ms, Nn = o.gpugameoflife_init_panel_ms, Qn = o.gpugameoflife_init_renderer_ms, Xn = o.gpugameoflife_init_seeding_ms, Yn = o.gpugameoflife_init_simulation_ms, Zn = o.gpugameoflife_last_compute_tick_ms, Hn = o.gpugameoflife_last_or_edit_ms, Jn = o.gpugameoflife_last_render_pass_ms, Kn = o.gpugameoflife_last_xor_edit_ms, er = o.gpugameoflife_new, _r = o.gpugameoflife_new_offscreen, tr = o.gpugameoflife_padded_rows, nr = o.gpugameoflife_render_only, rr = o.gpugameoflife_resize, cr = o.gpugameoflife_set_init_fade, or = o.gpugameoflife_set_scroll, fr = o.gpugameoflife_set_theme_json, ar = o.gpugameoflife_set_transition, ir = o.gpugameoflife_set_zones_json, sr = o.gpugameoflife_tick_and_render, ur = o.gpugameoflife_timestamp_query_supported, br = o.gpugameoflife_toggle_cell, gr = o.gpugameoflife_words_per_row, dr = o.gpugameoflife_world_cols, wr = o.gpugameoflife_world_rows, lr = o.wasm_bindgen__convert__closures_____invoke__haeeeb3f4979a72f5, mr = o.wasm_bindgen__convert__closures_____invoke__h5f052b83621e37ce, pr = o.wasm_bindgen__convert__closures_____invoke__h8ce5ce45e6255d0f, xr = o.wasm_bindgen__convert__closures_____invoke__h8ce5ce45e6255d0f_2, hr = o.__wbindgen_malloc, yr = o.__wbindgen_realloc, Br = o.__wbindgen_exn_store, Sr = o.__externref_table_alloc, Ir = o.__wbindgen_externrefs, Tr = o.__wbindgen_free, vr = o.__wbindgen_destroy_closure, Pr = o.__externref_table_dealloc, W = o.__wbindgen_start;
+    var kr = Object.freeze({
         __proto__: null,
-        __externref_table_alloc: Br,
-        __externref_table_dealloc: vr,
+        __externref_table_alloc: Sr,
+        __externref_table_dealloc: Pr,
         __wbg_gpugameoflife_free: Mn,
-        __wbindgen_destroy_closure: Tr,
-        __wbindgen_exn_store: yr,
-        __wbindgen_externrefs: Sr,
-        __wbindgen_free: Ir,
-        __wbindgen_malloc: xr,
-        __wbindgen_realloc: hr,
+        __wbindgen_destroy_closure: vr,
+        __wbindgen_exn_store: Br,
+        __wbindgen_externrefs: Ir,
+        __wbindgen_free: Tr,
+        __wbindgen_malloc: hr,
+        __wbindgen_realloc: yr,
         __wbindgen_start: W,
         gpugameoflife_flush_and_render: Fn,
         gpugameoflife_grid_pitch: jn,
@@ -1328,23 +1331,24 @@ ${e.stack}` : n;
         gpugameoflife_padded_rows: tr,
         gpugameoflife_render_only: nr,
         gpugameoflife_resize: rr,
-        gpugameoflife_set_scroll: cr,
-        gpugameoflife_set_theme_json: or,
-        gpugameoflife_set_transition: fr,
-        gpugameoflife_set_zones_json: ar,
-        gpugameoflife_tick_and_render: ir,
-        gpugameoflife_timestamp_query_supported: sr,
-        gpugameoflife_toggle_cell: ur,
-        gpugameoflife_words_per_row: br,
-        gpugameoflife_world_cols: gr,
-        gpugameoflife_world_rows: dr,
+        gpugameoflife_set_init_fade: cr,
+        gpugameoflife_set_scroll: or,
+        gpugameoflife_set_theme_json: fr,
+        gpugameoflife_set_transition: ar,
+        gpugameoflife_set_zones_json: ir,
+        gpugameoflife_tick_and_render: sr,
+        gpugameoflife_timestamp_query_supported: ur,
+        gpugameoflife_toggle_cell: br,
+        gpugameoflife_words_per_row: gr,
+        gpugameoflife_world_cols: dr,
+        gpugameoflife_world_rows: wr,
         memory: qn,
-        wasm_bindgen__convert__closures_____invoke__h5f052b83621e37ce: lr,
-        wasm_bindgen__convert__closures_____invoke__h8ce5ce45e6255d0f: mr,
-        wasm_bindgen__convert__closures_____invoke__h8ce5ce45e6255d0f_2: pr,
-        wasm_bindgen__convert__closures_____invoke__haeeeb3f4979a72f5: wr
+        wasm_bindgen__convert__closures_____invoke__h5f052b83621e37ce: mr,
+        wasm_bindgen__convert__closures_____invoke__h8ce5ce45e6255d0f: pr,
+        wasm_bindgen__convert__closures_____invoke__h8ce5ce45e6255d0f_2: xr,
+        wasm_bindgen__convert__closures_____invoke__haeeeb3f4979a72f5: lr
     });
-    Rn(Pr);
+    Rn(kr);
     W();
 })();
 export { y as GpuGameOfLife, __tla };
