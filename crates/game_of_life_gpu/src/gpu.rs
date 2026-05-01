@@ -369,6 +369,14 @@ impl GpuGameOfLife {
         self.primary().set_transition(&self.ctx.queue, t.clamp(0.0, 1.0));
     }
 
+    /// Drive the first-paint cell-ink fade.  `t` ramps 0 → 1 over ~1.2 s
+    /// after the first painted frame, gradually revealing cells while the
+    /// paper / grid layers are already at full opacity.  Worker stops
+    /// calling this once `t` saturates at 1.0.
+    pub fn set_init_fade(&self, t: f32) {
+        self.primary().set_init_fade(&self.ctx.queue, t.clamp(0.0, 1.0));
+    }
+
     /// Update the viewport when the canvas dimensions change.  The world
     /// itself is fixed, so this only updates the renderer's viewport
     /// uniforms — no buffer reallocation, no simulation reset.  Pattern

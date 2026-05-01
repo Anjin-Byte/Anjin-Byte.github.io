@@ -229,6 +229,15 @@ impl GpuRenderer {
         queue.write_buffer(&self.uniform_buf, 32, bytemuck::bytes_of(&transition_t));
     }
 
+    /// Update the per-pixel cell-ink fade multiplier.  The render shader
+    /// multiplies the cell `coverage` term by this, so 0.0 hides cells
+    /// entirely while paper / grid stay visible, and 1.0 is the normal
+    /// rendered state.  Driven by the worker as a one-shot ramp on first
+    /// paint; see backgroundRenderer.ts.
+    pub fn set_init_fade(&self, queue: &wgpu::Queue, t: f32) {
+        queue.write_buffer(&self.uniform_buf, 52, bytemuck::bytes_of(&t));
+    }
+
     pub fn capture_previous_state(
         &self,
         encoder: &mut wgpu::CommandEncoder,

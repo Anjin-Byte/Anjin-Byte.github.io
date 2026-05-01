@@ -33,7 +33,7 @@ struct RenderUniforms {
     viewport_origin_y:  u32,
     viewport_size_x:    u32,  // viewport width in world cells
     viewport_size_y:    u32,
-    pad0:               u32,
+    init_fade_t:        f32,    // first-paint ink fade; 0 hides cells, 1 normal
     pad1:               u32,
     pad2:               u32,
 }
@@ -661,8 +661,14 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     let ext_top      = f32(top_alive)    * ext_scale;
     let ext_bot      = f32(bottom_alive) * ext_scale;
 
+    // `init_fade_t` ramps 0 → 1 over ~1.2 s after the first painted frame
+    // (driven from the worker), gradually revealing cells against a
+    // paper/grid layer that's already at full opacity.  Once it saturates
+    // at 1.0 the worker stops issuing the buffer write and this multiply
+    // becomes a no-op for the rest of the session.
     let coverage  = cell_fill(pCell, fill_t, ext_r, ext_l, ext_top, ext_bot)
-                  * content_mask * zone_mask.w;
+                  * content_mask * zone_mask.w
+                  * uniforms.init_fade_t;
     let grid_mask = 1.0 - coverage;  // grid fades proportionally inside cells
 
     // ── 6. Grid lines (composited with cell-aware suppression) ───────────────

@@ -25,6 +25,9 @@ interface Renderer {
   resize(w: number, h: number): void;
   setScroll?(scrollY: number): void;
   setTransition?(transitionT: number): void;
+  /** First-paint cell-ink fade: ramps 0 → 1 to gradually reveal cells.
+   *  Optional — CPU fallback doesn't implement it. */
+  setInitFade?(t: number): void;
   toggleCell?(cx: number, cy: number): void;
   setZones?(zones: BlankZone[]): void;
   setTheme?(theme: ThemePalette): void;
@@ -60,6 +63,17 @@ const zoneState  = new BlankZoneState();
 // Cached so the current theme survives renderer hand-offs (GPU→CPU fallback,
 // resize, etc). Defaults to light until the main thread sends `set_theme`.
 let currentTheme: ThemePalette = LIGHT_THEME;
+// One-shot first-paint signal: posted exactly once after the first
+// successful render (tick or render_only).  Drives the canvas-CSS fade
+// in AppBackground.vue.
+let firstFramePosted = false;
+// Time-based ramp for the shader-side cell-ink fade.  `firstFrameAt` is
+// captured on the first frame we render; `initFadeT` walks 0 → 1 over
+// `INIT_FADE_DURATION_MS`.  Once it saturates we stop calling
+// `renderer.setInitFade` for the rest of the session.
+const INIT_FADE_DURATION_MS = 3000;
+let firstFrameAt = 0;
+let initFadeT = 0;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -235,6 +249,7 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
             resize:     (w, h) => gpu.resize(w, h),
             setScroll:  (scrollY) => gpu.set_scroll(scrollY),
             setTransition: (transitionT) => gpu.set_transition(transitionT),
+            setInitFade: (t) => gpu.set_init_fade(t),
             toggleCell: (cx, cy) => { gpu.toggle_cell(cx, cy); gpu.flush_and_render(); },
             setZones:   (zones)  => setZonesOnGpu(zones),
             setTheme:   (theme)  => setThemeOnGpu(theme),
@@ -310,6 +325,18 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
       if (!renderer) break;
       perf?.beginFrame();
       frameCount++;
+
+      // Drive the shader-side init fade until it saturates.  After ~72
+      // frames (1.2 s at 60 Hz) we stop calling setInitFade entirely; the
+      // uniform stays at 1.0 for the rest of the session.  No-op on the
+      // CPU fallback (setInitFade is undefined there).
+      if (initFadeT < 1) {
+        const now = performance.now();
+        if (firstFrameAt === 0) firstFrameAt = now;
+        initFadeT = Math.min(1, (now - firstFrameAt) / INIT_FADE_DURATION_MS);
+        renderer.setInitFade?.(initFadeT);
+      }
+
       const action = resolveFrameAction(frameCount);
       switch (action) {
         case 'base_tick':
@@ -326,6 +353,14 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
           break;
       }
       perf?.endFrame();
+
+      // First-paint signal: emitted exactly once after the first
+      // successful render (either backend) so the main thread can
+      // crossfade the canvas in from `opacity: 0`.
+      if (!firstFramePosted) {
+        firstFramePosted = true;
+        post({ type: 'first_frame_painted' });
+      }
       // GPU pass breakdown: piggyback on the perf-summary cadence.
       // Pull `last_*_pass_ms` from the renderer (Rust-side TimestampPanel)
       // and post if a fresh sample arrived since the last poll.  Skipped

@@ -102,5 +102,9 @@ export type WorkerOutMsg =
   // DEV-only perf signals — see StartupBreakdown / GpuPassDurations.
   | { type: 'startup_breakdown'; phases: StartupBreakdown }
   | { type: 'gpu_pass_breakdown'; frame: number; durations: GpuPassDurations }
+  // One-shot signal: the worker successfully painted its first frame.
+  // Used by AppBackground.vue to crossfade the canvas in from
+  // `opacity: 0`, smoothing the otherwise-instantaneous reveal.
+  | { type: 'first_frame_painted' }
   // Non-fatal diagnostic: the named phase failed and a fallback was (or was not) attempted.
   | { type: 'error'; phase: string; message: string };

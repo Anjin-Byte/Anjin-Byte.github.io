@@ -26,7 +26,7 @@ pub struct RenderUniforms {
     pub viewport_origin_y: u32,   // 40
     pub viewport_size_x: u32,     // 44  (in world cells)
     pub viewport_size_y: u32,     // 48
-    pub pad0: u32,                // 52
+    pub init_fade_t: f32,         // 52  ← set_init_fade() writes here
     pub pad1: u32,                // 56
     pub pad2: u32,                // 60
     // total: 64 bytes (16-byte aligned)
@@ -50,7 +50,10 @@ impl RenderUniforms {
             viewport_origin_y: grid.viewport_origin_y,
             viewport_size_x,
             viewport_size_y,
-            pad0: 0,
+            // 0.0 makes cells invisible on the first painted frame; the
+            // worker ramps this to 1.0 over ~1.2 s after first paint, so
+            // cells emerge gradually.  See `set_init_fade` callers.
+            init_fade_t: 0.0,
             pad1: 0,
             pad2: 0,
         }

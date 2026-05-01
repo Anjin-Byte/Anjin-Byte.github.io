@@ -304,6 +304,18 @@ onMounted(() => {
   });
   bridge.on('zones_state', (msg) => blankZones.syncFromWorker(msg.zones));
   bridge.on('zones_error', (msg) => log.error('Zone update rejected:', msg.message));
+  bridge.on('first_frame_painted', () => {
+    if (!canvasRef.value) return;
+    // Crossfade the canvas in over ~700 ms; the GPU shader is also
+    // ramping its `init_fade_t` 0→1 over ~1.2 s in parallel, so paper
+    // and grid fade in slightly faster than the cells themselves.
+    canvasRef.value.classList.add('app-bg--visible');
+    // After the initial fade window, swap to the snappy 180 ms transition
+    // so subsequent toggles (resize-hide path) don't drag at 700 ms.
+    window.setTimeout(() => {
+      canvasRef.value?.classList.add('app-bg--snappy-transition');
+    }, 800);
+  });
   bridge.on('startup_breakdown', (msg) => {
     const fmt = (ms: number): string => `${ms.toFixed(0)}ms`;
     const lines: string[] = [
@@ -469,7 +481,24 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   display: block;
+  /* Default invisible; `app-bg--visible` is added by AppBackground.vue's
+     `first_frame_painted` handler so the GPU canvas crossfades in over
+     ~700 ms instead of snapping in on the first painted frame.  The
+     html background (paper colour + CSS gridlines from App.vue) stays
+     visible underneath during the fade. */
+  opacity: 0;
+  transition: opacity 3000ms ease-out;
+}
+
+.app-bg--visible {
   opacity: 1;
+}
+
+/* Added 800 ms after first paint to revert the transition timing to the
+   original snappy value used by the resize-hide path.  Without this, a
+   resize during the first second of the session would fade back in at
+   the slow first-paint rate. */
+.app-bg--snappy-transition {
   transition: opacity 180ms ease-out;
 }
 
