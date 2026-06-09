@@ -31,14 +31,15 @@ const INTERACTIVE_SELECTORS = '.zone-panel, .v-overlay-container, [data-grid-ign
 
 export function useCoordinateMapper(
   gridInfo: Ref<GridInfo | null>,
-  scrollCanvasPx: Ref<number>,
+  worldOffset: Ref<{ x: number; y: number }>,
 ): CoordinateMapper {
   function makeSnapshot(): CoordSnapshot | null {
     const info = gridInfo.value;
     if (!info || info.gridPitch === 0) return null;
     return {
       gridPitch: info.gridPitch,
-      scrollCanvasPx: scrollCanvasPx.value,
+      offsetX: worldOffset.value.x,
+      offsetY: worldOffset.value.y,
       dpr: devicePixelRatio,
       worldCols: info.worldCols,
       worldRows: info.worldRows,

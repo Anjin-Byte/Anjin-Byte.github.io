@@ -225,6 +225,15 @@ impl GpuRenderer {
         queue.write_buffer(&self.uniform_buf, 28, bytemuck::bytes_of(&scroll_y));
     }
 
+    /// Set the full 2-D camera offset (canvas px). `scroll_y` (offset 28) and
+    /// `scroll_x` (offset 56) are non-adjacent — the fields between them hold
+    /// transition/viewport/init-fade state — so this is two scalar writes, not
+    /// one slice. The shader applies them as `world = frag + scroll`.
+    pub fn set_camera(&self, queue: &wgpu::Queue, scroll_x: f32, scroll_y: f32) {
+        queue.write_buffer(&self.uniform_buf, 28, bytemuck::bytes_of(&scroll_y));
+        queue.write_buffer(&self.uniform_buf, 56, bytemuck::bytes_of(&scroll_x));
+    }
+
     pub fn set_transition(&self, queue: &wgpu::Queue, transition_t: f32) {
         queue.write_buffer(&self.uniform_buf, 32, bytemuck::bytes_of(&transition_t));
     }

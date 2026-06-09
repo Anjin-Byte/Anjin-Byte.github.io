@@ -365,6 +365,13 @@ impl GpuGameOfLife {
         self.primary().set_scroll(&self.ctx.queue, scroll_y);
     }
 
+    /// Updates the full 2-D camera offset (canvas pixels) so the grid pans in
+    /// lockstep with the content. The 1024² toroidal world wraps on both axes,
+    /// so panning in any direction is edgeless.
+    pub fn set_camera(&self, x: f32, y: f32) {
+        self.primary().set_camera(&self.ctx.queue, x, y);
+    }
+
     pub fn set_transition(&self, t: f32) {
         self.primary().set_transition(&self.ctx.queue, t.clamp(0.0, 1.0));
     }

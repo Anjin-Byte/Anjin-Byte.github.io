@@ -5,11 +5,11 @@
 //
 //   1. CSS pixel    — MouseEvent.clientX/Y.
 //   2. Canvas pixel — CSS × devicePixelRatio.
-//   3. World pixel  — canvas pixel offset by current scroll.
+//   3. World pixel  — canvas pixel + the camera offset (offsetX, offsetY).
 //   4. World cell   — world pixel ÷ gridPitch, mod world_cols/world_rows.
 //
 // Reverses the fragment shader's cell-index math (render.wgsl):
-//   cx = floor(px / grid_pitch_px)
+//   cx = floor((px + scroll_x) / grid_pitch_px)
 //   cy = floor((py + scroll_y) / grid_pitch_px)
 //
 // Uses the same float grid_pitch as the shader's PaperParams.grid_pitch_px,
@@ -26,8 +26,10 @@ const MAJOR_EVERY = 5;
 export interface CoordSnapshot {
   /** Float grid pitch in canvas pixels — must match PaperParams.grid_pitch_px. */
   gridPitch: number;
-  /** Scroll offset in canvas pixels (CSS scrollTop × DPR). */
-  scrollCanvasPx: number;
+  /** Horizontal camera offset in canvas pixels (matches shader `scroll_x`). */
+  offsetX: number;
+  /** Vertical camera offset in canvas pixels (matches shader `scroll_y`). */
+  offsetY: number;
   /** Device pixel ratio at the moment of the click. */
   dpr: number;
   /** World cell columns; toroidal-wrap modulus for `cx`. Currently 1024. */
@@ -70,11 +72,12 @@ export function screenToCell(
   const canvasPx = clientX * snap.dpr;
   const canvasPy = clientY * snap.dpr;
 
-  // Apply scroll offset (matches render.wgsl: world_y = py + scroll_y)
-  const worldY = canvasPy + snap.scrollCanvasPx;
+  // Apply camera offset (matches render.wgsl: world = frag + scroll)
+  const worldX = canvasPx + snap.offsetX;
+  const worldY = canvasPy + snap.offsetY;
 
-  // Reverse the shader's floor division (render.wgsl lines 434-435)
-  const cx = Math.floor(canvasPx / snap.gridPitch);
+  // Reverse the shader's floor division
+  const cx = Math.floor(worldX / snap.gridPitch);
   const cy = Math.floor(worldY / snap.gridPitch);
 
   return { cx, cy };
@@ -121,8 +124,8 @@ export function cellToScreen(
   snap: CoordSnapshot,
 ): { cssX: number; cssY: number } {
   return {
-    cssX: cx * snap.gridPitch / snap.dpr,
-    cssY: (cy * snap.gridPitch - snap.scrollCanvasPx) / snap.dpr,
+    cssX: (cx * snap.gridPitch - snap.offsetX) / snap.dpr,
+    cssY: (cy * snap.gridPitch - snap.offsetY) / snap.dpr,
   };
 }
 

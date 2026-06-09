@@ -5,9 +5,10 @@ import { useDisplay } from 'vuetify';
 import ThemeToggle from './ThemeToggle.vue';
 
 const navLinks = [
-  { label: 'Demos',   href: '#projects' },
-  { label: 'Resume',  href: '#resume' },
-  { label: 'Contact', href: '#contact' },
+  { label: 'About',   to: '/about' },
+  { label: 'Demos',   to: '/projects' },
+  { label: 'Resume',  to: '/resume' },
+  { label: 'Contact', to: '/contact' },
 ];
 
 const { smAndDown } = useDisplay();
@@ -42,7 +43,7 @@ const isMenuOpen = ref(false);
             <v-list-item
               v-for="link in navLinks"
               :key="link.label"
-              :href="link.href"
+              :to="link.to"
               :title="link.label"
               @click="isMenuOpen = false"
             />
@@ -54,7 +55,7 @@ const isMenuOpen = ref(false);
         <v-btn
           v-for="link in navLinks"
           :key="link.label"
-          :href="link.href"
+          :to="link.to"
           variant="text"
           size="default"
           class="nav-ink"

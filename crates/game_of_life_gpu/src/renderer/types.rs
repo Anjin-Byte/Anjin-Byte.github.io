@@ -1,10 +1,11 @@
 use crate::grid::Grid;
 
 /// 64-byte uniform layout, must match the `RenderUniforms` struct in
-/// `render.wgsl`.  Fields are ordered so `scroll_y` (offset 28) and
-/// `transition_t` (offset 32) keep their byte positions — `set_scroll`
-/// and `set_transition` in pipeline.rs do partial uniform writes at
-/// those exact offsets.
+/// `render.wgsl`.  Fields are ordered so `scroll_y` (28), `transition_t`
+/// (32), `init_fade_t` (52), and `scroll_x` (56) keep their byte positions —
+/// `set_scroll`, `set_transition`, `set_init_fade`, and `set_scroll_x` /
+/// `set_camera` in pipeline.rs do partial uniform writes at those exact
+/// offsets.  The `const _` assert below makes a wrong layout uncompilable.
 ///
 /// Viewport fields are scalar `u32` × 4, not `vec2<u32>` × 2, because
 /// `vec2<u32>` in `var<uniform>` has 8-byte alignment and would shift
@@ -27,10 +28,22 @@ pub struct RenderUniforms {
     pub viewport_size_x: u32,     // 44  (in world cells)
     pub viewport_size_y: u32,     // 48
     pub init_fade_t: f32,         // 52  ← set_init_fade() writes here
-    pub pad1: u32,                // 56
+    pub scroll_x: f32,            // 56  ← set_scroll_x() / set_camera() writes here
     pub pad2: u32,                // 60
     // total: 64 bytes (16-byte aligned)
 }
+
+// Compile-time guard for the partial-write offsets in pipeline.rs (and the
+// mirrored WGSL struct). A wrong offset silently corrupts every field past it,
+// so make a bad layout fail to compile rather than fail at runtime. Checked by
+// `cargo clippy --all-targets`, hence enforced by `make check`.
+const _: () = {
+    assert!(core::mem::offset_of!(RenderUniforms, scroll_y) == 28);
+    assert!(core::mem::offset_of!(RenderUniforms, transition_t) == 32);
+    assert!(core::mem::offset_of!(RenderUniforms, init_fade_t) == 52);
+    assert!(core::mem::offset_of!(RenderUniforms, scroll_x) == 56);
+    assert!(core::mem::size_of::<RenderUniforms>() == 64);
+};
 
 impl RenderUniforms {
     pub fn from_grid(grid: &Grid) -> Self {
@@ -54,7 +67,7 @@ impl RenderUniforms {
             // worker ramps this to 1.0 over ~1.2 s after first paint, so
             // cells emerge gradually.  See `set_init_fade` callers.
             init_fade_t: 0.0,
-            pad1: 0,
+            scroll_x: 0.0,
             pad2: 0,
         }
     }

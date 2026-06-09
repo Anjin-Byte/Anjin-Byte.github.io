@@ -1,5 +1,11 @@
 [build]
 # All crates in this workspace target WASM. Setting the default target here
 # ensures rust-analyzer resolves cfg(target_arch = "wasm32") dependencies
-# (wgpu, web-sys) correctly in the IDE.
+# (wgpu, web-sys) correctly in the IDE, and lets `cargo clippy --all-targets`
+# check the wasm-only GPU crate (its wgpu/web-sys deps don't build on host).
+#
+# Caveat: a bare `cargo test` will compile the test binaries for wasm and then
+# try to *execute* them natively, failing with "cannot execute binary file".
+# Run native tests via `make check` (passes --target <host> for game-of-life-core)
+# and browser tests via `make test-wasm`.
 target = "wasm32-unknown-unknown"

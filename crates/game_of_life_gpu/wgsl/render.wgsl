@@ -33,9 +33,9 @@ struct RenderUniforms {
     viewport_origin_y:  u32,
     viewport_size_x:    u32,  // viewport width in world cells
     viewport_size_y:    u32,
-    init_fade_t:        f32,    // first-paint ink fade; 0 hides cells, 1 normal
-    pad1:               u32,
-    pad2:               u32,
+    init_fade_t:        f32,    // 52  first-paint ink fade; 0 hides cells, 1 normal
+    scroll_x:           f32,    // 56  horizontal camera offset (canvas px)
+    pad2:               u32,    // 60
 }
 
 struct PaperParams {
@@ -512,9 +512,9 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     // in world space, so a moving viewport is just a sliding window.
     let vp_off_x = f32(uniforms.viewport_origin_x * uniforms.cell_px);
     let vp_off_y = f32(uniforms.viewport_origin_y * uniforms.cell_px);
-    let px       = frag_pos.x + vp_off_x;
+    let px       = frag_pos.x + vp_off_x + uniforms.scroll_x;   // world X (scrolled)
     let py       = frag_pos.y + vp_off_y;
-    let world_y  = py + uniforms.scroll_y;   // world coordinate (scrolled)
+    let world_y  = py + uniforms.scroll_y;                      // world Y (scrolled)
 
     // ── 1. Paper fiber noise ──────────────────────────────────────────────────
     // textureSample must come before any fwidth/derivative call (uniformity).
@@ -546,23 +546,14 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     let pitch_minor = paper.grid_pitch_px;
     let pitch_major = pitch_minor * paper.major_every;
 
-    // Canvas dimensions, margin, and content mask — computed once; used by both
-    // the grid suppression and the border drawing below.
-    let cw = f32(uniforms.canvas_width);
-    let ch = f32(uniforms.canvas_height);
-    // grid_pitch_px is computed from canvas_width so cw = n_total * pitch_major exactly.
-    // 2 major squares per margin → both left and right borders land on major lines.
-    let margin = 0.0 * pitch_major;
-    // 0 inside margin band, 1 inside content area.
-    // Grid lines and cell ink are only drawn inside the content area.
-    // Horizontal is aligned via alignedPitch (canvas width is an integer
-    // number of major pitches).  Vertical is not — partial major cells are
-    // expected at the viewport bottom, which is natural when the page scrolls
-    // past a grid that extends infinitely.  A shader-level clip to hide them
-    // creates a visible paper/grid seam worse than the problem it solves.
-    let in_cx = step(margin, px) * (1.0 - step(cw - margin, px));
-    let in_cy = step(margin, world_y);
-    let content_mask = in_cx * in_cy;
+    // The grid is an omnipresent toroidal backdrop for the spatial layout, so
+    // there is no single-page clip. Previously a `content_mask` confined the
+    // grid + cells to the [0, canvas_width] × [0, infinity) footprint of the old
+    // single-vertical-scroll page, which left bare background everywhere the 2-D
+    // camera panned beyond that rectangle. The world is toroidal (cells wrap)
+    // and the grid lines are periodic, so the grid tiles infinitely in every
+    // direction and fills wherever the camera looks.
+    let content_mask = 1.0;
 
     // Fiber-dependent ink bleed: open fiber absorbs more dye, spreading the edge.
     // ns.r is already in [0,1]; 0.3px max bleed keeps lines recognisably straight.
@@ -610,8 +601,14 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     // it.
     let gp       = paper.grid_pitch_px;
     let pCell    = vec2f(fract(px / gp) - 0.5, fract(world_y / gp) - 0.5);
-    let base_cx  = u32(floor(px      / gp));
-    let base_cy  = u32(floor(world_y / gp));
+    // floor() goes negative when the camera pans into negative world space, and
+    // u32(negativeFloat) is undefined in WGSL — it streaks cells to the edges.
+    // Wrap the signed cell index into [0, world_cols/rows) before the u32 cast
+    // (the old content_mask hid this by guaranteeing non-negative coords).
+    let wcols    = i32(uniforms.world_cols);
+    let wrows    = i32(uniforms.world_rows);
+    let base_cx  = u32(((i32(floor(px      / gp)) % wcols) + wcols) % wcols);
+    let base_cy  = u32(((i32(floor(world_y / gp)) % wrows) + wrows) % wrows);
     let prev_state = cell_alive_prev(base_cx, base_cy);
     let curr_state = cell_alive_current(base_cx, base_cy);
 
@@ -679,16 +676,11 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     let after_minor = oklab_mix(paper_lit,   minor_color, minor_cov * grid_mask);
     let paper_grid  = oklab_mix(after_minor, major_color, major_cov * grid_mask);
 
-    // ── 7. Border margin ──────────────────────────────────────────────────────
-    // Bold rectangle inset exactly 2 major squares from each edge. Also masked
-    // by cell coverage for the same reason as the grid — visual consistency.
-    let bdr_half = paper.major_half_px * 2.5 + fiber_bleed;
-    let bdr_l = 1.0 - aastep(bdr_half, abs(px - margin));
-    let bdr_r = 1.0 - aastep(bdr_half, abs(px - (cw - margin)));
-    let bdr_t = 1.0 - aastep(bdr_half, abs(world_y - margin));
-    let border_cov     = max(max(bdr_l, bdr_r), bdr_t);
-    let border_color   = theme_grid_linear(theme.border_t);
-    let paper_bordered = oklab_mix(paper_grid, border_color, border_cov * 0.88 * grid_mask);
+    // ── 7. (Page border removed) ──────────────────────────────────────────────
+    // The engineering-paper page border was a bold rectangle at the page edges
+    // (px = 0 / canvas_width, world_y = 0). An infinite grid has no page edge,
+    // so there is no border to draw.
+    let paper_bordered = paper_grid;
 
     // ── 8. Ink application (theme-driven) ────────────────────────────────────
     // The cell ink color comes from the theme's `ink` endpoint, modulated by

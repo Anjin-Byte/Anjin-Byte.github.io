@@ -30,12 +30,13 @@ This project follows the engineering standards in the Engineering Codex at:
 - **Build entry points**: `make dev` (full WASM dev build + Vite dev server), `make build` (release WASM + production Vite build), `make check` (clippy + tests).
 
 ### Layout
-- `crates/game_of_life/` — CPU Game of Life (fallback renderer)
-- `crates/game_of_life_gpu/` — WebGPU-accelerated renderer + simulation
+- `crates/game_of_life_core/` — pure-Rust simulation core (bitpacked `World`, tick rule, pattern stamping, seeding); no GPU/JS deps. Consumed by both adapter crates below. `build.rs` generates pattern constants from `patterns.toml` + the committed `patterns_cache/` RLEs. Native-testable (the only crate `make check` runs tests for).
+- `crates/game_of_life/` — CPU Game of Life (fallback renderer); thin wasm-bindgen adapter over the core
+- `crates/game_of_life_gpu/` — WebGPU-accelerated renderer + simulation; wasm-only (wgpu/web-sys gated to the wasm32 target)
 - `crates/game_of_life_gpu/wgsl/` — shaders (`compute.wgsl`, `render.wgsl`)
 - `app/src/components/layout/AppBackground.vue` — fixed full-viewport canvas, owns the worker bridge
 - `app/src/workers/backgroundRenderer.ts` — Web Worker, GPU/CPU renderer hand-off
-- `docs/` — design notes; **gitignored and intentionally local-only**. Don't track new docs there. Active design notes for tabled work live there (`methuselah-seeding.md`, `perturbed-cell-fill-origin.md`, `hires-removal.md`).
+- `docs/` — design notes; **gitignored and intentionally local-only**. Don't track new docs there. Tabled notes: `methuselah-seeding.md`, `perturbed-cell-fill-origin.md`. Historical record: `hires-removal.md`. The March 2026 audit/overview docs are superseded — see History.
 
 ### Gotchas
 - **WGSL uniform alignment**: `vec3u` in `var<uniform>` has 16-byte alignment producing a 32-byte struct. Use 4 scalar `u32` fields instead. Same trap applies to any uniform struct that gains a vec3 field.
@@ -44,3 +45,4 @@ This project follows the engineering standards in the Engineering Codex at:
 
 ### History
 - The hi-res region feature was removed on 2026-04-25. Pre-removal state is preserved on the [`archive/hires-feature`](https://github.com/Anjin-Byte/Anjin-Byte.github.io/tree/archive/hires-feature) branch + tag `archive/hires-feature-2026-04`.
+- **Superseded design docs (March 2026):** `docs/architecture-audit.md`, `docs/audit-1..5`, `docs/solution-1..5`, and `docs/architecture-overview.md` predate the portfolio redesign. They analyze features since removed (hi-res, decals, SDF text) and a since-decomposed `AppBackground.vue` monolith — treat them as historical, not as the current architecture. (`architecture-overview.md` §5, the GPU/struct-alignment note, remains valid.) Current direction: `docs/project_redesign_direction.md`.

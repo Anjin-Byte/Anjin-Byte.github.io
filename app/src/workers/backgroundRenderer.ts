@@ -23,7 +23,7 @@ interface Renderer {
   tick(): void;
   renderOnly?(): void;
   resize(w: number, h: number): void;
-  setScroll?(scrollY: number): void;
+  setCamera?(x: number, y: number): void;
   setTransition?(transitionT: number): void;
   /** First-paint cell-ink fade: ramps 0 → 1 to gradually reveal cells.
    *  Optional — CPU fallback doesn't implement it. */
@@ -51,10 +51,11 @@ let renderer: Renderer | null = null;
 // constructs the WebGPU surface, so a resize that arrives during the async
 // GPU-init window is no longer dropped silently.
 let canvas: OffscreenCanvas | null = null;
-// Latest scroll offset (canvas px). Cached so it can be re-applied when the
+// Latest camera offset (canvas px). Cached so it can be re-applied when the
 // renderer becomes available (init is async) or after a resize (resize rewrites
-// the uniform buffer, resetting scroll_y to 0).
-let pendingScrollY = 0;
+// the uniform buffer, resetting scroll_x/scroll_y to 0).
+let pendingCameraX = 0;
+let pendingCameraY = 0;
 // Latest resize dims received before the renderer materialised.  Drained by
 // the init handler after the renderer object is assigned.
 let pendingResize: { width: number; height: number } | null = null;
@@ -247,7 +248,7 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
             // they apply even when the renderer is mid-init.  This closure
             // only updates the GPU surface and viewport uniforms.
             resize:     (w, h) => gpu.resize(w, h),
-            setScroll:  (scrollY) => gpu.set_scroll(scrollY),
+            setCamera:  (x, y) => gpu.set_camera(x, y),
             setTransition: (transitionT) => gpu.set_transition(transitionT),
             setInitFade: (t) => gpu.set_init_fade(t),
             toggleCell: (cx, cy) => { gpu.toggle_cell(cx, cy); gpu.flush_and_render(); },
@@ -264,9 +265,9 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
             renderer.resize(pendingResize.width, pendingResize.height);
             pendingResize = null;
           }
-          // Scroll messages sent during async GPU init were dropped (renderer was null).
-          // Re-apply the latest position now that the renderer is accepting commands.
-          renderer.setScroll?.(pendingScrollY);
+          // Camera messages sent during async GPU init were dropped (renderer was null).
+          // Re-apply the latest offset now that the renderer is accepting commands.
+          renderer.setCamera?.(pendingCameraX, pendingCameraY);
           renderer.setTransition?.(1);
           renderer.setZones?.(zoneState.getAll());
           renderer.setTheme?.(currentTheme);
@@ -307,7 +308,7 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
       log.debug('CPU: starting software renderer...');
       try {
         renderer = await makeCpuRenderer(canvas);
-        renderer.setScroll?.(pendingScrollY);
+        renderer.setCamera?.(pendingCameraX, pendingCameraY);
         renderer.setZones?.(zoneState.getAll());
         renderer.setTheme?.(currentTheme);
         log.info('CPU renderer ready');
@@ -397,8 +398,8 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
         break;
       }
       renderer.resize(e.data.width, e.data.height);
-      // resize() rewrites the uniform buffer (scroll_y resets to 0); re-apply.
-      renderer.setScroll?.(pendingScrollY);
+      // resize() rewrites the uniform buffer (scroll_x/scroll_y reset to 0); re-apply.
+      renderer.setCamera?.(pendingCameraX, pendingCameraY);
       renderer.setTransition?.(1);
       renderer.setZones?.(zoneState.getAll());
       renderer.setTheme?.(currentTheme);
@@ -409,9 +410,10 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
       break;
     }
 
-    case 'scroll':
-      pendingScrollY = e.data.scrollY;
-      renderer?.setScroll?.(pendingScrollY);
+    case 'camera':
+      pendingCameraX = e.data.x;
+      pendingCameraY = e.data.y;
+      renderer?.setCamera?.(pendingCameraX, pendingCameraY);
       break;
 
     case 'toggle_cell':

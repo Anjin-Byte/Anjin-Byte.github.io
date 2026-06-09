@@ -2,22 +2,14 @@
 import AppBackground from '@/components/layout/AppBackground.vue';
 import AppHeader from '@/components/layout/AppHeader.vue';
 import AppFooter from '@/components/layout/AppFooter.vue';
-import HeroSection from '@/components/sections/HeroSection.vue';
-import ProjectsSection from '@/components/sections/ProjectsSection.vue';
-import ResumeSection from '@/components/sections/ResumeSection.vue';
-import ContactSection from '@/components/sections/ContactSection.vue';
+import WorldStage from '@/components/space/WorldStage.vue';
 </script>
 
 <template>
   <v-app class="app-shell">
     <AppBackground />
     <AppHeader />
-    <v-main class="app-main">
-      <HeroSection />
-      <ProjectsSection />
-      <ResumeSection />
-      <ContactSection />
-    </v-main>
+    <WorldStage />
     <AppFooter />
   </v-app>
 </template>
@@ -43,7 +35,6 @@ import ContactSection from '@/components/sections/ContactSection.vue';
 */
 html {
   zoom: .875;
-  scroll-behavior: smooth;
   background-color: var(--theme-surface, oklab(0.985 -0.001 0.004));
   background-image:
     linear-gradient(
@@ -101,8 +92,22 @@ a {
   isolation: isolate;
 }
 
-.app-main {
-  padding-bottom: calc(1.5rem + var(--safe-area-bottom));
+/* The space is navigated by camera traversal, not page scroll — lock the
+   document so the only motion is the WorldStage transform. */
+body {
+  overflow: hidden;
+}
+
+/* Footer is fixed chrome over the world, mirroring the header bar. The
+   !important beats Vuetify's own `.v-footer { position: relative }`, which
+   otherwise leaves the footer in normal flow (floating mid-viewport since
+   there is no scrolling document behind it). */
+.app-footer {
+  position: fixed !important;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
 }
 
 /* App header uses the same content-surface treatment as body surfaces, but

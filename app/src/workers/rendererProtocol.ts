@@ -31,7 +31,9 @@ export type WorkerInMsg =
   | { type: 'init'; canvas: OffscreenCanvas; cellPx: number; theme: ThemePalette }
   | { type: 'frame' }
   | { type: 'resize'; width: number; height: number }
-  | { type: 'scroll'; scrollY: number }
+  // 2-D camera offset (canvas/device px). Drives the grid's scroll_x/scroll_y
+  // uniforms so the world pans in lockstep with the content plane.
+  | { type: 'camera'; x: number; y: number }
   // Toggle a cell's alive/dead state. cx/cy are world-cell coordinates
   // already wrapped into [0, worldCols) × [0, worldRows) by the main
   // thread. scrollCanvasPx is the scroll offset at click time so the

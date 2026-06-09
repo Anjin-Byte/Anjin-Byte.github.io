@@ -7,7 +7,7 @@
     "build": "vue-tsc --noEmit && vite build",
     "typecheck": "vue-tsc --noEmit",
     "test:zones": "tsc -p tsconfig.tests.json && node ./.tests-dist/tests/blankZones.test.js",
-    "test": "tsc -p tsconfig.tests.json && node ./.tests-dist/tests/blankZones.test.js",
+    "test": "tsc -p tsconfig.tests.json && node -e \"require('fs').readdirSync('./.tests-dist/tests').filter(f=>f.endsWith('.test.js')).sort().forEach(f=>require('./.tests-dist/tests/'+f))\"",
     "format": "prettier --write \"src/**/*.{ts,vue}\"",
     "preview": "vite preview",
     "deploy": "gh-pages -d dist -b main -t true"
@@ -15,6 +15,7 @@
   "dependencies": {
     "@mdi/font": "^7.4.47",
     "vue": "^3.5.13",
+    "vue-router": "^4.6.4",
     "vuetify": "^3.7.4"
   },
   "devDependencies": {
