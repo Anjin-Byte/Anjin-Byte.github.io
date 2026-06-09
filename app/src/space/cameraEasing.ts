@@ -57,20 +57,3 @@ export function cameraToDeviceOffset(
 ): { x: number; y: number } {
   return { x: cam.x * dpr * rate, y: cam.y * dpr * rate };
 }
-
-/**
- * Target camera for a drag-to-pan gesture: as the pointer moves by Δscreen, the
- * camera moves by −Δscreen / zoom so the grabbed world point stays under the
- * cursor (1:1 direct manipulation). Pure so the delta math is unit-testable.
- */
-export function dragPanTarget(
-  startCam: Camera,
-  startPointer: { x: number; y: number },
-  pointer: { x: number; y: number },
-): Camera {
-  return {
-    x: startCam.x - (pointer.x - startPointer.x) / startCam.zoom,
-    y: startCam.y - (pointer.y - startPointer.y) / startCam.zoom,
-    zoom: startCam.zoom,
-  };
-}

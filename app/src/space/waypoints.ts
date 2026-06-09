@@ -34,6 +34,30 @@ export function findWaypoint(id: WaypointId): Waypoint {
   return BY_ID.get(id) ?? homeWaypoint;
 }
 
+/** The waypoint at an exact unit-grid cell, or `null` if none. */
+function findByGrid(gx: number, gy: number): Waypoint | null {
+  return WAYPOINTS.find((w) => w.gx === gx && w.gy === gy) ?? null;
+}
+
+/** The waypoint offset from `id` by `(dgx, dgy)` on the unit grid, or `null`.
+ *  The grid topology is the navigation graph for break-away and the chevrons. */
+export function gridNeighbor(id: WaypointId, dgx: number, dgy: number): Waypoint | null {
+  const wp = findWaypoint(id);
+  return findByGrid(wp.gx + dgx, wp.gy + dgy);
+}
+
+/** Vertical neighbour (`dir -1` = up/north, `+1` = down/south), or `null`.
+ *  hero has about (−1) and contact (+1); resume/projects have none. */
+export function verticalNeighbor(id: WaypointId, dir: -1 | 1): Waypoint | null {
+  return gridNeighbor(id, 0, dir);
+}
+
+/** Horizontal neighbour (`dir -1` = west, `+1` = east), or `null`.
+ *  hero has resume (−1) and projects (+1); the others have none. */
+export function horizontalNeighbor(id: WaypointId, dir: -1 | 1): Waypoint | null {
+  return gridNeighbor(id, dir, 0);
+}
+
 /** Look up a waypoint by route path, or `null` if no route matches. */
 export function findByRoute(route: string): Waypoint | null {
   return BY_ROUTE.get(route) ?? null;

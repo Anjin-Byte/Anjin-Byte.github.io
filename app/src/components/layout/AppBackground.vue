@@ -13,7 +13,6 @@ import { useCanvasSurface } from '../../composables/useCanvasSurface';
 import { useWorkerDiagnostics } from '../../composables/useWorkerDiagnostics';
 import { useCamera } from '../../composables/useCamera';
 import { useCameraGridSync } from '../../composables/useCameraGridSync';
-import { useDragToPan } from '../../composables/useDragToPan';
 import GridBlankZonePanel from './GridBlankZonePanel.vue';
 
 const log = createLogger('AppBackground');
@@ -33,12 +32,9 @@ const surface = useCanvasSurface(bridge.post);
 
 // Forward camera motion to the worker so the grid pans in lockstep (Phase 2).
 useCameraGridSync(bridge);
-// Drag the background to fly the camera directly; yields to the zone tool and
-// interactive content so it never hijacks those gestures.
-const dragPan = useDragToPan({
-  isInteractiveTarget: coords.isInteractiveTarget,
-  isToolActive: () => drag.anyToolEnabled(),
-});
+// Lane navigation (vertical over-scroll break + horizontal two-finger-scroll
+// break) is wired per-panel in WorldPanel via useLaneScroll, so the wheel
+// listener lives on the captured island it scrolls.
 
 // ── Worker serialization helpers ──────────────────────────────────────────
 function toWorkerZone(zone: BlankZone): BlankZone {
@@ -116,7 +112,7 @@ function onToolChange(payload: { enabled: boolean; snapMajor: boolean }): void {
 
 // ── Click-to-toggle cell ────────────────────────────────────────────────────
 function onDocumentClick(event: MouseEvent): void {
-  if (drag.anyToolEnabled() || coords.isInteractiveTarget(event.target) || dragPan.consumedClick()) return;
+  if (drag.anyToolEnabled() || coords.isInteractiveTarget(event.target)) return;
   const snap = coords.makeSnapshot();
   if (!snap) return;
   const cell = screenToCell(event.clientX, event.clientY, snap);
@@ -132,7 +128,6 @@ function onDocumentClick(event: MouseEvent): void {
 
 // ── Lifecycle ───────────────────────────────────────────────────────────────
 let detachDrag: (() => void) | null = null;
-let detachPan: (() => void) | null = null;
 
 onMounted(() => {
   const shell = shellRef.value;
@@ -169,7 +164,6 @@ onMounted(() => {
   // Event listeners
   document.addEventListener('click', onDocumentClick);
   detachDrag = drag.attachListeners();
-  detachPan = dragPan.attachListeners();
 
   // Animation loop — drives the worker's per-frame tick/render. The camera and
   // its eased motion live in useCamera; the grid stays fixed in Phase 1.
@@ -181,7 +175,6 @@ onUnmounted(() => {
   surface.teardown();
   document.removeEventListener('click', onDocumentClick);
   detachDrag?.();
-  detachPan?.();
   bridge.terminate();
   log.debug('Unmounted, worker terminated');
 });

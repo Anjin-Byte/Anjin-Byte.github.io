@@ -3,7 +3,6 @@ import {
   isSettled,
   cssTransformFor,
   cameraToDeviceOffset,
-  dragPanTarget,
 } from '../space/cameraEasing';
 import type { Camera } from '../types/space';
 
@@ -66,19 +65,11 @@ function testDeviceOffset(): void {
   assertEq(cameraToDeviceOffset({ x: 100, y: 50, zoom: 1 }, 2, 1), { x: 200, y: 100 }, 'rate 1 → camera × dpr');
 }
 
-// Drag-to-pan moves the camera by −Δscreen/zoom so the grabbed world point
-// stays under the cursor. At zoom 2, a +60/−20 px drag moves the camera −30/+10.
-function testDragPanTarget(): void {
-  const result = dragPanTarget({ x: 100, y: 50, zoom: 2 }, { x: 200, y: 200 }, { x: 260, y: 180 });
-  assertEq(result, { x: 70, y: 60, zoom: 2 }, 'drag-pan: camera moves -Δscreen/zoom');
-}
-
 function run(): void {
   testMonotonicConvergence();
   testStepFractionNoOvershoot();
   testCssTransform();
   testDeviceOffset();
-  testDragPanTarget();
   // eslint-disable-next-line no-console
   console.log('cameraEasing.test.ts passed');
 }

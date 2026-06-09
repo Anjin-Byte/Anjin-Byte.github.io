@@ -3,6 +3,7 @@ import AppBackground from '@/components/layout/AppBackground.vue';
 import AppHeader from '@/components/layout/AppHeader.vue';
 import AppFooter from '@/components/layout/AppFooter.vue';
 import WorldStage from '@/components/space/WorldStage.vue';
+import DirectionalNav from '@/components/space/DirectionalNav.vue';
 </script>
 
 <template>
@@ -10,6 +11,7 @@ import WorldStage from '@/components/space/WorldStage.vue';
     <AppBackground />
     <AppHeader />
     <WorldStage />
+    <DirectionalNav />
     <AppFooter />
   </v-app>
 </template>
@@ -70,6 +72,9 @@ body,
 html,
 body {
   margin: 0;
+  /* Two-finger horizontal scroll drives lane navigation (useLaneScroll), so
+     disable the browser's back/forward overscroll swipe on this axis. */
+  overscroll-behavior-x: none;
 }
 
 body {

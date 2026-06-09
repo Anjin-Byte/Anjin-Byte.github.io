@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { findWaypoint, type WaypointId } from '../../space/waypoints';
 import { useCamera } from '../../composables/useCamera';
+import { useLaneScroll } from '../../composables/useLaneScroll';
 import { gridToWorld, focusWeight } from '../../space/layout';
 import { FOCUS_FLOOR, FOCUS_RADIUS_FRACTION, FOCUS_SCALE_MIN } from '../../space/layoutConfig';
 
@@ -49,6 +50,10 @@ watch(isActive, (active) => {
     setCaptureScroll(0);
   }
 });
+
+// Two-finger scroll navigates: vertical over-scroll → north/south neighbour,
+// horizontal scroll → east/west neighbour (biased axis lock; see useLaneScroll).
+useLaneScroll({ el: panelRef, isActive, waypointId: props.waypointId });
 </script>
 
 <template>
@@ -80,12 +85,14 @@ watch(isActive, (active) => {
 }
 
 /* The active island is a native vertical scroll container, so tall content
-   (the resume list) is reachable by scrolling. overscroll-behavior-y: contain
-   stops scroll-chaining and is the future break-away edge signal. */
+   (the resume list) is reachable by scrolling. overscroll-behavior: contain
+   stops scroll-chaining and is the break-away edge signal. */
 .world-panel--scroll {
   max-height: 100svh;
   overflow-y: auto;
-  overscroll-behavior-y: contain;
+  overscroll-behavior: contain;
+  /* Touch keeps vertical native-scroll; horizontal-swipe nav is deferred. */
+  touch-action: pan-y;
   /* Scrollable, but the scrollbar is hidden — the grid pan is the scroll cue. */
   scrollbar-width: none; /* Firefox */
 }
