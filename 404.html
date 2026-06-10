@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!--
+      `theme-color` colours the mobile-browser chrome strip (URL bar in iOS
+      Safari, the status-bar background spillover above it).  Initial value
+      below is the light surface; the inline pre-paint script overwrites it
+      to match the resolved theme, and `useThemePreference.ts`'s `apply`
+      keeps it in sync on live toggles.
+
+      `apple-mobile-web-app-status-bar-style="black-translucent"` only takes
+      effect when the user adds the page to their iOS home screen
+      (standalone/PWA mode).  Combined with `viewport-fit=cover` + the
+      `--safe-area-*` CSS vars set in App.vue, the GoL canvas extends under
+      the iOS status bar so the time/battery icons float over the background.
+    -->
+    <meta name="theme-color" content="oklab(0.9850 -0.0010 0.0040)" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>My Portfolio</title>
+    <!--
+      Pre-paint theme bridge.  Resolves the user's theme preference and writes
+      the surface + grid CSS vars to <html> BEFORE the stylesheet evaluates,
+      so the placeholder behind the (transparent until first frame) Game of
+      Life canvas matches the active theme — no flash on initial load or
+      during resize-induced canvas reallocation.
+
+      Values mirror LIGHT_THEME / DARK_THEME in src/types/theme.ts; if those
+      surface/ink/minor_t/major_t values change, update the constants below.
+    -->
+    <script>
+      (function () {
+        try {
+          var SURFACE_LIGHT = 'oklab(0.9850 -0.0010 0.0040)';
+          var SURFACE_DARK  = 'oklab(0.1800 0.0000 -0.0030)';
+          var MINOR_LIGHT   = 'oklab(0.9286 -0.0008 0.0041)';
+          var MINOR_DARK    = 'oklab(0.2328 0.0000 -0.0029)';
+          var MAJOR_LIGHT   = 'oklab(0.8863 -0.0007 0.0041)';
+          var MAJOR_DARK    = 'oklab(0.2724 0.0000 -0.0029)';
+
+          var stored = null;
+          try {
+            stored = window.localStorage && localStorage.getItem('theme-preference');
+          } catch (_) { /* private mode — fall through to default */ }
+
+          var pref = (stored === 'light' || stored === 'dark' || stored === 'system')
+            ? stored
+            : 'system';
+          var isDark =
+            pref === 'dark' ? true :
+            pref === 'light' ? false :
+            (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+          var root = document.documentElement;
+          root.dataset.themeMode = isDark ? 'dark' : 'light';
+          var s = root.style;
+          var surface = isDark ? SURFACE_DARK : SURFACE_LIGHT;
+          s.setProperty('--theme-surface',    surface);
+          s.setProperty('--theme-grid-minor', isDark ? MINOR_DARK   : MINOR_LIGHT);
+          s.setProperty('--theme-grid-major', isDark ? MAJOR_DARK   : MAJOR_LIGHT);
+          s.setProperty('color-scheme',       isDark ? 'dark'       : 'light');
+          // Coordinate iOS Safari's URL-bar / status-bar background with the
+          // resolved theme.  Live toggles re-apply this from useThemePreference.
+          var themeMeta = document.querySelector('meta[name="theme-color"]');
+          if (themeMeta) themeMeta.setAttribute('content', surface);
+        } catch (_) { /* if anything fails, App.vue's CSS fallbacks take over */ }
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-sRJmYYoZ.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-CEHY6lgc.css">
+  </head>
+  <body>
+    <noscript>This page requires JavaScript and WebAssembly to be enabled.</noscript>
+    <div id="app"></div>
+  </body>
+</html>
