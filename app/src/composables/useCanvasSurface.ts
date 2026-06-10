@@ -226,15 +226,16 @@ export function useCanvasSurface(post: (msg: WorkerInMsg) => void): CanvasSurfac
 
   function revealCanvas(): void {
     if (!canvasEl) return;
-    // Crossfade the canvas in over ~700 ms; the GPU shader is also ramping its
-    // `init_fade_t` 0→1 over ~1.2 s in parallel, so paper and grid fade in
-    // slightly faster than the cells themselves.
+    // Crossfade the canvas in over ~1 s; the GPU shader ramps its `init_fade_t`
+    // 0→1 over the same window in parallel, so paper, grid, and cells all
+    // resolve together.
     canvasEl.classList.add('app-bg--visible');
-    // After the initial fade window, swap to the snappy 180 ms transition so
-    // subsequent toggles (resize-hide path) don't drag at the slow rate.
+    // Just after the fade completes, swap to the snappy 180 ms transition so
+    // subsequent toggles (resize-hide path) don't drag at the slow rate. Keep
+    // this ≥ the fade duration above so it never cuts the reveal short.
     window.setTimeout(() => {
       if (!disposed) canvasEl?.classList.add('app-bg--snappy-transition');
-    }, 800);
+    }, 1100);
   }
 
   function teardown(): void {

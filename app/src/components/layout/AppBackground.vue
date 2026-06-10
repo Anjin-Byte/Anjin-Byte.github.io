@@ -216,18 +216,18 @@ onUnmounted(() => {
   display: block;
   /* Default invisible; `app-bg--visible` is added by useCanvasSurface's
      `revealCanvas` (driven by the worker's `first_frame_painted` signal) so
-     the GPU canvas crossfades in over ~700 ms instead of snapping in on the
+     the GPU canvas crossfades in over ~1 s instead of snapping in on the
      first painted frame. The html background (paper colour + CSS gridlines
      from App.vue) stays visible underneath during the fade. */
   opacity: 0;
-  transition: opacity 3000ms ease-out;
+  transition: opacity 1000ms ease-out;
 }
 
 .app-bg--visible {
   opacity: 1;
 }
 
-/* Added 800 ms after first paint to revert the transition timing to the
+/* Added shortly after the fade completes to revert the transition timing to the
    original snappy value used by the resize-hide path. Without this, a resize
    during the first second of the session would fade back in at the slow
    first-paint rate. */

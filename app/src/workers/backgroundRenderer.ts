@@ -72,7 +72,7 @@ let firstFramePosted = false;
 // captured on the first frame we render; `initFadeT` walks 0 → 1 over
 // `INIT_FADE_DURATION_MS`.  Once it saturates we stop calling
 // `renderer.setInitFade` for the rest of the session.
-const INIT_FADE_DURATION_MS = 3000;
+const INIT_FADE_DURATION_MS = 1000;
 let firstFrameAt = 0;
 let initFadeT = 0;
 
@@ -327,8 +327,8 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
       perf?.beginFrame();
       frameCount++;
 
-      // Drive the shader-side init fade until it saturates.  After ~72
-      // frames (1.2 s at 60 Hz) we stop calling setInitFade entirely; the
+      // Drive the shader-side init fade until it saturates.  After ~60
+      // frames (1 s at 60 Hz) we stop calling setInitFade entirely; the
       // uniform stays at 1.0 for the rest of the session.  No-op on the
       // CPU fallback (setInitFade is undefined there).
       if (initFadeT < 1) {
