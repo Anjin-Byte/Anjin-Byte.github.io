@@ -204,7 +204,7 @@
     let n = null, _ = null, I = 0, E = 0, T = null, O = 0;
     const p = new de;
     let b = W, X = !1;
-    const pe = 3e3;
+    const pe = 1e3;
     let Z = 0, j = 0;
     function g(e) {
         J.postMessage(e);
