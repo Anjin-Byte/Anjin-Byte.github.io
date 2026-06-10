@@ -1,5 +1,6 @@
 import { defineConfig, type Plugin } from 'vite';
 import { fileURLToPath } from 'node:url';
+import { copyFileSync, existsSync } from 'node:fs';
 import vue from '@vitejs/plugin-vue';
 import vuetify from 'vite-plugin-vuetify';
 import wasm from 'vite-plugin-wasm';
@@ -28,13 +29,28 @@ function patchWgpuFirefoxLimits(): Plugin {
   };
 }
 
+// GitHub Pages has no SPA fallback, so a hard load of /projects 404s (no such
+// file). Emitting a 404.html that IS the built index.html makes Pages serve the
+// app for any unmatched path; assets are absolute (base '/'), so it boots at any
+// depth and vue-router resolves the real route. Runs only on `vite build`.
+function spaPages404(): Plugin {
+  return {
+    name: 'spa-pages-404',
+    closeBundle() {
+      const dist = fileURLToPath(new URL('./dist', import.meta.url));
+      const index = `${dist}/index.html`;
+      if (existsSync(index)) copyFileSync(index, `${dist}/404.html`);
+    },
+  };
+}
+
 // Plugins needed in both the main pipeline and the worker sub-pipeline.
 const sharedPlugins = () => [wasm(), topLevelAwait(), patchWgpuFirefoxLimits()];
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 
 export default defineConfig({
   base: '/',
-  plugins: [vue(), vuetify({ autoImport: true }), ...sharedPlugins()],
+  plugins: [vue(), vuetify({ autoImport: true }), spaPages404(), ...sharedPlugins()],
   server: {
     fs: {
       allow: [repoRoot],
