@@ -272,7 +272,17 @@ impl GpuRenderer {
         self.surface_config.width = grid.canvas_width;
         self.surface_config.height = grid.canvas_height;
         self.surface.configure(device, &self.surface_config);
-        queue.write_buffer(&self.uniform_buf, 0, bytes_of(&RenderUniforms::from_grid(grid)));
+        // Write ONLY the geometry-derived fields, preserving the dynamic state
+        // that set_camera()/set_init_fade()/set_scroll() wrote at fixed offsets.
+        // Rewriting the whole struct here reset init_fade_t to 0 (filled cells
+        // vanished) and scroll_x/scroll_y to 0 (the grid jumped to the origin)
+        // on every resize. Geometry occupies [0, 28) (…canvas_height) and
+        // [36, 52) (the viewport fields); the dynamic fields sit at 28/32/52/56.
+        // See the RenderUniforms layout + offset asserts in types.rs.
+        let u = RenderUniforms::from_grid(grid);
+        let bytes = bytes_of(&u);
+        queue.write_buffer(&self.uniform_buf, 0, &bytes[0..28]);
+        queue.write_buffer(&self.uniform_buf, 36, &bytes[36..52]);
         // PaperParams pitch is constant now (CELL_PX), so no per-resize update.
     }
 

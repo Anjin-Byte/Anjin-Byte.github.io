@@ -45,6 +45,12 @@ export function useCanvasSurface(post: (msg: WorkerInMsg) => void): CanvasSurfac
   // we still publish at most one resize per frame to the worker.
   let pendingWidth = 0;
   let resizeRafId: number | null = null;
+  // Settle-debounce for the worker surface reconfigure: a window drag fires the
+  // rAF coalescer ~60×/s, and a per-frame surface.configure() in the worker
+  // crashes Firefox's WebGPU. We update the canvas box + grid margin live but
+  // reconfigure the GPU surface only once the drag stops (the canvas is hidden
+  // throughout, so this is invisible).
+  let resizeSettleTimer: number | null = null;
   let detachDprListener: (() => void) | null = null;
   // Cached "Chrome effective-zoom asymmetry" flag. Refreshed at mount and on
   // DPR change. See `probeEffectiveZoomAsymmetry` / `applyCanvasBox`.
@@ -137,8 +143,17 @@ export function useCanvasSurface(post: (msg: WorkerInMsg) => void): CanvasSurfac
     applyCanvasBox(canvas, canvasW, canvasH);
     hideCanvasDuringResize(canvas);
     applyGridMargin(canvasW);
-    log.debug('Resize → width', canvasW, 'height', canvasH);
-    post({ type: 'resize', width: canvasW, height: canvasH });
+    // Reconfigure the GPU surface only once the resize settles (see note at the
+    // declaration). During a drag this keeps resetting, so the worker sees one
+    // resize on release instead of ~60/s — which is what crashes Firefox WebGPU.
+    if (resizeSettleTimer !== null) clearTimeout(resizeSettleTimer);
+    resizeSettleTimer = window.setTimeout(() => {
+      resizeSettleTimer = null;
+      log.debug('Resize settle → width', canvasW, 'height', canvasH);
+      post({ type: 'resize', width: canvasW, height: canvasH });
+      // Keep the canvas masked until the reconfigured frame lands.
+      hideCanvasDuringResize(canvas);
+    }, 90);
   }
 
   function scheduleResizePublish(canvas: HTMLCanvasElement): void {
@@ -249,6 +264,10 @@ export function useCanvasSurface(post: (msg: WorkerInMsg) => void): CanvasSurfac
     if (resizeRafId !== null) {
       cancelAnimationFrame(resizeRafId);
       resizeRafId = null;
+    }
+    if (resizeSettleTimer !== null) {
+      clearTimeout(resizeSettleTimer);
+      resizeSettleTimer = null;
     }
     canvasEl = null;
   }
