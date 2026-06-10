@@ -47,7 +47,8 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
 
       - name: Test (native core)
-        run: cargo test -p game-of-life-core --target "$(rustc -vV | sed -n 's/^host: //p')"
+        run: |
+          cargo test -p game-of-life-core --target "$(rustc -vV | sed -n 's/^host: //p')"
 
       - name: Build WASM (CPU)
         run: wasm-pack build crates/game_of_life --target bundler
