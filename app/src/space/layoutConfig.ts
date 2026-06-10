@@ -62,12 +62,16 @@ export const SUPPRESS_DIST = 40;
  *  destination fades out on arrival and the origin fades in on departure. */
 export const FADE_BAND = 240;
 
-/** Spring/damping toward the bearing target per frame, in (0, 1] — the marker
- *  "inertia". Lower = floatier. */
-export const COMPASS_ATTRACTION = 0.22;
+/** Spring acceleration toward the bearing target each frame (Verlet). Higher =
+ *  snappier pull to the rim. */
+export const COMPASS_STIFFNESS = 0.14;
+
+/** Velocity retained frame-to-frame (Verlet momentum), in (0, 1). Higher =
+ *  floatier glide + more jostle; lower = snappier settle. */
+export const COMPASS_FRICTION = 0.7;
 
 /** Relaxation passes per frame resolving overlaps + walls (n ≤ 5 → cheap). */
-export const COMPASS_ITERATIONS = 4;
+export const COMPASS_ITERATIONS = 6;
 
 /** Box top inset (CSS px) so markers clear the header bar. */
 export const COMPASS_HEADER_INSET = 84;

@@ -4,13 +4,14 @@ import { useCamera } from './useCamera';
 import { WAYPOINTS } from '../space/waypoints';
 import { gridToWorld } from '../space/layout';
 import { bearingTo, worldDistance, markerRadius, bearingTarget, type Box } from '../space/compass';
-import { solveMarkers, type Marker } from '../space/markerSolver';
+import { solveMarkers, type Marker, type Vec2 } from '../space/markerSolver';
 import {
   MARKER_MIN_R,
   MARKER_MAX_R,
   SUPPRESS_DIST,
   FADE_BAND,
-  COMPASS_ATTRACTION,
+  COMPASS_STIFFNESS,
+  COMPASS_FRICTION,
   COMPASS_ITERATIONS,
   COMPASS_HEADER_INSET,
   COMPASS_EDGE_MARGIN,
@@ -55,7 +56,7 @@ export function useCompass(): Ref<MarkerView[]> {
   const camera = useCamera();
   const route = useRoute();
   const markers = ref<MarkerView[]>([]);
-  const prev = new Map<string, { x: number; y: number }>();
+  const state = new Map<string, { pos: Vec2; prevPos: Vec2 }>();
   const reduced = reducedMotion();
 
   function compute(snap: boolean): boolean {
@@ -78,25 +79,29 @@ export function useCompass(): Ref<MarkerView[]> {
     const input: Marker[] = visible.map((g) => {
       const radius = markerRadius(g.dist, minD, maxD, MARKER_MIN_R, MARKER_MAX_R);
       const target = bearingTarget(center, g.bearing, box, radius);
-      return { pos: prev.get(g.wp.id) ?? target, target, radius };
+      const st = state.get(g.wp.id) ?? { pos: target, prevPos: target };
+      return { pos: st.pos, prevPos: st.prevPos, target, radius };
     });
 
     const resolved = solveMarkers(input, box, {
-      attraction: snap ? 1 : COMPASS_ATTRACTION,
+      stiffness: snap ? 1 : COMPASS_STIFFNESS,
+      friction: snap ? 0 : COMPASS_FRICTION,
       iterations: COMPASS_ITERATIONS,
     });
 
-    // Drop stale positions for islands that left the visible set (the current
-    // one), so re-entry starts fresh at its target rather than a stale spot.
-    const visibleIds = new Set(visible.map((g) => g.wp.id));
-    for (const id of [...prev.keys()]) if (!visibleIds.has(id)) prev.delete(id);
+    // Drop state for islands that left the visible set (the current one), so
+    // re-entry starts fresh at its target rather than a stale spot.
+    const visibleIds = new Set<string>(visible.map((g) => g.wp.id));
+    for (const id of [...state.keys()]) if (!visibleIds.has(id)) state.delete(id);
 
     let settled = true;
     markers.value = visible.map((g, i) => {
       const p = resolved[i];
-      prev.set(g.wp.id, p);
+      const before = input[i].pos;
+      state.set(g.wp.id, { pos: p, prevPos: before });
       const t = input[i].target;
-      if (Math.hypot(p.x - t.x, p.y - t.y) > 0.5) settled = false;
+      const moving = Math.hypot(p.x - before.x, p.y - before.y) > 0.3;
+      if (moving || Math.hypot(p.x - t.x, p.y - t.y) > 0.5) settled = false;
       return {
         id: g.wp.id,
         route: g.wp.route,

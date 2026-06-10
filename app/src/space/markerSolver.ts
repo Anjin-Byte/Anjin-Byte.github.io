@@ -1,15 +1,15 @@
-// Pure constrained solver for the compass waymarkers — no Vue, no DOM,
+// Pure constrained particle solver for the compass waymarkers — no Vue, no DOM,
 // unit-tested (app/src/tests/markerSolver.test.ts).
 //
-// Each marker is pinned to the box EDGE its bearing points at, then spread
-// ALONG that edge so collinear islands (same bearing) settle side-by-side on the
-// rim instead of stacking. Because two markers on one wall sit at different
-// perpendicular offsets (each inset by its own radius), overlap must be resolved
-// in the TANGENTIAL coordinate (along the wall) — resolving perpendicular would
-// just be undone by the snap. Markers on different walls (near a corner) fall
-// back to a 2-D push. A few Gauss-Seidel passes per frame; at n ≤ 5 it's
-// trivial. The composable holds the previous positions, so `attraction` is also
-// the damping.
+// Position-based dynamics: each marker carries momentum (Verlet — velocity is
+// the implicit `pos − prevPos`), is pulled toward its bearing target on the rim,
+// repels its neighbours, and is pinned to the box EDGE its bearing points at. So
+// they GLIDE along the rim and jostle each other, while the wall kills
+// perpendicular momentum (they stick) and tangential momentum carries (they
+// slide). Overlap on a shared wall is resolved TANGENTIALLY (along the wall) —
+// resolving perpendicular would just be undone by the snap; markers on different
+// walls (near a corner) fall back to a 2-D push. A few Gauss-Seidel passes per
+// frame; at n ≤ 5 it's trivial.
 
 import type { Box } from './compass';
 
@@ -19,17 +19,21 @@ export interface Vec2 {
 }
 
 export interface Marker {
-  /** Previous-frame resolved position (the integration state). */
+  /** Current position (integration state). */
   pos: Vec2;
+  /** Previous-frame position — `pos − prevPos` is the implicit velocity. */
+  prevPos: Vec2;
   /** Resting target — the bearing point on the rim (also picks the wall). */
   target: Vec2;
   radius: number;
 }
 
 export interface SolveOptions {
-  /** Spring/damping toward the target per step, in (0, 1]. */
-  attraction: number;
-  /** Relaxation passes resolving overlaps (3–5 is plenty). */
+  /** Spring acceleration toward the target each frame. */
+  stiffness: number;
+  /** Velocity retained frame-to-frame (Verlet momentum), in (0, 1). */
+  friction: number;
+  /** Constraint passes resolving overlaps (3–5 is plenty). */
   iterations: number;
 }
 
@@ -102,17 +106,19 @@ function resolvePair(a: Solved, b: Solved): void {
 }
 
 /**
- * Step the markers one frame: spring toward targets, pin to walls, then relax
- * (tangential spread + corner pushes), re-pinning each pass. Returns the new
- * positions (same order). Pure — does not mutate inputs.
+ * Step the markers one frame: integrate (momentum + attraction), pin to walls,
+ * then relax (tangential spread + corner pushes), re-pinning each pass. Returns
+ * the new positions (same order); the caller derives the next velocity by
+ * keeping these as the new `pos` and the old `pos` as `prevPos`. Pure.
  */
 export function solveMarkers(markers: readonly Marker[], box: Box, opts: SolveOptions): Vec2[] {
-  const p: Solved[] = markers.map((m) => ({
-    x: m.pos.x + (m.target.x - m.pos.x) * opts.attraction,
-    y: m.pos.y + (m.target.y - m.pos.y) * opts.attraction,
-    r: m.radius,
-    wall: wallOf(m.target, box, m.radius),
-  }));
+  const p: Solved[] = markers.map((m) => {
+    const vx = (m.pos.x - m.prevPos.x) * opts.friction;
+    const vy = (m.pos.y - m.prevPos.y) * opts.friction;
+    const ax = (m.target.x - m.pos.x) * opts.stiffness;
+    const ay = (m.target.y - m.pos.y) * opts.stiffness;
+    return { x: m.pos.x + vx + ax, y: m.pos.y + vy + ay, r: m.radius, wall: wallOf(m.target, box, m.radius) };
+  });
 
   for (const m of p) snap(m, box);
   for (let it = 0; it < opts.iterations; it++) {
