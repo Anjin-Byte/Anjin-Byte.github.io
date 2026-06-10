@@ -6,8 +6,6 @@ import { gridToWorld } from '../space/layout';
 import { bearingTo, worldDistance, markerRadius, bearingTarget, type Box } from '../space/compass';
 import { solveMarkers, type Marker, type Vec2 } from '../space/markerSolver';
 import {
-  MARKER_MIN_R,
-  MARKER_MAX_R,
   SUPPRESS_DIST,
   FADE_BAND,
   COMPASS_STIFFNESS,
@@ -16,6 +14,13 @@ import {
   COMPASS_HEADER_INSET,
   COMPASS_EDGE_MARGIN,
 } from '../space/layoutConfig';
+import {
+  MARKER_FLOOR_R,
+  MARKER_CAP_R,
+  MARKER_LIFT_K,
+  MARKER_LIFT_BASE,
+  MARKER_LIFT_MAX,
+} from '../space/tokens';
 
 /** A renderable waymarker: resolved screen position, size, true bearing (for the
  *  arrow), and fade opacity. */
@@ -76,8 +81,16 @@ export function useCompass(): Ref<MarkerView[]> {
     const minD = dists.length ? Math.min(...dists) : 0;
     const maxD = dists.length ? Math.max(...dists) : 1;
 
+    // Hybrid radius: a constant touch-safe near/far range (floor → cap) plus a
+    // gentle viewport lift that raises both ends together — keeps the range so
+    // size still reads as distance, and far never drops below the touch floor.
+    const vmin = Math.min(vp.w, vp.h);
+    const lift = Math.min(MARKER_LIFT_MAX, Math.max(0, MARKER_LIFT_K * (vmin - MARKER_LIFT_BASE)));
+    const farR = MARKER_FLOOR_R + lift;
+    const nearR = MARKER_CAP_R + lift;
+
     const input: Marker[] = visible.map((g) => {
-      const radius = markerRadius(g.dist, minD, maxD, MARKER_MIN_R, MARKER_MAX_R);
+      const radius = markerRadius(g.dist, minD, maxD, farR, nearR);
       const target = bearingTarget(center, g.bearing, box, radius);
       const st = state.get(g.wp.id) ?? { pos: target, prevPos: target };
       return { pos: st.pos, prevPos: st.prevPos, target, radius };

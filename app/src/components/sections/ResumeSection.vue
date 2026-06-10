@@ -78,7 +78,7 @@ import { experience, education } from '../../data/profile';
 }
 
 .resume-container {
-  max-width: 1080px;
+  max-width: var(--container-max);
 }
 
 .resume-head {

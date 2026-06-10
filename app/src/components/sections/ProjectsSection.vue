@@ -119,7 +119,7 @@ const projectIndex: ProjectIndexItem[] = rawProjectIndex.map((project) => ({
 }
 
 .projects-container {
-  max-width: 1120px;
+  max-width: var(--container-max);
 }
 
 .projects-head {

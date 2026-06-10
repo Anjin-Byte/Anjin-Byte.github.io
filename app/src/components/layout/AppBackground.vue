@@ -67,7 +67,7 @@ const zoneDraft = ref<BlankZoneDraft>({
 
 // ── Theme ───────────────────────────────────────────────────────────────────
 // The active palette is owned by the useThemePreference composable (singleton
-// module state, shared with the toggle in AppHeader). We watch it and push
+// module state, shared with the toggle in AppChrome). We watch it and push
 // changes to the worker, which forwards to the GPU shader uniform.
 const { theme: currentTheme } = useThemePreference();
 watch(currentTheme, (next) => {

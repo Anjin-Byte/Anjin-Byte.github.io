@@ -22,7 +22,7 @@ import { profile } from '@/data/profile';
 }
 
 .about-container {
-  max-width: 1080px;
+  max-width: var(--container-max);
 }
 
 .about-card {

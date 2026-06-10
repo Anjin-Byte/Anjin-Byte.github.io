@@ -67,4 +67,13 @@ const { preference } = useThemePreference();
     margin-inline-start: 0;
   }
 }
+
+/* Touch devices: give each segment a 44px+ tall target (51 × 0.875 ≈ 44.6).
+   Height only — forcing full width per segment would make the 3-button pill
+   too wide. Desktop (fine pointer) stays compact. */
+@media (pointer: coarse) {
+  .theme-toggle :deep(.v-btn) {
+    min-height: var(--touch-min);
+  }
+}
 </style>

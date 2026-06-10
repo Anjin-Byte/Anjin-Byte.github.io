@@ -71,7 +71,7 @@ const heroLinks = contactLinks.filter((link) =>
 }
 
 .hero-container {
-  max-width: 1160px;
+  max-width: var(--container-max);
 }
 
 .hero-frame {

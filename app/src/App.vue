@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import AppBackground from '@/components/layout/AppBackground.vue';
-import AppHeader from '@/components/layout/AppHeader.vue';
+import AppChrome from '@/components/layout/AppChrome.vue';
 import WorldStage from '@/components/space/WorldStage.vue';
 import CompassNav from '@/components/space/CompassNav.vue';
 </script>
@@ -8,7 +8,7 @@ import CompassNav from '@/components/space/CompassNav.vue';
 <template>
   <v-app class="app-shell">
     <AppBackground />
-    <AppHeader />
+    <AppChrome />
     <WorldStage />
     <CompassNav />
   </v-app>
@@ -22,6 +22,47 @@ import CompassNav from '@/components/space/CompassNav.vue';
   --safe-area-right: env(safe-area-inset-right, 0px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-left: env(safe-area-inset-left, 0px);
+
+  /* ── Design tokens ──────────────────────────────────────────────────────
+     The scale everything derives from. The compass solver mirrors the marker
+     geometry in space/tokens.ts — keep the two in sync. */
+
+  /* Foundation */
+  --zoom: 0.875;
+  --touch-min: 51px; /* 51 × 0.875 = 44.6 ≥ 44px visual touch target */
+
+  /* Space scale (4px base) */
+  --space-3xs: 4px;
+  --space-2xs: 8px;
+  --space-xs: 12px;
+  --space-sm: 16px;
+  --space-md: 24px;
+  --space-lg: 32px;
+  --space-xl: 48px;
+  --space-2xl: 64px;
+  --space-3xl: 96px;
+
+  /* Fluid type scale (base 16px, ratio 1.25; clamp min@360 → max@1440) */
+  --step--2: clamp(0.69rem, 0.66rem + 0.13vw, 0.75rem);
+  --step--1: clamp(0.83rem, 0.78rem + 0.22vw, 0.94rem);
+  --step-0: clamp(1rem, 0.95rem + 0.22vw, 1.13rem);
+  --step-1: clamp(1.25rem, 1.16rem + 0.39vw, 1.41rem);
+  --step-2: clamp(1.56rem, 1.43rem + 0.59vw, 1.76rem);
+  --step-3: clamp(1.95rem, 1.75rem + 0.89vw, 2.2rem);
+  --step-4: clamp(2.44rem, 2.11rem + 1.46vw, 3.43rem);
+
+  /* Radius scale */
+  --radius-xs: 11px;
+  --radius-sm: 16px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --radius-pill: 999px;
+
+  /* Layout */
+  --inset-chrome: 16px; /* balanced corner inset (top = sides) */
+  --measure: 64ch; /* prose line-length cap */
+  --container-max: 1120px; /* content reading column (inside the 1200px panel) */
+  --text-ui: 1.05rem; /* fixed chrome label — controls don't balloon */
 }
 
 /*
@@ -34,7 +75,7 @@ import CompassNav from '@/components/space/CompassNav.vue';
   resolved theme before paint, so these are only a last-resort defense.
 */
 html {
-  zoom: .875;
+  zoom: var(--zoom, .875);
   background-color: var(--theme-surface, oklab(0.985 -0.001 0.004));
   background-image:
     linear-gradient(
@@ -101,22 +142,10 @@ body {
   overflow: hidden;
 }
 
-/* App header uses the same content-surface treatment as body surfaces, but
-   with only a bottom border — so it reads as a floating bar of chrome over
-   the Game-of-Life canvas rather than a full card.  The !important battles
-   Vuetify's own !important on .bg-background. */
-.v-app-bar.bg-background {
-  background-color: color-mix(in oklab, var(--theme-surface) 84%, transparent) !important;
-  backdrop-filter: blur(14px) saturate(1.08);
-  -webkit-backdrop-filter: blur(14px) saturate(1.08);
-  border-bottom: 1px solid color-mix(in oklab, var(--theme-grid-border) 68%, white 12%) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
 .glass-panel {
   background: color-mix(in oklab, var(--theme-surface) 84%, transparent);
   border: 1px solid color-mix(in oklab, var(--theme-grid-border) 62%, white 10%);
-  border-radius: 24px;
+  border-radius: var(--radius-lg);
   backdrop-filter: blur(14px) saturate(1.08);
   -webkit-backdrop-filter: blur(14px) saturate(1.08);
   box-shadow:
@@ -131,7 +160,7 @@ body {
 .quiet-sheet {
   background: color-mix(in oklab, var(--theme-surface) 78%, transparent);
   border: 1px solid color-mix(in oklab, var(--theme-grid-border) 54%, white 8%);
-  border-radius: 18px;
+  border-radius: var(--radius-md);
   backdrop-filter: blur(8px) saturate(1.04);
   -webkit-backdrop-filter: blur(8px) saturate(1.04);
   box-shadow:
@@ -147,7 +176,7 @@ body {
   max-width: max-content;
   min-height: 1.8rem;
   padding: 0.34rem 0.78rem 0.32rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid color-mix(in oklab, var(--theme-grid-border) 58%, white 8%);
   background: color-mix(in oklab, var(--theme-surface) 74%, transparent);
   backdrop-filter: blur(10px) saturate(1.05);
@@ -158,7 +187,7 @@ body {
 .content-surface {
   background: color-mix(in oklab, var(--theme-surface) 84%, transparent);
   border: 1px solid color-mix(in oklab, var(--theme-grid-border) 62%, white 10%);
-  border-radius: 24px;
+  border-radius: var(--radius-lg);
   backdrop-filter: blur(14px) saturate(1.08);
   -webkit-backdrop-filter: blur(14px) saturate(1.08);
   box-shadow:
@@ -169,7 +198,7 @@ body {
 .section-kicker {
   align-self: start;
   color: var(--theme-text-secondary);
-  font-size: 0.69rem;
+  font-size: var(--step--2);
   font-weight: 600;
   letter-spacing: 0.11em;
   text-transform: uppercase;
@@ -178,7 +207,7 @@ body {
 
 .section-heading {
   font-family: var(--font-display);
-  font-size: clamp(2.15rem, 4vw, 3.5rem);
+  font-size: var(--step-4);
   font-weight: 700;
   line-height: 0.98;
   letter-spacing: -0.03em;
@@ -189,17 +218,9 @@ body {
 .section-intro {
   margin: 0;
   color: var(--theme-text-secondary);
-  font-size: 0.98rem;
+  font-size: var(--step-0);
   line-height: 1.7;
-  max-width: 56ch;
-}
-
-html[data-theme-mode="light"] .v-app-bar.bg-background {
-  background-color: color-mix(in oklab, var(--theme-surface) 94%, white 6%) !important;
-  border-bottom-color: color-mix(in oklab, var(--theme-grid-major) 42%, white 46%) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.78),
-    0 10px 30px rgba(120, 112, 98, 0.08);
+  max-width: var(--measure);
 }
 
 html[data-theme-mode="light"] .glass-panel {

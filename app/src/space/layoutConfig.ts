@@ -47,12 +47,8 @@ export const HORIZONTAL_BREAK_THRESHOLD = 300;
 
 // ── Waymarker compass (Phase 4) ──────────────────────────────────────────────
 
-/** Marker radius (CSS px) for the farthest island — the click-target floor.
- *  Diameter `2·MARKER_MIN_R` stays a comfortable tap target. */
-export const MARKER_MIN_R = 22;
-
-/** Marker radius for the nearest island (size encodes proximity, inverted). */
-export const MARKER_MAX_R = 30;
+// Marker radii live in space/tokens.ts now — the hybrid floor/cap/lift the
+// compass computes per frame (touch-safe + viewport-aware). See useCompass.ts.
 
 /** World-px distance below which an island is the *current* one — its marker is
  *  suppressed (you're on it). */

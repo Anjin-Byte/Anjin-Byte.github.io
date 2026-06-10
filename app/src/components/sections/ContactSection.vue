@@ -29,7 +29,7 @@ import ContactStrip from '../layout/ContactStrip.vue';
 }
 
 .contact-container {
-  max-width: 1120px;
+  max-width: var(--container-max);
 }
 
 .contact-band {
