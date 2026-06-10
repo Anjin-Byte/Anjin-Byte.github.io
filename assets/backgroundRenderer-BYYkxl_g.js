@@ -165,7 +165,7 @@
     }
     const le = q("CpuRenderer"), U = 5, ue = 4279175690, fe = 4294921596, V = 4278190080;
     async function me(e) {
-        const t = e.getContext("2d"), { WasmBridge: r } = await import("./index-IUXSeHhz.js").then(async (m)=>{
+        const t = e.getContext("2d"), { WasmBridge: r } = await import("./index-Dlp0fEZC.js").then(async (m)=>{
             await m.__tla;
             return m;
         }), a = await r.create(), d = U + 1, o = d * a.width + 1, i = d * a.height + 1;
@@ -258,7 +258,7 @@
                     }
                     const d = performance.now();
                     if (a) try {
-                        const { GpuGameOfLife: o } = await import("./game_of_life_gpu-HHuWZIfQ.js").then(async (m)=>{
+                        const { GpuGameOfLife: o } = await import("./game_of_life_gpu-DUJpwRvv.js").then(async (m)=>{
                             await m.__tla;
                             return m;
                         }), i = performance.now();
