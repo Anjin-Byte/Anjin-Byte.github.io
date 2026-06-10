@@ -13,18 +13,27 @@ import topLevelAwait from 'vite-plugin-top-level-await';
 // to delete the offending key before the call reaches the browser API.
 // Remove once wgpu is updated to a version that sends the correct field name.
 function patchWgpuFirefoxLimits(): Plugin {
+  // Match `<dev>.requestDevice(<opts>)` regardless of the surrounding wrapper or
+  // semicolons — robust to the wasm-bindgen glue varying between versions (CI
+  // installs wasm-pack latest, which can differ from a local one). Rewrites it
+  // to delete the offending limit inline via the comma operator, so it works as
+  // an expression. THROWS if the call-site is gone, so a drift fails the build
+  // loudly instead of silently shipping a Firefox-broken bundle.
+  const RE = /(\w+)\.requestDevice\((\w+)\)/;
   return {
     name: 'patch-wgpu-firefox-limits',
     transform(code, id) {
       if (!id.includes('game_of_life_gpu_bg.js')) return;
-      const patched = code.replace(
-        'const ret = arg0.requestDevice(arg1);',
-        "if (arg1?.requiredLimits) delete arg1.requiredLimits.maxInterStageShaderComponents;\n    const ret = arg0.requestDevice(arg1);",
-      );
-      if (patched === code) {
-        console.warn('[patch-wgpu-firefox-limits] requestDevice call-site not found — patch may be stale');
+      if (!RE.test(code)) {
+        throw new Error(
+          '[patch-wgpu-firefox-limits] requestDevice call-site not found in the wasm-bindgen glue — ' +
+            'it changed; update the regex (Firefox would otherwise reject maxInterStageShaderComponents).',
+        );
       }
-      return patched;
+      return code.replace(
+        RE,
+        '($2?.requiredLimits && delete $2.requiredLimits.maxInterStageShaderComponents, $1.requestDevice($2))',
+      );
     },
   };
 }
