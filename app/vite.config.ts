@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from 'vite';
 import { fileURLToPath } from 'node:url';
 import vue from '@vitejs/plugin-vue';
+import vuetify from 'vite-plugin-vuetify';
 import wasm from 'vite-plugin-wasm';
 import topLevelAwait from 'vite-plugin-top-level-await';
 
@@ -33,7 +34,7 @@ const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 
 export default defineConfig({
   base: '/',
-  plugins: [vue(), ...sharedPlugins()],
+  plugins: [vue(), vuetify({ autoImport: true }), ...sharedPlugins()],
   server: {
     fs: {
       allow: [repoRoot],

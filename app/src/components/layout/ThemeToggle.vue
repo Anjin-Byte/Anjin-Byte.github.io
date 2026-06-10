@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { mdiWeatherSunny, mdiThemeLightDark, mdiWeatherNight } from '@mdi/js';
 import { useThemePreference } from '../../composables/useThemePreference';
 
 const { preference } = useThemePreference();
@@ -12,16 +13,16 @@ const { preference } = useThemePreference();
     variant="text"
     class="theme-toggle"
   >
-    <v-btn value="light" icon="mdi-weather-sunny" size="small">
-      <v-icon>mdi-weather-sunny</v-icon>
+    <v-btn value="light" :icon="mdiWeatherSunny" size="small">
+      <v-icon :icon="mdiWeatherSunny" />
       <v-tooltip activator="parent" location="bottom" text="Light" />
     </v-btn>
-    <v-btn value="system" icon="mdi-theme-light-dark" size="small">
-      <v-icon>mdi-theme-light-dark</v-icon>
+    <v-btn value="system" :icon="mdiThemeLightDark" size="small">
+      <v-icon :icon="mdiThemeLightDark" />
       <v-tooltip activator="parent" location="bottom" text="System" />
     </v-btn>
-    <v-btn value="dark" icon="mdi-weather-night" size="small">
-      <v-icon>mdi-weather-night</v-icon>
+    <v-btn value="dark" :icon="mdiWeatherNight" size="small">
+      <v-icon :icon="mdiWeatherNight" />
       <v-tooltip activator="parent" location="bottom" text="Dark" />
     </v-btn>
   </v-btn-toggle>

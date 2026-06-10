@@ -1,9 +1,17 @@
 // Single source of truth for the portfolio's content.
 // Sections import from here so content edits don't sprawl across components.
 
+import {
+  mdiMapMarkerOutline,
+  mdiEmailOutline,
+  mdiPhoneOutline,
+  mdiGithub,
+  mdiLinkedin,
+} from '@mdi/js';
+
 export interface ContactLink {
   label: string;
-  icon: string;   // MDI name
+  icon: string; // MDI SVG path (from @mdi/js)
   href: string;
   display?: string; // override text shown alongside icon
 }
@@ -33,11 +41,11 @@ export const profile = {
 };
 
 export const contactLinks: ContactLink[] = [
-  { label: 'Location',  icon: 'mdi-map-marker-outline', href: 'https://maps.google.com/?q=Bentonville,+AR', display: profile.location },
-  { label: 'Email',     icon: 'mdi-email-outline',      href: `mailto:${profile.email}`,                    display: profile.email },
-  { label: 'Phone',     icon: 'mdi-phone-outline',      href: `tel:${profile.phone.replace(/[^\d+]/g, '')}`,display: profile.phone },
-  { label: 'GitHub',    icon: 'mdi-github',             href: profile.github,                               display: 'Anjin-Byte' },
-  { label: 'LinkedIn',  icon: 'mdi-linkedin',           href: profile.linkedin,                             display: 'bits-for-bread' },
+  { label: 'Location', icon: mdiMapMarkerOutline, href: 'https://maps.google.com/?q=Bentonville,+AR', display: profile.location },
+  { label: 'Email',    icon: mdiEmailOutline,     href: `mailto:${profile.email}`,                     display: profile.email },
+  { label: 'Phone',    icon: mdiPhoneOutline,     href: `tel:${profile.phone.replace(/[^\d+]/g, '')}`, display: profile.phone },
+  { label: 'GitHub',   icon: mdiGithub,           href: profile.github,                                display: 'Anjin-Byte' },
+  { label: 'LinkedIn', icon: mdiLinkedin,         href: profile.linkedin,                              display: 'bits-for-bread' },
 ];
 
 // ── Skills ──────────────────────────────────────────────────────────────────

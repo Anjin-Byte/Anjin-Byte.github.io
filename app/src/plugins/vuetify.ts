@@ -1,13 +1,18 @@
 import 'vuetify/styles';
-import '@mdi/font/css/materialdesignicons.css';
 import { createVuetify } from 'vuetify';
-import * as components from 'vuetify/components';
-import * as directives from 'vuetify/directives';
+import { aliases, mdi } from 'vuetify/iconsets/mdi-svg';
 
+// Components/directives are auto-imported per-use by vite-plugin-vuetify
+// (autoImport), so the bundle ships only what's referenced instead of all of
+// Vuetify. Icons use the SVG set (mdi-svg): each glyph is a tree-shaken path
+// string from @mdi/js, replacing the ~395 KB webfont we shipped for a handful
+// of icons.
 export const vuetify = createVuetify({
-  components,
-  directives,
-  icons: { defaultSet: 'mdi' },
+  icons: {
+    defaultSet: 'mdi',
+    aliases,
+    sets: { mdi },
+  },
   theme: {
     defaultTheme: 'dark',
     themes: {

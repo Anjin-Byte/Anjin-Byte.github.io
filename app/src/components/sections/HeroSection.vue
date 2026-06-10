@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { mdiMapMarkerOutline, mdiArrowRight } from '@mdi/js';
 import { contactLinks, profile, skills } from '../../data/profile';
 
 const heroLinks = contactLinks.filter((link) =>
@@ -11,7 +12,7 @@ const heroLinks = contactLinks.filter((link) =>
     <v-container class="hero-container">
       <div class="hero-frame glass-panel glass-panel--strong">
         <div class="hero-main">
-          <span class="hero-kicker glass-chip section-kicker"><v-icon icon="mdi-map-marker-outline" class="hero-location-icon" />{{ profile.location }}</span>
+          <span class="hero-kicker glass-chip section-kicker"><v-icon :icon="mdiMapMarkerOutline" class="hero-location-icon" />{{ profile.location }}</span>
           <h1 class="hero-name section-heading">{{ profile.name }}</h1>
           <p class="hero-tagline">{{ profile.tagline }}</p>
           <p class="hero-bio">{{ profile.bio }}</p>
@@ -19,7 +20,7 @@ const heroLinks = contactLinks.filter((link) =>
           <div class="hero-actions">
             <a href="#projects" class="hero-link hero-link--primary">
               View selected work
-              <v-icon icon="mdi-arrow-right" class="hero-link-icon" />
+              <v-icon :icon="mdiArrowRight" class="hero-link-icon" />
             </a>
             <a href="#resume" class="hero-link">Resume</a>
           </div>

@@ -17,3 +17,17 @@ game-of-life-core = { path = "../game_of_life_core" }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.34"
+
+# wasm-opt must enable the wasm features rustc now emits under LTO (bulk-memory's
+# memory.copy, nontrapping float→int, …); the bundled v117 otherwise rejects
+# them. `-O` is the speed-respecting default — NOT a size-first `-Oz`/`-Os`.
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = [
+  "-O",
+  "--enable-bulk-memory",
+  "--enable-nontrapping-float-to-int",
+  "--enable-sign-ext",
+  "--enable-mutable-globals",
+  "--enable-multivalue",
+  "--enable-reference-types",
+]

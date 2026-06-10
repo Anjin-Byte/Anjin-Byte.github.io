@@ -30,6 +30,12 @@ const style = computed(() => {
     transform: `translate(${world.value.x}px, ${world.value.y}px) translate(-50%, -50%) scale(${scale})`,
     opacity: focus.value,
     pointerEvents: (focus.value > 0.5 ? 'auto' : 'none') as 'auto' | 'none',
+    // The active island's scroll box must match the TRUE viewport — the stage
+    // height the camera centres on. A CSS `svh` unit diverges from it under
+    // html{zoom}, leaving the box short and centred, so content clipped a
+    // ~chrome-height early at top (masked by the header) and bottom (was masked
+    // by the footer). Driving the height from the measured viewport fixes both.
+    maxHeight: isActive.value ? `${viewport.value.h}px` : undefined,
   };
 });
 
@@ -88,7 +94,8 @@ useLaneScroll({ el: panelRef, isActive, waypointId: props.waypointId });
    (the resume list) is reachable by scrolling. overscroll-behavior: contain
    stops scroll-chaining and is the break-away edge signal. */
 .world-panel--scroll {
-  max-height: 100svh;
+  /* max-height is set inline from the measured viewport height (see the style
+     computed) so it matches the camera's centring basis exactly under zoom. */
   overflow-y: auto;
   overscroll-behavior: contain;
   /* Touch keeps vertical native-scroll; horizontal-swipe nav is deferred. */

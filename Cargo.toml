@@ -5,3 +5,11 @@ resolver = "2"
 [profile.release]
 # Optimize all workspace crates for small WASM binary size.
 opt-level = "s"
+# Size wins with no runtime cost: lto + codegen-units=1 give the optimizer more
+# to work with (typically neutral-to-faster), while strip + panic=abort just
+# drop dead weight (symbol names, unwind tables). opt-level and wasm-opt stay
+# speed-first, so the wgpu wasm's runtime is never traded for bytes.
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

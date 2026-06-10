@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useDisplay } from 'vuetify';
+import { mdiMenu } from '@mdi/js';
 
 import ThemeToggle from './ThemeToggle.vue';
 
@@ -31,7 +32,7 @@ const isMenuOpen = ref(false);
           <template #activator="{ props }">
             <v-btn
               v-bind="props"
-              icon="mdi-menu"
+              :icon="mdiMenu"
               variant="text"
               size="small"
               class="menu-ink"

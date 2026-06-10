@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { coerceWaypointId, gridNeighbor } from '../../space/waypoints';
+import { mdiChevronLeft, mdiChevronRight, mdiChevronUp, mdiChevronDown } from '@mdi/js';
 
 // On-screen chevrons are the universal, accessible way to move between adjacent
 // islands — they work on every browser/input (unlike the trackpad scroll
@@ -18,10 +19,10 @@ interface Direction {
 }
 
 const DIRECTIONS: readonly Direction[] = [
-  { key: 'west', dgx: -1, dgy: 0, icon: 'mdi-chevron-left', edge: 'left' },
-  { key: 'east', dgx: 1, dgy: 0, icon: 'mdi-chevron-right', edge: 'right' },
-  { key: 'north', dgx: 0, dgy: -1, icon: 'mdi-chevron-up', edge: 'top' },
-  { key: 'south', dgx: 0, dgy: 1, icon: 'mdi-chevron-down', edge: 'bottom' },
+  { key: 'west', dgx: -1, dgy: 0, icon: mdiChevronLeft, edge: 'left' },
+  { key: 'east', dgx: 1, dgy: 0, icon: mdiChevronRight, edge: 'right' },
+  { key: 'north', dgx: 0, dgy: -1, icon: mdiChevronUp, edge: 'top' },
+  { key: 'south', dgx: 0, dgy: 1, icon: mdiChevronDown, edge: 'bottom' },
 ];
 
 const route = useRoute();
@@ -98,7 +99,7 @@ function go(target: string): void {
 }
 
 .lane-compass__btn--bottom {
-  bottom: calc(76px + var(--safe-area-bottom));
+  bottom: calc(18px + var(--safe-area-bottom));
   left: 50%;
   transform: translateX(-50%);
 }

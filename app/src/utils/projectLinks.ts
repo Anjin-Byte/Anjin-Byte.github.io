@@ -1,3 +1,9 @@
+import {
+  mdiPlayCircleOutline,
+  mdiGithub,
+  mdiTextBoxOutline,
+  mdiFileDocumentOutline,
+} from '@mdi/js';
 import type { Project, ProjectLink, ProjectLinkKind } from '../data/profile';
 
 export type ProjectCardVariant = 'featured' | 'compact';
@@ -12,31 +18,31 @@ export interface ResolvedProjectLink extends ProjectLink {
 const projectLinkMeta = {
   demo: {
     ariaLabel: 'Live demo',
-    icon: 'mdi-play-circle-outline',
+    icon: mdiPlayCircleOutline,
     label: 'Demo',
     priority: 0,
   },
   source: {
     ariaLabel: 'GitHub repository',
-    icon: 'mdi-github',
+    icon: mdiGithub,
     label: 'Source',
     priority: 1,
   },
   writeup: {
     ariaLabel: 'Project writeup',
-    icon: 'mdi-text-box-outline',
+    icon: mdiTextBoxOutline,
     label: 'Writeup',
     priority: 2,
   },
   video: {
     ariaLabel: 'Project video',
-    icon: 'mdi-play-circle-outline',
+    icon: mdiPlayCircleOutline,
     label: 'Video',
     priority: 3,
   },
   docs: {
     ariaLabel: 'Project documentation',
-    icon: 'mdi-file-document-outline',
+    icon: mdiFileDocumentOutline,
     label: 'Docs',
     priority: 4,
   },
