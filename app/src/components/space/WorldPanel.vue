@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router';
 import { findWaypoint, type WaypointId } from '../../space/waypoints';
 import { useCamera } from '../../composables/useCamera';
 import { useLaneScroll } from '../../composables/useLaneScroll';
+import { GESTURE_NAV_ENABLED } from '../../featureFlags';
 import { gridToWorld, focusWeight } from '../../space/layout';
 import { FOCUS_FLOOR, FOCUS_RADIUS_FRACTION, FOCUS_SCALE_MIN } from '../../space/layoutConfig';
 
@@ -57,9 +58,13 @@ watch(isActive, (active) => {
   }
 });
 
-// Two-finger scroll navigates: vertical over-scroll → north/south neighbour,
-// horizontal scroll → east/west neighbour (biased axis lock; see useLaneScroll).
-useLaneScroll({ el: panelRef, isActive, waypointId: props.waypointId });
+// Gesture navigation (scroll/swipe break-away to a neighbour) is feature-gated
+// off for now — the compass + header links are the navigation. With the flag
+// false the bundler strips useLaneScroll (and the break-away math) from
+// production entirely. Native scroll WITHIN the island is unaffected (above).
+if (GESTURE_NAV_ENABLED) {
+  useLaneScroll({ el: panelRef, isActive, waypointId: props.waypointId });
+}
 </script>
 
 <template>
