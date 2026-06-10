@@ -258,7 +258,7 @@
                     }
                     const d = performance.now();
                     if (a) try {
-                        const { GpuGameOfLife: o } = await import("./game_of_life_gpu-t9r9oNFJ.js").then(async (m)=>{
+                        const { GpuGameOfLife: o } = await import("./game_of_life_gpu-BvfIHsZ9.js").then(async (m)=>{
                             await m.__tla;
                             return m;
                         }), i = performance.now();
