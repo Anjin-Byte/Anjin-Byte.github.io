@@ -1,7 +1,7 @@
-import { _ as D } from "./__vite-plugin-wasm-helper-oqf-7dtx.js";
+import { _ as T } from "./__vite-plugin-wasm-helper-oqf-7dtx.js";
 let k;
 let __tla = (async ()=>{
-    var A = "/assets/game_of_life_bg-BTVrrDst.wasm";
+    var A = "/assets/game_of_life_bg-DyZNvoKj.wasm";
     class w {
         static __wrap(e) {
             const n = Object.create(w.prototype);
@@ -13,23 +13,23 @@ let __tla = (async ()=>{
         }
         free() {
             const e = this.__destroy_into_raw();
-            r.__wbg_universe_free(e, 0);
+            _.__wbg_universe_free(e, 0);
         }
         cells() {
-            return r.universe_cells(this.__wbg_ptr) >>> 0;
+            return _.universe_cells(this.__wbg_ptr) >>> 0;
         }
         height() {
-            return r.universe_height(this.__wbg_ptr) >>> 0;
+            return _.universe_height(this.__wbg_ptr) >>> 0;
         }
         static new() {
-            const e = r.universe_new();
+            const e = _.universe_new();
             return w.__wrap(e);
         }
         tick() {
-            r.universe_tick(this.__wbg_ptr);
+            _.universe_tick(this.__wbg_ptr);
         }
         width() {
-            return r.universe_width(this.__wbg_ptr) >>> 0;
+            return _.universe_width(this.__wbg_ptr) >>> 0;
         }
     }
     Symbol.dispose && (w.prototype[Symbol.dispose] = w.prototype.free);
@@ -37,56 +37,56 @@ let __tla = (async ()=>{
         throw new Error(y(t, e));
     }
     function M(t, e) {
-        let n, _;
+        let n, r;
         try {
-            n = t, _ = e, console.error(y(t, e));
+            n = t, r = e, console.error(y(t, e));
         } finally{
-            r.__wbindgen_free(n, _, 1);
+            _.__wbindgen_free(n, r, 1);
         }
     }
     function S() {
         return new Error;
     }
     function U(t, e) {
-        const n = e.stack, _ = I(n, r.__wbindgen_malloc, r.__wbindgen_realloc), o = h;
-        v().setInt32(t + 4, o, !0), v().setInt32(t + 0, _, !0);
+        const n = e.stack, r = I(n, _.__wbindgen_malloc, _.__wbindgen_realloc), o = h;
+        v().setInt32(t + 4, o, !0), v().setInt32(t + 0, r, !0);
     }
     function F() {
-        const t = r.__wbindgen_externrefs, e = t.grow(4);
+        const t = _.__wbindgen_externrefs, e = t.grow(4);
         t.set(0, void 0), t.set(e + 0, void 0), t.set(e + 1, null), t.set(e + 2, !0), t.set(e + 3, !1);
     }
     const m = typeof FinalizationRegistry > "u" ? {
         register: ()=>{},
         unregister: ()=>{}
-    } : new FinalizationRegistry((t)=>r.__wbg_universe_free(t, 1));
+    } : new FinalizationRegistry((t)=>_.__wbg_universe_free(t, 1));
     let u = null;
     function v() {
-        return (u === null || u.buffer.detached === !0 || u.buffer.detached === void 0 && u.buffer !== r.memory.buffer) && (u = new DataView(r.memory.buffer)), u;
+        return (u === null || u.buffer.detached === !0 || u.buffer.detached === void 0 && u.buffer !== _.memory.buffer) && (u = new DataView(_.memory.buffer)), u;
     }
     function y(t, e) {
         return R(t >>> 0, e);
     }
     let b = null;
-    function a() {
-        return (b === null || b.byteLength === 0) && (b = new Uint8Array(r.memory.buffer)), b;
+    function f() {
+        return (b === null || b.byteLength === 0) && (b = new Uint8Array(_.memory.buffer)), b;
     }
     function I(t, e, n) {
         if (n === void 0) {
-            const c = f.encode(t), d = e(c.length, 1) >>> 0;
-            return a().subarray(d, d + c.length).set(c), h = c.length, d;
+            const c = a.encode(t), d = e(c.length, 1) >>> 0;
+            return f().subarray(d, d + c.length).set(c), h = c.length, d;
         }
-        let _ = t.length, o = e(_, 1) >>> 0;
-        const T = a();
+        let r = t.length, o = e(r, 1) >>> 0;
+        const D = f();
         let i = 0;
-        for(; i < _; i++){
+        for(; i < r; i++){
             const c = t.charCodeAt(i);
             if (c > 127) break;
-            T[o + i] = c;
+            D[o + i] = c;
         }
-        if (i !== _) {
-            i !== 0 && (t = t.slice(i)), o = n(o, _, _ = i + t.length * 3, 1) >>> 0;
-            const c = a().subarray(o + i, o + _), d = f.encodeInto(t, c);
-            i += d.written, o = n(o, _, i, 1) >>> 0;
+        if (i !== r) {
+            i !== 0 && (t = t.slice(i)), o = n(o, r, r = i + t.length * 3, 1) >>> 0;
+            const c = f().subarray(o + i, o + r), d = a.encodeInto(t, c);
+            i += d.written, o = n(o, r, i, 1) >>> 0;
         }
         return h = i, o;
     }
@@ -101,46 +101,46 @@ let __tla = (async ()=>{
         return g += e, g >= O && (l = new TextDecoder("utf-8", {
             ignoreBOM: !0,
             fatal: !0
-        }), l.decode(), g = e), l.decode(a().subarray(t, t + e));
+        }), l.decode(), g = e), l.decode(f().subarray(t, t + e));
     }
-    const f = new TextEncoder;
-    "encodeInto" in f || (f.encodeInto = function(t, e) {
-        const n = f.encode(t);
+    const a = new TextEncoder;
+    "encodeInto" in a || (a.encodeInto = function(t, e) {
+        const n = a.encode(t);
         return e.set(n), {
             read: t.length,
             written: n.length
         };
     });
-    let h = 0, r;
-    function B(t) {
-        r = t;
+    let h = 0, _;
+    function j(t) {
+        _ = t;
     }
     URL = globalThis.URL;
-    const s = await D({
+    const s = await T({
         "./game_of_life_bg.js": {
             __wbg_new_227d7c05414eb861: S,
             __wbg_stack_3b0d974bbf31e44f: U,
             __wbg_error_a6fa202b58aa1cd3: M,
-            __wbg___wbindgen_throw_9c75d47bf9e7731e: E,
+            __wbg___wbindgen_throw_bbadd78c1bac3a77: E,
             __wbindgen_init_externref_table: F
         }
-    }, A), p = s.memory, V = s.__wbg_universe_free, j = s.universe_cells, z = s.universe_height, C = s.universe_new, L = s.universe_tick, W = s.universe_width, N = s.__wbindgen_free, X = s.__wbindgen_malloc, Y = s.__wbindgen_realloc, $ = s.__wbindgen_externrefs, x = s.__wbindgen_start;
-    var q = Object.freeze({
+    }, A), p = s.memory, z = s.__wbg_universe_free, B = s.universe_cells, C = s.universe_height, L = s.universe_new, V = s.universe_tick, W = s.universe_width, N = s.__wbindgen_free, K = s.__wbindgen_malloc, X = s.__wbindgen_realloc, Y = s.__wbindgen_externrefs, x = s.__wbindgen_start;
+    var Z = Object.freeze({
         __proto__: null,
-        __wbg_universe_free: V,
-        __wbindgen_externrefs: $,
+        __wbg_universe_free: z,
+        __wbindgen_externrefs: Y,
         __wbindgen_free: N,
-        __wbindgen_malloc: X,
-        __wbindgen_realloc: Y,
+        __wbindgen_malloc: K,
+        __wbindgen_realloc: X,
         __wbindgen_start: x,
         memory: p,
-        universe_cells: j,
-        universe_height: z,
-        universe_new: C,
-        universe_tick: L,
+        universe_cells: B,
+        universe_height: C,
+        universe_new: L,
+        universe_tick: V,
         universe_width: W
     });
-    B(q);
+    j(Z);
     x();
     k = class {
         universe;
