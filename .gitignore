@@ -1,6 +1,8 @@
 /target
 **/*.rs.bk
-Cargo.lock
+# Cargo.lock IS tracked: this workspace builds deployed wasm binaries (an app),
+# so pinning deps keeps CI reproducible — an unpinned wasm-bindgen drifted to a
+# newer glue form than local and broke the Firefox patch in CI.
 bin/
 pkg/
 crates/*/pkg/

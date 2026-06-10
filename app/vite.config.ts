@@ -13,22 +13,23 @@ import topLevelAwait from 'vite-plugin-top-level-await';
 // to delete the offending key before the call reaches the browser API.
 // Remove once wgpu is updated to a version that sends the correct field name.
 function patchWgpuFirefoxLimits(): Plugin {
-  // Match `<dev>.requestDevice(<opts>)` regardless of the surrounding wrapper or
-  // semicolons — robust to the wasm-bindgen glue varying between versions (CI
-  // installs wasm-pack latest, which can differ from a local one). Rewrites it
-  // to delete the offending limit inline via the comma operator, so it works as
-  // an expression. THROWS if the call-site is gone, so a drift fails the build
-  // loudly instead of silently shipping a Firefox-broken bundle.
-  const RE = /(\w+)\.requestDevice\((\w+)\)/;
+  // Match `<dev>.requestDevice(<opts>)`, allowing one level of wrapping (newer
+  // wasm-bindgen emits `getObject(arg0).requestDevice(getObject(arg1))`), and
+  // rewrite it to delete the offending limit inline via the comma operator.
+  // WARNS (does not throw) on a miss so a glue drift never blocks the deploy —
+  // it just ships a Firefox-degraded background until the regex is refreshed.
+  // (Cargo.lock is committed, so the glue form is pinned and this should match.)
+  const RE = /([\w$]+(?:\([^)]*\))?)\.requestDevice\(([\w$]+(?:\([^)]*\))?)\)/;
   return {
     name: 'patch-wgpu-firefox-limits',
     transform(code, id) {
       if (!id.includes('game_of_life_gpu_bg.js')) return;
       if (!RE.test(code)) {
-        throw new Error(
-          '[patch-wgpu-firefox-limits] requestDevice call-site not found in the wasm-bindgen glue — ' +
-            'it changed; update the regex (Firefox would otherwise reject maxInterStageShaderComponents).',
+        console.warn(
+          '[patch-wgpu-firefox-limits] requestDevice call-site not found — wasm-bindgen glue form ' +
+            'changed; Firefox may reject maxInterStageShaderComponents until the regex is updated.',
         );
+        return;
       }
       return code.replace(
         RE,

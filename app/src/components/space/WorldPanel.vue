@@ -87,7 +87,9 @@ useLaneScroll({ el: panelRef, isActive, waypointId: props.waypointId });
   width: min(100vw, 1200px);
   /* pointer-events + opacity are driven inline by the focal falloff. */
   outline: none;
-  will-change: transform, opacity;
+  /* No permanent will-change: 5 viewport-sized layers blow Firefox's tiny
+     will-change budget (it's then ignored + warns). Transform/opacity still
+     composite on-demand during the fly. */
 }
 
 /* The active island is a native vertical scroll container, so tall content

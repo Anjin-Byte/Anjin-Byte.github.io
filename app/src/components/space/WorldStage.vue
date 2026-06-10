@@ -11,7 +11,7 @@ import AboutSection from '../sections/AboutSection.vue';
 // WorldStage hosts the transformed world plane. All panels coexist on the
 // plane (so the camera can fly past them); the plane's transform is the live
 // camera. Sections mount UNCHANGED inside their panels.
-const { cameraStyle, setViewport } = useCamera();
+const { cameraStyle, setViewport, isAnimating } = useCamera();
 
 const stageRef = ref<HTMLDivElement | null>(null);
 let resizeObserver: ResizeObserver | null = null;
@@ -32,7 +32,7 @@ onUnmounted(() => resizeObserver?.disconnect());
 
 <template>
   <div ref="stageRef" class="world-stage">
-    <div class="world-plane" :style="cameraStyle">
+    <div class="world-plane" :class="{ 'world-plane--animating': isAnimating }" :style="cameraStyle">
       <WorldPanel waypoint-id="hero"><HeroSection /></WorldPanel>
       <WorldPanel waypoint-id="projects"><ProjectsSection /></WorldPanel>
       <WorldPanel waypoint-id="resume"><ResumeSection /></WorldPanel>
@@ -61,6 +61,12 @@ onUnmounted(() => resizeObserver?.disconnect());
   height: 0;
   transform-origin: 0 0;
   pointer-events: none;
+}
+
+/* will-change only DURING a fly — a transient hint that's dropped at rest. A
+   permanent one promotes a constellation-sized layer that blows Firefox's
+   will-change budget (then it's ignored and warns). */
+.world-plane--animating {
   will-change: transform;
 }
 </style>
