@@ -18,11 +18,12 @@ export interface Camera {
 
 /**
  * A fixed location in the space.  `id` is the stable key (also the route
- * name); `route` is its shareable URL path; `(gx, gy)` is its position on the
- * abstract UNIT grid (hero (0,0), east (1,0), south (0,1), …) — the physical
- * world coordinate is `gridToWorld(wp, responsiveSpacing(viewport))`, so
- * spacing breathes with the viewport (see `space/layout.ts`). `zoom` overrides
- * the arrival zoom when present.
+ * name); `route` is its shareable URL path; `(gx, gy)` is its position in the
+ * constellation — FREE floats (arbitrary composition), not unit-grid integers.
+ * The physical world coordinate is `gridToWorld(wp, responsiveSpacing(viewport))`,
+ * so spacing breathes with the viewport (see `space/layout.ts`). `icon` is the
+ * destination glyph for the compass waymarker (an mdi-svg path from `@mdi/js`).
+ * `zoom` overrides the arrival zoom when present.
  *
  * Declared with `id: string` (loose) so the `WAYPOINTS` table can be a
  * `satisfies readonly Waypoint[]` literal and the strict `WaypointId` union is
@@ -34,5 +35,6 @@ export interface Waypoint {
   label: string;
   gx: number;
   gy: number;
+  icon: string;
   zoom?: number;
 }

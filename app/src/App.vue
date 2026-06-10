@@ -2,7 +2,7 @@
 import AppBackground from '@/components/layout/AppBackground.vue';
 import AppHeader from '@/components/layout/AppHeader.vue';
 import WorldStage from '@/components/space/WorldStage.vue';
-import DirectionalNav from '@/components/space/DirectionalNav.vue';
+import CompassNav from '@/components/space/CompassNav.vue';
 </script>
 
 <template>
@@ -10,7 +10,7 @@ import DirectionalNav from '@/components/space/DirectionalNav.vue';
     <AppBackground />
     <AppHeader />
     <WorldStage />
-    <DirectionalNav />
+    <CompassNav />
   </v-app>
 </template>
 

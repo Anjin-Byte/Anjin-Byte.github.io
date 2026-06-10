@@ -44,3 +44,37 @@ export const HORIZONTAL_DAMPING = 0.6;
 /** Accumulated horizontal scroll (px) to break to the east/west neighbour;
  *  below it the camera springs back to the lane on idle. */
 export const HORIZONTAL_BREAK_THRESHOLD = 300;
+
+// ── Waymarker compass (Phase 4) ──────────────────────────────────────────────
+
+/** Marker radius (CSS px) for the farthest island — the click-target floor.
+ *  Diameter `2·MARKER_MIN_R` stays a comfortable tap target. */
+export const MARKER_MIN_R = 22;
+
+/** Marker radius for the nearest island (size encodes proximity, inverted). */
+export const MARKER_MAX_R = 30;
+
+/** World-px distance below which an island is the *current* one — its marker is
+ *  suppressed (you're on it). */
+export const SUPPRESS_DIST = 40;
+
+/** World-px band above `SUPPRESS_DIST` over which a marker fades 0→1, so the
+ *  destination fades out on arrival and the origin fades in on departure. */
+export const FADE_BAND = 240;
+
+/** Spring/damping toward the bearing target per frame, in (0, 1] — the marker
+ *  "inertia". Lower = floatier. */
+export const COMPASS_ATTRACTION = 0.22;
+
+/** Relaxation passes per frame resolving overlaps + walls (n ≤ 5 → cheap). */
+export const COMPASS_ITERATIONS = 4;
+
+/** Box top inset (CSS px) so markers clear the header bar. */
+export const COMPASS_HEADER_INSET = 84;
+
+/** Box margin (CSS px) on the other edges. */
+export const COMPASS_EDGE_MARGIN = 18;
+
+/** Break-away angular tolerance (radians): a scroll/swipe breaks to the island
+ *  whose bearing is within this of the gesture direction (~60°). */
+export const BEARING_TOLERANCE = Math.PI / 3;

@@ -1,23 +1,31 @@
 // The constellation — the ONE place the spatial layout lives.
 //
-// Each waypoint sits on an abstract UNIT grid (gx, gy): hero at the origin,
-// neighbours one cell away on the compass. The physical world coordinate is
-// derived at runtime via `gridToWorld(wp, responsiveSpacing(viewport))`, so the
-// spacing scales with the viewport (see space/layout.ts). Adding a page = add
-// an entry here, a matching route in router/index.ts, and a <WorldPanel> in
-// WorldStage.vue.
+// Each waypoint sits in the constellation at a FREE position (gx, gy) — floats,
+// composed for aesthetics, not a rigid unit grid. The physical world coordinate
+// is derived at runtime via `gridToWorld(wp, responsiveSpacing(viewport))`, so
+// spacing scales with the viewport (see space/layout.ts). The compass derives
+// each marker's bearing/distance from these positions; `icon` is its glyph.
+// Adding a page = add an entry here, a matching route in router/index.ts, and a
+// <WorldPanel> in WorldStage.vue.
 //
 // `WaypointId` is DERIVED from this table (`as const`), so the table is the
 // single source of truth and the union can never drift from the data.
 
+import {
+  mdiHome,
+  mdiViewGridOutline,
+  mdiFileAccountOutline,
+  mdiEmailOutline,
+  mdiAccountOutline,
+} from '@mdi/js';
 import type { Waypoint } from '../types/space';
 
 export const WAYPOINTS = [
-  { id: 'hero', route: '/', label: 'Home', gx: 0, gy: 0 },
-  { id: 'projects', route: '/projects', label: 'Demos', gx: 1, gy: 0 },
-  { id: 'resume', route: '/resume', label: 'Resume', gx: -1, gy: 0 },
-  { id: 'contact', route: '/contact', label: 'Contact', gx: 0, gy: 1 },
-  { id: 'about', route: '/about', label: 'About', gx: 0, gy: -1 },
+  { id: 'hero', route: '/', label: 'Home', gx: 0, gy: 0, icon: mdiHome },
+  { id: 'projects', route: '/projects', label: 'Demos', gx: 1, gy: 0, icon: mdiViewGridOutline },
+  { id: 'resume', route: '/resume', label: 'Resume', gx: -1, gy: 0, icon: mdiFileAccountOutline },
+  { id: 'contact', route: '/contact', label: 'Contact', gx: 0, gy: 1, icon: mdiEmailOutline },
+  { id: 'about', route: '/about', label: 'About', gx: 0, gy: -1, icon: mdiAccountOutline },
 ] as const satisfies readonly Waypoint[];
 
 /** Strict union of valid waypoint ids, derived from the table above. */
@@ -34,29 +42,9 @@ export function findWaypoint(id: WaypointId): Waypoint {
   return BY_ID.get(id) ?? homeWaypoint;
 }
 
-/** The waypoint at an exact unit-grid cell, or `null` if none. */
-function findByGrid(gx: number, gy: number): Waypoint | null {
-  return WAYPOINTS.find((w) => w.gx === gx && w.gy === gy) ?? null;
-}
-
-/** The waypoint offset from `id` by `(dgx, dgy)` on the unit grid, or `null`.
- *  The grid topology is the navigation graph for break-away and the chevrons. */
-export function gridNeighbor(id: WaypointId, dgx: number, dgy: number): Waypoint | null {
-  const wp = findWaypoint(id);
-  return findByGrid(wp.gx + dgx, wp.gy + dgy);
-}
-
-/** Vertical neighbour (`dir -1` = up/north, `+1` = down/south), or `null`.
- *  hero has about (−1) and contact (+1); resume/projects have none. */
-export function verticalNeighbor(id: WaypointId, dir: -1 | 1): Waypoint | null {
-  return gridNeighbor(id, 0, dir);
-}
-
-/** Horizontal neighbour (`dir -1` = west, `+1` = east), or `null`.
- *  hero has resume (−1) and projects (+1); the others have none. */
-export function horizontalNeighbor(id: WaypointId, dir: -1 | 1): Waypoint | null {
-  return gridNeighbor(id, dir, 0);
-}
+// Neighbour lookup is no longer grid-based: the compass derives each island's
+// bearing/distance from the live camera (see space/compass.ts + useCompass.ts),
+// and break-away picks the nearest bearing (useLaneScroll.ts).
 
 /** Look up a waypoint by route path, or `null` if no route matches. */
 export function findByRoute(route: string): Waypoint | null {

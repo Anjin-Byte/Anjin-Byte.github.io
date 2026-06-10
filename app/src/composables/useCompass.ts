@@ -1,0 +1,155 @@
+import { onMounted, onUnmounted, ref, watch, type Ref } from 'vue';
+import { useRoute } from 'vue-router';
+import { useCamera } from './useCamera';
+import { WAYPOINTS } from '../space/waypoints';
+import { gridToWorld } from '../space/layout';
+import { bearingTo, worldDistance, markerRadius, bearingTarget, type Box } from '../space/compass';
+import { solveMarkers, type Marker } from '../space/markerSolver';
+import {
+  MARKER_MIN_R,
+  MARKER_MAX_R,
+  SUPPRESS_DIST,
+  FADE_BAND,
+  COMPASS_ATTRACTION,
+  COMPASS_ITERATIONS,
+  COMPASS_HEADER_INSET,
+  COMPASS_EDGE_MARGIN,
+} from '../space/layoutConfig';
+
+/** A renderable waymarker: resolved screen position, size, true bearing (for the
+ *  arrow), and fade opacity. */
+export interface MarkerView {
+  id: string;
+  route: string;
+  label: string;
+  icon: string;
+  x: number;
+  y: number;
+  radius: number;
+  bearing: number;
+  opacity: number;
+}
+
+function safeBox(vp: { w: number; h: number }): Box {
+  return {
+    minX: COMPASS_EDGE_MARGIN,
+    minY: COMPASS_HEADER_INSET,
+    maxX: vp.w - COMPASS_EDGE_MARGIN,
+    maxY: vp.h - COMPASS_EDGE_MARGIN,
+  };
+}
+
+const reducedMotion = (): boolean =>
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/**
+ * The waymarker compass: one marker per reachable island, derived live from
+ * `camera.value` (so it's calm while scrolling — `camera` doesn't move then —
+ * and sweeps during a fly). Each frame computes bearing/size/target, steps the
+ * constrained solver (rim-pull + repulsion + box containment), and exposes the
+ * resolved markers. The current island (distance below `SUPPRESS_DIST`) is
+ * dropped; markers in the fade band carry a sub-1 opacity. The rAF loop runs
+ * only while the camera animates or the solver hasn't settled.
+ */
+export function useCompass(): Ref<MarkerView[]> {
+  const camera = useCamera();
+  const route = useRoute();
+  const markers = ref<MarkerView[]>([]);
+  const prev = new Map<string, { x: number; y: number }>();
+  const reduced = reducedMotion();
+
+  function compute(snap: boolean): boolean {
+    const cam = camera.camera.value;
+    const vp = camera.viewport.value;
+    const sp = camera.spacing.value;
+    const box = safeBox(vp);
+    const center = { x: vp.w / 2, y: vp.h / 2 };
+
+    // Visible = every island except the current one (we're on it).
+    const visible = WAYPOINTS.map((wp) => {
+      const world = gridToWorld(wp, sp);
+      return { wp, dist: worldDistance(world, cam), bearing: bearingTo(world, cam, vp) };
+    }).filter((g) => g.dist > SUPPRESS_DIST);
+
+    const dists = visible.map((g) => g.dist);
+    const minD = dists.length ? Math.min(...dists) : 0;
+    const maxD = dists.length ? Math.max(...dists) : 1;
+
+    const input: Marker[] = visible.map((g) => {
+      const radius = markerRadius(g.dist, minD, maxD, MARKER_MIN_R, MARKER_MAX_R);
+      const target = bearingTarget(center, g.bearing, box, radius);
+      return { pos: prev.get(g.wp.id) ?? target, target, radius };
+    });
+
+    const resolved = solveMarkers(input, box, {
+      attraction: snap ? 1 : COMPASS_ATTRACTION,
+      iterations: COMPASS_ITERATIONS,
+    });
+
+    // Drop stale positions for islands that left the visible set (the current
+    // one), so re-entry starts fresh at its target rather than a stale spot.
+    const visibleIds = new Set(visible.map((g) => g.wp.id));
+    for (const id of [...prev.keys()]) if (!visibleIds.has(id)) prev.delete(id);
+
+    let settled = true;
+    markers.value = visible.map((g, i) => {
+      const p = resolved[i];
+      prev.set(g.wp.id, p);
+      const t = input[i].target;
+      if (Math.hypot(p.x - t.x, p.y - t.y) > 0.5) settled = false;
+      return {
+        id: g.wp.id,
+        route: g.wp.route,
+        label: g.wp.label,
+        icon: g.wp.icon,
+        x: p.x,
+        y: p.y,
+        radius: input[i].radius,
+        bearing: g.bearing,
+        opacity: Math.min(1, Math.max(0, (g.dist - SUPPRESS_DIST) / FADE_BAND)),
+      };
+    });
+    return settled;
+  }
+
+  let rafId = 0;
+  let running = false;
+
+  function frame(): void {
+    const settled = compute(false);
+    if (!camera.isAnimating.value && settled) {
+      running = false;
+      rafId = 0;
+      return;
+    }
+    rafId = requestAnimationFrame(frame);
+  }
+
+  function ensureRunning(): void {
+    if (reduced) {
+      compute(true); // snap — no animation under reduced-motion
+      return;
+    }
+    if (running) return;
+    running = true;
+    rafId = requestAnimationFrame(frame);
+  }
+
+  watch(
+    [
+      () => camera.camera.value.x,
+      () => camera.camera.value.y,
+      () => camera.viewport.value,
+      () => camera.spacing.value,
+      camera.isAnimating,
+      () => route.name,
+    ],
+    ensureRunning,
+  );
+  onMounted(() => (reduced ? compute(true) : ensureRunning()));
+  onUnmounted(() => {
+    if (rafId) cancelAnimationFrame(rafId);
+  });
+
+  return markers;
+}

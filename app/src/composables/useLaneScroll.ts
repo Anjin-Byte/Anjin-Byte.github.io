@@ -1,7 +1,9 @@
 import { onMounted, onUnmounted, type Ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useCamera } from './useCamera';
-import { verticalNeighbor, horizontalNeighbor, type WaypointId } from '../space/waypoints';
+import { WAYPOINTS, type WaypointId } from '../space/waypoints';
+import { gridToWorld } from '../space/layout';
+import { bearingTo, bearingNeighbor } from '../space/compass';
 import {
   overscrollDirection,
   stepBreakAccumulator,
@@ -19,6 +21,7 @@ import {
   HORIZONTAL_BIAS,
   HORIZONTAL_DAMPING,
   HORIZONTAL_BREAK_THRESHOLD,
+  BEARING_TOLERANCE,
 } from '../space/layoutConfig';
 
 /**
@@ -34,9 +37,9 @@ import {
  *    App.vue) suppresses the browser's two-finger back/forward swipe.
  *
  * The gesture resets after `ACCUM_RESET_MS` of idle, so each scroll re-decides
- * its axis. This complements the on-screen chevrons (DirectionalNav — the
- * primary, accessible, cross-browser path) and the header links; the fly snaps
- * under prefers-reduced-motion (existing panTo/fly behaviour).
+ * its axis. This complements the on-screen compass (CompassNav — the primary,
+ * accessible, cross-browser path) and the header links; the fly snaps under
+ * prefers-reduced-motion (existing panTo/fly behaviour).
  */
 export function useLaneScroll(opts: {
   el: Ref<HTMLElement | null>;
@@ -71,6 +74,21 @@ export function useLaneScroll(opts: {
       clearTimeout(idleTimer);
       idleTimer = null;
     }
+  }
+
+  // Break-away target: the island whose screen-bearing best matches the gesture
+  // direction (replaces the old grid vertical/horizontal neighbour lookup).
+  function breakToBearing(gestureBearing: number): boolean {
+    const cam = camera.camera.value;
+    const vp = camera.viewport.value;
+    const sp = camera.spacing.value;
+    const candidates = WAYPOINTS.filter((w) => w.id !== opts.waypointId).map((w) => ({
+      route: w.route,
+      bearing: bearingTo(gridToWorld(w, sp), cam, vp),
+    }));
+    const hit = bearingNeighbor(candidates, gestureBearing, BEARING_TOLERANCE);
+    if (hit) void router.push(hit.route);
+    return hit !== null;
   }
 
   function onWheel(e: WheelEvent): void {
@@ -111,13 +129,8 @@ export function useLaneScroll(opts: {
       if (broke) return;
       camera.snapTo(tugCameraX(laneX, accX, HORIZONTAL_DAMPING), laneY);
       const dir = horizontalBreakDir(accX, HORIZONTAL_BREAK_THRESHOLD);
-      if (dir !== 0) {
-        const neighbour = horizontalNeighbor(opts.waypointId, dir);
-        if (neighbour) {
-          broke = true;
-          void router.push(neighbour.route);
-        }
-      }
+      // dir > 0 = scroll right → bearing 0 (east); dir < 0 = left → π (west).
+      if (dir !== 0 && breakToBearing(dir > 0 ? 0 : Math.PI)) broke = true;
     } else if (axis === 'vertical') {
       const sdir = overscrollDirection(
         { scrollTop: el.scrollTop, scrollHeight: el.scrollHeight, clientHeight: el.clientHeight },
@@ -125,13 +138,8 @@ export function useLaneScroll(opts: {
       );
       const stepped = stepBreakAccumulator(vacc, sdir, e.deltaY, BREAK_THRESHOLD);
       vacc = stepped.acc;
-      if (stepped.fire !== 0) {
-        const neighbour = verticalNeighbor(opts.waypointId, stepped.fire);
-        if (neighbour) {
-          broke = true;
-          void router.push(neighbour.route);
-        }
-      }
+      // fire > 0 = over-scroll down → bearing π/2; fire < 0 = up → −π/2.
+      if (stepped.fire !== 0 && breakToBearing(stepped.fire > 0 ? Math.PI / 2 : -Math.PI / 2)) broke = true;
     }
   }
 

@@ -7,7 +7,6 @@ import {
   horizontalBreakDir,
   type ScrollEdgeState,
 } from '../space/breakAway';
-import { verticalNeighbor, horizontalNeighbor } from '../space/waypoints';
 
 function assertEq<T>(actual: T, expected: T, message: string): void {
   const a = JSON.stringify(actual);
@@ -63,16 +62,6 @@ function testAccumulator(): void {
   assertEq(zeroed.fire, 0, 'dir 0 never fires');
 }
 
-// The unit-grid topology is the navigation graph.
-function testVerticalNeighbor(): void {
-  assertEq(verticalNeighbor('hero', 1)?.id, 'contact', 'hero down → contact');
-  assertEq(verticalNeighbor('hero', -1)?.id, 'about', 'hero up → about');
-  assertEq(verticalNeighbor('contact', 1), null, 'contact down → none (no gy=2)');
-  assertEq(verticalNeighbor('about', -1), null, 'about up → none');
-  assertEq(verticalNeighbor('resume', 1), null, 'resume (horizontal lane) → none');
-  assertEq(verticalNeighbor('projects', -1), null, 'projects (horizontal lane) → none');
-}
-
 // Biased dominant-axis lock: below threshold undetermined; horizontal only when
 // it dominates by the bias, so a wobbly vertical scroll stays vertical.
 function testLockedAxis(): void {
@@ -101,22 +90,12 @@ function testHorizontalBreakDir(): void {
   assertEq(horizontalBreakDir(0, D), 0, 'no scroll → no break');
 }
 
-// The unit-grid topology is the navigation graph (horizontal axis).
-function testHorizontalNeighbor(): void {
-  assertEq(horizontalNeighbor('hero', 1)?.id, 'projects', 'hero east → projects');
-  assertEq(horizontalNeighbor('hero', -1)?.id, 'resume', 'hero west → resume');
-  assertEq(horizontalNeighbor('projects', 1), null, 'projects east → none (no gx=2)');
-  assertEq(horizontalNeighbor('contact', 1), null, 'contact (vertical lane) → none');
-}
-
 function run(): void {
   testOverscrollDirection();
   testAccumulator();
-  testVerticalNeighbor();
   testLockedAxis();
   testTugCameraX();
   testHorizontalBreakDir();
-  testHorizontalNeighbor();
   // eslint-disable-next-line no-console
   console.log('breakAway.test.ts passed');
 }
