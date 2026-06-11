@@ -5,6 +5,7 @@ import { contactLinks, profile, skills } from '../../data/profile';
 const heroLinks = contactLinks.filter((link) =>
   link.label === 'Email' || link.label === 'GitHub' || link.label === 'LinkedIn'
 );
+const locationLink = contactLinks.find((link) => link.label === 'Location');
 </script>
 
 <template>
@@ -12,17 +13,23 @@ const heroLinks = contactLinks.filter((link) =>
     <v-container class="hero-container">
       <div class="hero-frame glass-panel glass-panel--strong">
         <div class="hero-main">
-          <span class="hero-kicker glass-chip section-kicker"><v-icon :icon="mdiMapMarkerOutline" class="hero-location-icon" />{{ profile.location }}</span>
+          <a
+            :href="locationLink?.href"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="hero-kicker glass-chip section-kicker"
+            :aria-label="`${profile.location} — open in maps`"
+          ><v-icon :icon="mdiMapMarkerOutline" class="hero-location-icon" />{{ profile.location }}</a>
           <h1 class="hero-name section-heading">{{ profile.name }}</h1>
           <p class="hero-tagline">{{ profile.tagline }}</p>
           <p class="hero-bio">{{ profile.bio }}</p>
 
           <div class="hero-actions">
-            <a href="#projects" class="hero-link hero-link--primary">
+            <router-link to="/projects" class="hero-link paper-key paper-key--primary">
               View selected work
               <v-icon :icon="mdiArrowRight" class="hero-link-icon" />
-            </a>
-            <a href="#resume" class="hero-link">Resume</a>
+            </router-link>
+            <router-link to="/resume" class="hero-link paper-key">Resume</router-link>
           </div>
         </div>
 
@@ -87,6 +94,17 @@ const heroLinks = contactLinks.filter((link) =>
 
 .hero-kicker {
   margin-bottom: 1.2rem;
+  text-decoration: none;
+  transition: color 140ms ease;
+}
+
+.hero-kicker:hover {
+  color: var(--theme-text-primary);
+}
+
+.hero-kicker:focus-visible {
+  outline: 2px solid var(--theme-accent-ring);
+  outline-offset: 2px;
 }
 
 .hero-location {
@@ -132,28 +150,13 @@ const heroLinks = contactLinks.filter((link) =>
   gap: 0.9rem;
 }
 
+/* Material + states come from .paper-key / .paper-key--primary (App.vue);
+   this owns layout only. */
 .hero-link {
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
-  text-decoration: none;
   padding: 0.8rem 1.05rem;
-  border-radius: 999px;
-  color: var(--theme-text-primary);
-  border: 1px solid color-mix(in oklab, var(--theme-grid-border) 56%, white 6%);
-  background: color-mix(in oklab, var(--theme-surface) 72%, transparent);
-  transition: transform 150ms ease, border-color 150ms ease, color 150ms ease;
-}
-
-.hero-link--primary {
-  background: color-mix(in oklab, var(--theme-surface) 82%, var(--theme-accent) 18%);
-}
-
-.hero-link:hover,
-.hero-link:focus-visible {
-  transform: translateY(-1px);
-  border-color: var(--theme-grid-border);
-  outline: none;
 }
 
 .hero-link-icon {

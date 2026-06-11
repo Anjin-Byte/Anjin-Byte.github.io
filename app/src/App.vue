@@ -78,7 +78,18 @@ import CompassNav from '@/components/space/CompassNav.vue';
   --island-edge: color-mix(in oklab, var(--theme-surface) 90%, var(--theme-ink) 10%);
   --shadow-1: rgba(54, 48, 40, 0.12); /* contact: tight, slightly stronger */
   --shadow-2: rgba(54, 48, 40, 0.08); /* cast: soft, faint */
-  --island-lip: inset 0 1px 0 rgba(255, 255, 255, 0.55); /* lit top edge */
+  /* The cut edge of the sheet, given thickness: top face lit, bottom face in
+     shadow. Expressed as a perceptual lightness delta (--cut) from the sheet's
+     OWN fill (not the field), so both themes get the SAME perceived edge depth
+     and the OKLab [0,1] clamp handles the mode asymmetry for free: in light the
+     lit face hits the white ceiling and becomes a whisper while the shadow
+     carries it; in dark both faces have headroom. Keeping the origin's a/b
+     tints the edge like lit/shadowed paper (never a glassy pure-white spec).
+     One knob — --cut — tunes the edge across every surface and both themes. */
+  --cut: 0.05;
+  --island-lip:
+    inset 0  1px 0 oklab(from var(--island-fill) calc(l + var(--cut)) a b),
+    inset 0 -1px 0 oklab(from var(--island-fill) calc(l - var(--cut)) a b);
   --elev-1: 0 1px 2px var(--shadow-1), 0 6px 18px var(--shadow-2);  /* resting */
   --elev-2: 0 2px 4px var(--shadow-1), 0 14px 34px var(--shadow-2); /* hero */
   --well-recess: color-mix(in oklab, var(--theme-surface) 96%, var(--theme-ink) 4%);
@@ -87,6 +98,14 @@ import CompassNav from '@/components/space/CompassNav.vue';
      wash on dark) — so one token, no per-mode override. Pairs with
      --island-edge; no shadow, because depth cues this small read as grime. */
   --badge-fill: color-mix(in oklab, var(--theme-ink) 6%, transparent);
+
+  /* Pressable keys (links, buttons, the active toggle segment): cut from the
+     same paper, they rest proud and sink IN on :active. Hover warms the fill a
+     step; the accent variant tints toward --theme-accent. All derive from
+     --island-fill / --theme-accent, so they track the theme — no per-mode dup. */
+  --key-hover-fill: color-mix(in oklab, var(--island-fill) 93%, var(--theme-ink) 7%);
+  --key-primary-fill: color-mix(in oklab, var(--island-fill) 82%, var(--theme-accent) 18%);
+  --key-primary-hover: color-mix(in oklab, var(--island-fill) 76%, var(--theme-accent) 24%);
 }
 
 /*
@@ -208,6 +227,71 @@ body {
   line-height: 1;
 }
 
+/* ── Pressable keys ───────────────────────────────────────────────────────
+   The interactive member of the paper family: rests raised (the cut edge),
+   sinks into a recess on :active — "the press." Consuming components own
+   layout (padding, size, gap); these own material + state only. Focus is an
+   explicit ring, never depth alone (a11y — the lesson neumorphism skipped). */
+.paper-key {
+  background: var(--island-fill);
+  border: 1px solid var(--island-edge);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--island-lip);
+  color: var(--theme-text-primary);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease, box-shadow 110ms ease;
+}
+.paper-key:hover {
+  background: var(--key-hover-fill);
+  border-color: var(--theme-grid-border);
+}
+.paper-key:active {
+  box-shadow: inset 0 1px 2px var(--shadow-1);
+}
+.paper-key:focus-visible {
+  outline: 2px solid var(--theme-accent-ring);
+  outline-offset: 2px;
+}
+
+/* Accent call-to-action: tinted fill + a touch of lift; same press. */
+.paper-key--primary {
+  background: var(--key-primary-fill);
+  box-shadow: var(--island-lip), var(--elev-1);
+}
+.paper-key--primary:hover {
+  background: var(--key-primary-hover);
+  border-color: var(--theme-grid-border);
+}
+.paper-key--primary:active {
+  box-shadow: inset 0 1px 2px var(--shadow-1);
+}
+
+/* Ghost key: flush until touched (icon buttons in a tray, inactive segments).
+   No resting fill/edge/lip — just a hover wash + the press. Self-contained. */
+.paper-key--ghost {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  box-shadow: none;
+  color: var(--theme-text-tertiary);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 110ms ease;
+}
+.paper-key--ghost:hover {
+  background: var(--key-hover-fill);
+  border-color: var(--island-edge);
+  color: var(--theme-text-primary);
+}
+.paper-key--ghost:active {
+  box-shadow: inset 0 1px 2px var(--shadow-1);
+}
+.paper-key--ghost:focus-visible {
+  outline: 2px solid var(--theme-accent-ring);
+  outline-offset: 2px;
+}
+
 .section-kicker {
   align-self: start;
   color: var(--theme-text-secondary);
@@ -237,16 +321,16 @@ body {
 }
 
 /* Dark mode: a raised object catches more light, so the plate rides LIGHTER
-   than the deep field and the edge is a lit rim; shadows go near-black and
-   stronger (low-L surfaces need more shadow to read). The lit lip warms toward
-   the surface rather than pure white to avoid a glassy specular. The well
-   recedes to field level so it reads pressed back down to the page. */
+   than the deep field; shadows go near-black and stronger (low-L surfaces need
+   more shadow to read). Both --well-recess and the cut edge need NO override —
+   they derive from --island-fill (+ --cut) in :root and `var()` resolves
+   lazily, so they track this mode's fill on their own. The well sits a faint
+   step below the plate (≈ΔL 0.05), not on the field floor — the inset shadow
+   carries the recess, so the fill needn't go all the way dark. */
 html[data-theme-mode="dark"] {
   --island-fill: color-mix(in oklab, var(--theme-surface) 88%, var(--theme-ink) 12%);
   --island-edge: color-mix(in oklab, var(--theme-surface) 80%, white 8%);
   --shadow-1: rgba(0, 0, 0, 0.55);
   --shadow-2: rgba(0, 0, 0, 0.40);
-  --island-lip: inset 0 1px 0 color-mix(in oklab, var(--theme-surface) 72%, white 16%);
-  --well-recess: var(--theme-surface);
 }
 </style>

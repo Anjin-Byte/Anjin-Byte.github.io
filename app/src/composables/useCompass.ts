@@ -11,7 +11,6 @@ import {
   COMPASS_STIFFNESS,
   COMPASS_FRICTION,
   COMPASS_ITERATIONS,
-  COMPASS_HEADER_INSET,
   COMPASS_EDGE_MARGIN,
 } from '../space/layoutConfig';
 import {
@@ -39,7 +38,7 @@ export interface MarkerView {
 function safeBox(vp: { w: number; h: number }): Box {
   return {
     minX: COMPASS_EDGE_MARGIN,
-    minY: COMPASS_HEADER_INSET,
+    minY: COMPASS_EDGE_MARGIN,
     maxX: vp.w - COMPASS_EDGE_MARGIN,
     maxY: vp.h - COMPASS_EDGE_MARGIN,
   };

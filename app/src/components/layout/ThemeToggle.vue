@@ -29,12 +29,14 @@ const { preference } = useThemePreference();
 </template>
 
 <style scoped>
+/* A recessed track cut into the chrome; the active mode is a raised key sitting
+   in the groove (accent-tinted), inactive segments sit flush. Matches the
+   pressable-key language in App.vue. */
 .theme-toggle {
-  background: color-mix(in oklab, var(--theme-surface) 74%, transparent) !important;
-  border: 1px solid color-mix(in oklab, var(--theme-grid-border) 55%, white 8%);
-  border-radius: 999px;
-  backdrop-filter: blur(10px) saturate(1.05);
-  -webkit-backdrop-filter: blur(10px) saturate(1.05);
+  background: var(--well-recess) !important;
+  border: 1px solid var(--island-edge);
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 1px 2px var(--shadow-1);
   margin-inline-start: 8px;
   padding: 2px;
 }
@@ -42,6 +44,7 @@ const { preference } = useThemePreference();
 .theme-toggle :deep(.v-btn) {
   color: var(--theme-text-tertiary) !important;
   opacity: 1 !important;
+  border-radius: var(--radius-pill) !important;
   transition:
     color 160ms ease,
     background-color 160ms ease,
@@ -54,8 +57,8 @@ const { preference } = useThemePreference();
 
 .theme-toggle :deep(.v-btn--active) {
   color: var(--theme-text-primary) !important;
-  background: color-mix(in oklab, var(--theme-grid-accent) 24%, var(--theme-surface) 76%) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  background: var(--key-primary-fill) !important;
+  box-shadow: var(--island-lip) !important;
 }
 
 .theme-toggle :deep(.v-icon) {

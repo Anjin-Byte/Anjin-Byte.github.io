@@ -62,8 +62,8 @@ const projectIndex: ProjectIndexItem[] = rawProjectIndex.map((project) => ({
             :href="link.href"
             target="_blank"
             rel="noopener noreferrer"
-            class="project-link"
-            :class="{ 'project-link--demo': link.kind === 'demo' }"
+            class="project-link paper-key"
+            :class="{ 'paper-key--primary': link.kind === 'demo' }"
             :aria-label="link.ariaLabel"
           >
             <v-icon :icon="link.icon" />
@@ -88,7 +88,7 @@ const projectIndex: ProjectIndexItem[] = rawProjectIndex.map((project) => ({
                 :href="link.href"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="project-item-link"
+                class="project-item-link paper-key--ghost"
                 :class="{ 'project-item-link--demo': link.kind === 'demo' }"
                 :aria-label="link.ariaLabel"
               >
@@ -186,28 +186,13 @@ const projectIndex: ProjectIndexItem[] = rawProjectIndex.map((project) => ({
   gap: 0.45rem;
 }
 
+/* Material + states from .paper-key (demo links also carry .paper-key--primary);
+   layout only here. */
 .project-link {
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
-  text-decoration: none;
-  color: var(--theme-text-primary);
   padding: 0.8rem 1rem;
-  border-radius: 999px;
-  border: 1px solid color-mix(in oklab, var(--theme-grid-border) 56%, white 7%);
-  background: color-mix(in oklab, var(--theme-surface) 70%, transparent);
-  transition: transform 150ms ease, border-color 150ms ease;
-}
-
-.project-link:hover,
-.project-link:focus-visible {
-  transform: translateY(-1px);
-  border-color: var(--theme-grid-border);
-  outline: none;
-}
-
-.project-link--demo {
-  background: color-mix(in oklab, var(--theme-surface) 74%, var(--theme-accent) 12%);
 }
 
 .project-feature-actions {
@@ -254,16 +239,13 @@ const projectIndex: ProjectIndexItem[] = rawProjectIndex.map((project) => ({
   letter-spacing: -0.02em;
 }
 
+/* Ghost key (flush until touched) from .paper-key--ghost; size + centring here. */
 .project-item-link {
   width: 2rem;
   height: 2rem;
-  border-radius: 999px;
-  color: var(--theme-text-tertiary);
-  text-decoration: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: color 120ms ease-out, background-color 120ms ease-out, transform 120ms ease-out;
 }
 
 .project-item-link :deep(.v-icon) {
@@ -273,28 +255,21 @@ const projectIndex: ProjectIndexItem[] = rawProjectIndex.map((project) => ({
   line-height: 1;
 }
 
+/* A shallow groove cut into the card, holding the ghost icon keys. */
 .project-item-links {
   display: inline-flex;
   align-items: center;
   gap: 0.2rem;
   padding: 0.18rem;
-  border-radius: 999px;
-  border: 1px solid color-mix(in oklab, var(--theme-grid-border) 48%, white 8%);
-  background: color-mix(in oklab, var(--theme-surface) 76%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in oklab, white 24%, transparent);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--island-edge);
+  background: var(--well-recess);
+  box-shadow: inset 0 1px 2px var(--shadow-1);
 }
 
-.project-item-link:hover,
-.project-item-link:focus-visible {
-  color: var(--theme-text-primary);
-  background: color-mix(in oklab, var(--theme-surface) 82%, white 6%);
-  transform: translateY(0);
-  outline: none;
-}
-
+/* Demo icon rests a touch darker so it reads as the primary action. */
 .project-item-link--demo {
   color: var(--theme-text-primary);
-  background: color-mix(in oklab, var(--theme-surface) 78%, var(--theme-accent) 10%);
 }
 
 .project-item-blurb {

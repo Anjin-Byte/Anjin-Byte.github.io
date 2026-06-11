@@ -69,10 +69,10 @@ export const COMPASS_FRICTION = 0.7;
 /** Relaxation passes per frame resolving overlaps + walls (n ≤ 5 → cheap). */
 export const COMPASS_ITERATIONS = 6;
 
-/** Box top inset (CSS px) so markers clear the header bar. */
-export const COMPASS_HEADER_INSET = 84;
-
-/** Box margin (CSS px) on the other edges. */
+/** Box margin (CSS px) on all four edges of the compass solver box. The top
+ *  formerly reserved an 84px `COMPASS_HEADER_INSET` for the app-bar; that bar
+ *  dissolved into floating corner chrome (wordmark + theme/menu) that sits
+ *  z-above the compass, so the top is now a normal edge like the others. */
 export const COMPASS_EDGE_MARGIN = 18;
 
 /** Break-away angular tolerance (radians): a scroll/swipe breaks to the island

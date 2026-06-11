@@ -16,7 +16,7 @@ defineProps<{
       :aria-label="link.label"
       target="_blank"
       rel="noopener noreferrer"
-      class="contact-link"
+      class="contact-link paper-key"
     >
       <v-icon :icon="link.icon" class="contact-icon" />
       <span class="contact-text">{{ link.display ?? link.label }}</span>
@@ -37,33 +37,20 @@ defineProps<{
   justify-content: center;
 }
 
+/* Material (fill, edge, cut, press, focus ring) comes from .paper-key in
+   App.vue; this owns only layout + the quieter resting ink colour. */
 .contact-link {
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
   color: var(--theme-text-secondary);
-  text-decoration: none;
   font-size: 0.88rem;
   padding: 0.7rem 0.95rem;
-  border-radius: 999px;
-  border: 1px solid color-mix(in oklab, var(--theme-grid-border) 52%, white 8%);
-  background: color-mix(in oklab, var(--theme-surface) 72%, transparent);
-  backdrop-filter: blur(10px) saturate(1.04);
-  -webkit-backdrop-filter: blur(10px) saturate(1.04);
-  transition: color 120ms ease-out, border-color 120ms ease-out, transform 120ms ease-out;
 }
 
 .contact-link:hover,
 .contact-link:focus-visible {
   color: var(--theme-text-primary);
-  border-color: var(--theme-grid-border);
-  transform: translateY(-1px);
-  outline: none;
-}
-
-.contact-link:focus-visible {
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
 
 .contact-icon {

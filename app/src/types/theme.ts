@@ -113,7 +113,13 @@ export const DARK_THEME: ThemePalette = {
   grain_intensity: 0.008,             // subtle dither — enough to break banding
 
   ink_secondary_t: 0.78,              // same proportions as light
-  ink_tertiary_t:  0.54,
+  // Dark-only: most text now sits on islands (--island-fill, L≈0.26), not the
+  // bare field, so tertiary needs a higher t than light's 0.54 to keep its
+  // intended ~3:1 metadata contrast there (→ 3.58:1 on islands vs 3.03 at 0.54).
+  // Future tier tuning should measure against the island, not --surface.
+  // GUARDRAIL: low tiers must not sit on accent keys in dark — tertiary on
+  // --key-primary is ≈2.28:1; accent keys (hero CTA, demo links) use primary text.
+  ink_tertiary_t:  0.60,
   // Muted purple — OKLCH(L, C, H).  H=305° is magenta-leaning purple: only
   // ~50° rotation from the light-mode rose, so the two modes feel like a
   // transposition of the same harmonic family rather than different brands.

@@ -47,6 +47,9 @@ function go(route: string): void {
   pointer-events: none;
 }
 
+/* A round paper token on the topmost layer (above the islands), so it earns
+   --elev-2. Opaque cut-paper stock — no glass — which also reads more legibly
+   over the living grid. Presses in on click; explicit focus ring restored. */
 .compass__marker {
   position: absolute;
   left: 0;
@@ -56,24 +59,26 @@ function go(route: string): void {
   padding: 0;
   border-radius: 50%;
   color: var(--theme-ink-secondary);
-  background: color-mix(in oklab, var(--theme-surface) 82%, transparent);
-  border: 1px solid color-mix(in oklab, var(--theme-grid-border) 58%, white 8%);
-  backdrop-filter: blur(10px) saturate(1.05);
-  -webkit-backdrop-filter: blur(10px) saturate(1.05);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 8px 22px rgba(0, 0, 0, 0.1);
+  background: var(--island-fill);
+  border: 1px solid var(--island-edge);
+  box-shadow: var(--island-lip), var(--elev-2);
   cursor: pointer;
-  transition: color 0.18s ease, box-shadow 0.18s ease;
+  transition: color 0.18s ease, background-color 0.18s ease, box-shadow 0.14s ease;
 }
 
-.compass__marker:hover,
+.compass__marker:hover {
+  color: var(--theme-ink);
+  background: var(--key-hover-fill);
+}
+
+.compass__marker:active {
+  box-shadow: inset 0 1px 2px var(--shadow-1);
+}
+
 .compass__marker:focus-visible {
   color: var(--theme-ink);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    0 10px 26px rgba(0, 0, 0, 0.16);
-  outline: none;
+  outline: 2px solid var(--theme-accent-ring);
+  outline-offset: 2px;
 }
 
 /* A full-size layer rotated to the true bearing; its triangle sits just past the
