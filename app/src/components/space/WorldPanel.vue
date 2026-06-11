@@ -1,22 +1,27 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { findWaypoint, type WaypointId } from '../../space/waypoints';
+import { panelDomId, type WaypointId } from '../../space/waypoints';
+import type { PanelNode } from '../../types/space';
 import { useCamera } from '../../composables/useCamera';
 import { useLaneScroll } from '../../composables/useLaneScroll';
 import { GESTURE_NAV_ENABLED } from '../../featureFlags';
 import { gridToWorld, focusWeight } from '../../space/layout';
 import { FOCUS_FLOOR, FOCUS_RADIUS_FRACTION, FOCUS_SCALE_MIN } from '../../space/layoutConfig';
 
-const props = defineProps<{ waypointId: WaypointId }>();
-const waypoint = findWaypoint(props.waypointId);
+// A panel hosts either a core section or a generated notebook-entry island. Both
+// supply a `node` (route + grid position + label) — the route is the active-state
+// and DOM-id key. `waypointId` is passed only for core sections (the gesture-nav
+// wiring is waypoint-only and feature-gated off).
+const props = defineProps<{ node: PanelNode; waypointId?: WaypointId }>();
 
 const { camera, viewport, spacing, setCaptureScroll } = useCamera();
 const route = useRoute();
-const isActive = computed(() => route.name === props.waypointId);
+const isActive = computed(() => route.path === props.node.route);
+const panelId = computed(() => panelDomId(props.node.route));
 
 // Physical position breathes with the viewport via responsive spacing.
-const world = computed(() => gridToWorld(waypoint, spacing.value));
+const world = computed(() => gridToWorld(props.node, spacing.value));
 
 // Focal falloff: crisp + interactive when centred under the camera; receding
 // (faded, slightly smaller, click-through) as it leaves the focus radius.
@@ -57,23 +62,24 @@ watch(isActive, (active) => {
 });
 
 // Gesture navigation (scroll/swipe break-away to a neighbour) is feature-gated
-// off for now — the compass + header links are the navigation. With the flag
-// false the bundler strips useLaneScroll (and the break-away math) from
-// production entirely. Native scroll WITHIN the island is unaffected (above).
-if (GESTURE_NAV_ENABLED) {
-  useLaneScroll({ el: panelRef, isActive, waypointId: props.waypointId });
+// off — the compass + header links are the navigation. With the flag false the
+// bundler strips useLaneScroll entirely. It's core-waypoint-only (entry islands
+// don't lane-scroll), so it's wired only when a waypointId is present.
+const waypointId = props.waypointId;
+if (GESTURE_NAV_ENABLED && waypointId) {
+  useLaneScroll({ el: panelRef, isActive, waypointId });
 }
 </script>
 
 <template>
   <section
-    :id="`panel-${waypointId}`"
+    :id="panelId"
     ref="panelRef"
     class="world-panel"
     :class="{ 'world-panel--scroll': isActive }"
     :style="style"
     :aria-current="isActive ? 'page' : undefined"
-    :aria-label="waypoint.label"
+    :aria-label="node.label"
     tabindex="-1"
     data-grid-ignore-click="true"
   >

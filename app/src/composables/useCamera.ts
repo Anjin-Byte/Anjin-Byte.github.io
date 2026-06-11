@@ -48,9 +48,12 @@ function initialCamera(): Camera {
 const cameraRef = ref<Camera>(initialCamera());
 const targetRef = ref<Camera>(initialCamera());
 const isAnimatingRef = ref(false);
-// The waypoint the camera is "parked" on. Drives re-centering on resize; null
-// once the user free-pans away (so a resize doesn't yank them back).
-const anchorRef = ref<WaypointId | null>(homeWaypoint.id);
+// The grid coordinate the camera is "parked" on (a core waypoint OR a notebook
+// entry). Drives re-centering on resize; null once the user free-pans away (so a
+// resize doesn't yank them back). Generalised from a WaypointId so dynamic entry
+// islands re-centre on resize exactly like the fixed waypoints.
+type Anchor = { gx: number; gy: number; zoom?: number };
+const anchorRef = ref<Anchor | null>({ gx: homeWaypoint.gx, gy: homeWaypoint.gy });
 
 // Vertical scroll within the captured island (CSS px). Owned by the active
 // WorldPanel's native scroll container; folded into the grid/coord offset below
@@ -117,12 +120,18 @@ function panTo(x: number, y: number, opts: { zoom?: number; snap?: boolean } = {
   startLoop();
 }
 
-function panToWaypoint(id: WaypointId, opts: { snap?: boolean } = {}): void {
-  anchorRef.value = id;
+/** Fly the camera to a grid coordinate — a core waypoint or a notebook entry —
+ *  parking the anchor there so a viewport resize re-centres on it. */
+function panToNode(node: Anchor, opts: { snap?: boolean } = {}): void {
+  anchorRef.value = node;
   captureScrollRef.value = 0; // arriving at an island lands at its top
+  const world = gridToWorld(node, spacing.value);
+  panTo(world.x, world.y, { zoom: node.zoom, snap: opts.snap });
+}
+
+function panToWaypoint(id: WaypointId, opts: { snap?: boolean } = {}): void {
   const wp = findWaypoint(id);
-  const world = gridToWorld(wp, spacing.value);
-  panTo(world.x, world.y, { zoom: wp.zoom, snap: opts.snap });
+  panToNode({ gx: wp.gx, gy: wp.gy, zoom: wp.zoom }, opts);
 }
 
 /** Detach from the parked waypoint (called when free-panning) so a viewport
@@ -144,11 +153,10 @@ function setCaptureScroll(px: number): void {
 // When spacing changes (viewport resize), the parked waypoint's WORLD position
 // moves — re-snap the camera to keep it centered. No-op when free-panning.
 watch(spacing, (sp) => {
-  const id = anchorRef.value;
-  if (id === null) return;
-  const wp = findWaypoint(id);
-  const world = gridToWorld(wp, sp);
-  snapTo(world.x, world.y, wp.zoom ?? cameraRef.value.zoom);
+  const node = anchorRef.value;
+  if (node === null) return;
+  const world = gridToWorld(node, sp);
+  snapTo(world.x, world.y, node.zoom ?? cameraRef.value.zoom);
 });
 
 const cameraStyle = computed(() => ({
@@ -179,6 +187,7 @@ export interface CameraController {
   worldOffsetDevicePx: ComputedRef<{ x: number; y: number }>;
   panTo(x: number, y: number, opts?: { zoom?: number; snap?: boolean }): void;
   panToWaypoint(id: WaypointId, opts?: { snap?: boolean }): void;
+  panToNode(node: { gx: number; gy: number; zoom?: number }, opts?: { snap?: boolean }): void;
   snapTo(x: number, y: number, zoom?: number): void;
   releaseAnchor(): void;
   setViewport(w: number, h: number): void;
@@ -195,6 +204,7 @@ export function useCamera(): CameraController {
     worldOffsetDevicePx,
     panTo,
     panToWaypoint,
+    panToNode,
     snapTo,
     releaseAnchor,
     setViewport,

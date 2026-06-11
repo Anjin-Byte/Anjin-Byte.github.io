@@ -38,3 +38,17 @@ export interface Waypoint {
   icon: string;
   zoom?: number;
 }
+
+/**
+ * The minimal shape a `WorldPanel` needs to position and address itself: a route
+ * (its coordinate / shareable URL), a grid position, and a label. Both a core
+ * `Waypoint` and a dynamic notebook-entry node satisfy it, so the same panel
+ * component hosts both the static sections and the generated entry islands.
+ */
+export interface PanelNode {
+  route: string;
+  gx: number;
+  gy: number;
+  label: string;
+  zoom?: number;
+}

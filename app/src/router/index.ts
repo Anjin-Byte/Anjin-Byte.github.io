@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 import { defineComponent } from 'vue';
 import { WAYPOINTS } from '../space/waypoints';
+import { notebookNodes } from '../space/notebookNodes';
 
 // Routes exist purely for addressability — deep links, back/forward, sharing.
 // They carry NO visible component: every panel is always mounted in WorldStage
@@ -10,6 +11,10 @@ const RouteCoordinate = defineComponent({ name: 'RouteCoordinate', render: () =>
 
 const routes: RouteRecordRaw[] = [
   ...WAYPOINTS.map((w) => ({ path: w.route, name: w.id, component: RouteCoordinate })),
+  // Notebook entries are coordinates too — generated from the markdown collection
+  // so each note is deep-linkable. Name is its route (unique) since slugs aren't
+  // in the static WaypointId union.
+  ...notebookNodes.map((n) => ({ path: n.route, name: n.route, component: RouteCoordinate })),
   // Unknown paths land at home rather than 404 — there is only one space.
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ];

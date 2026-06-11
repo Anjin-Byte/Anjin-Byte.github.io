@@ -17,6 +17,7 @@ import {
   mdiFileAccountOutline,
   mdiEmailOutline,
   mdiAccountOutline,
+  mdiNotebookOutline,
 } from '@mdi/js';
 import type { Waypoint } from '../types/space';
 
@@ -26,6 +27,7 @@ export const WAYPOINTS = [
   { id: 'resume', route: '/resume', label: 'Resume', gx: -1, gy: 0, icon: mdiFileAccountOutline },
   { id: 'contact', route: '/contact', label: 'Contact', gx: 0, gy: 1, icon: mdiEmailOutline },
   { id: 'about', route: '/about', label: 'About', gx: 0, gy: -1, icon: mdiAccountOutline },
+  { id: 'notebook', route: '/notebook', label: 'Notebook', gx: 1, gy: -1, icon: mdiNotebookOutline },
 ] as const satisfies readonly Waypoint[];
 
 /** Strict union of valid waypoint ids, derived from the table above. */
@@ -49,6 +51,17 @@ export function findWaypoint(id: WaypointId): Waypoint {
 /** Look up a waypoint by route path, or `null` if no route matches. */
 export function findByRoute(route: string): Waypoint | null {
   return BY_ROUTE.get(route) ?? null;
+}
+
+/**
+ * Stable DOM id for a panel keyed by its route — `/notebook/cut-paper` →
+ * `panel-notebook-cut-paper`, `/` → `panel-home`. The route is the one key both
+ * core waypoints and dynamic entry nodes share, so cameraSync can move focus to
+ * any panel on arrival regardless of which layer it belongs to.
+ */
+export function panelDomId(route: string): string {
+  const slug = route.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '');
+  return `panel-${slug || 'home'}`;
 }
 
 /**

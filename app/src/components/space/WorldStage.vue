@@ -7,11 +7,26 @@ import ProjectsSection from '../sections/ProjectsSection.vue';
 import ResumeSection from '../sections/ResumeSection.vue';
 import ContactSection from '../sections/ContactSection.vue';
 import AboutSection from '../sections/AboutSection.vue';
+import NotebookSection from '../sections/NotebookSection.vue';
+import NotebookPage from '../sections/NotebookPage.vue';
+import { findWaypoint } from '../../space/waypoints';
+import { notebookNodes } from '../../space/notebookNodes';
 
 // WorldStage hosts the transformed world plane. All panels coexist on the
 // plane (so the camera can fly past them); the plane's transform is the live
-// camera. Sections mount UNCHANGED inside their panels.
+// camera. Core sections mount in fixed-waypoint panels; notebook entries mount
+// in generated entry-coordinate panels (one per markdown note).
 const { cameraStyle, setViewport, isAnimating } = useCamera();
+
+// Static waypoint coordinates for the core section panels, resolved once.
+const coreNodes = {
+  hero: findWaypoint('hero'),
+  projects: findWaypoint('projects'),
+  resume: findWaypoint('resume'),
+  contact: findWaypoint('contact'),
+  about: findWaypoint('about'),
+  notebook: findWaypoint('notebook'),
+};
 
 const stageRef = ref<HTMLDivElement | null>(null);
 let resizeObserver: ResizeObserver | null = null;
@@ -54,11 +69,15 @@ onUnmounted(() => {
 <template>
   <div ref="stageRef" class="world-stage">
     <div class="world-plane" :class="{ 'world-plane--animating': isAnimating }" :style="cameraStyle">
-      <WorldPanel waypoint-id="hero"><HeroSection /></WorldPanel>
-      <WorldPanel waypoint-id="projects"><ProjectsSection /></WorldPanel>
-      <WorldPanel waypoint-id="resume"><ResumeSection /></WorldPanel>
-      <WorldPanel waypoint-id="contact"><ContactSection /></WorldPanel>
-      <WorldPanel waypoint-id="about"><AboutSection /></WorldPanel>
+      <WorldPanel :node="coreNodes.hero" waypoint-id="hero"><HeroSection /></WorldPanel>
+      <WorldPanel :node="coreNodes.projects" waypoint-id="projects"><ProjectsSection /></WorldPanel>
+      <WorldPanel :node="coreNodes.resume" waypoint-id="resume"><ResumeSection /></WorldPanel>
+      <WorldPanel :node="coreNodes.contact" waypoint-id="contact"><ContactSection /></WorldPanel>
+      <WorldPanel :node="coreNodes.about" waypoint-id="about"><AboutSection /></WorldPanel>
+      <WorldPanel :node="coreNodes.notebook" waypoint-id="notebook"><NotebookSection /></WorldPanel>
+      <WorldPanel v-for="entry in notebookNodes" :key="entry.slug" :node="entry">
+        <NotebookPage :entry="entry" />
+      </WorldPanel>
     </div>
   </div>
 </template>

@@ -2,6 +2,8 @@ import { createApp } from 'vue';
 import App from './App.vue';
 import { vuetify } from './plugins/vuetify';
 import { router, installCameraRouteSync } from './router';
+// KaTeX stylesheet for notebook math (the markdown pipeline renders to KaTeX HTML).
+import 'katex/dist/katex.min.css';
 
 const app = createApp(App).use(vuetify).use(router);
 
