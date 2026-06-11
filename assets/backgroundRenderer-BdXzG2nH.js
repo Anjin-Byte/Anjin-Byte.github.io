@@ -46,15 +46,15 @@
         });
     }
     const v = 128;
-    function ee(e, t, r, a) {
+    function ee(e, t, r, s) {
         if (!Array.isArray(e)) return [];
-        const d = a ?? Date.now(), o = [];
+        const d = s ?? Date.now(), a = [];
         for (const i of e){
-            if (o.length >= r) break;
+            if (a.length >= r) break;
             const u = t(i, d);
-            u && o.push(u);
+            u && a.push(u);
         }
-        return o;
+        return a;
     }
     const te = new Set([
         "minor",
@@ -69,7 +69,7 @@
     function D(e, t, r) {
         return Math.min(r, Math.max(t, e));
     }
-    function k(e) {
+    function A(e) {
         return typeof e != "number" || !Number.isFinite(e) ? null : Math.trunc(e);
     }
     function ne() {
@@ -78,19 +78,19 @@
     function oe(e) {
         return typeof e == "string" && te.has(e) ? e : "both";
     }
-    function se(e) {
-        const t = e && typeof e == "object" ? e : {}, r = typeof t.style == "string" && re.has(t.style) ? t.style : "none", a = D(k(t.widthCells) ?? 1, 1, 4), d = typeof t.opacity == "number" ? t.opacity : 1, o = D(d, 0, 1), i = {
+    function ae(e) {
+        const t = e && typeof e == "object" ? e : {}, r = typeof t.style == "string" && re.has(t.style) ? t.style : "none", s = D(A(t.widthCells) ?? 1, 1, 4), d = typeof t.opacity == "number" ? t.opacity : 1, a = D(d, 0, 1), i = {
             style: r,
-            widthCells: a,
-            opacity: o
+            widthCells: s,
+            opacity: a
         };
         if (r === "fade") {
             const u = typeof t.fadeStrength == "number" ? t.fadeStrength : .6;
             i.fadeStrength = D(u, 0, 1);
         }
-        return r === "noted" && (i.notePitchCells = Math.max(1, k(t.notePitchCells) ?? 2)), (r === "bold-major" || r === "noted") && (i.hideInteriorBorder = typeof t.hideInteriorBorder == "boolean" ? t.hideInteriorBorder : !1), i;
+        return r === "noted" && (i.notePitchCells = Math.max(1, A(t.notePitchCells) ?? 2)), (r === "bold-major" || r === "noted") && (i.hideInteriorBorder = typeof t.hideInteriorBorder == "boolean" ? t.hideInteriorBorder : !1), i;
     }
-    function ae(e) {
+    function se(e) {
         return typeof e == "boolean" ? e : !0;
     }
     function $(e, t) {
@@ -98,18 +98,18 @@
     }
     function H(e, t = Date.now()) {
         if (!e || typeof e != "object") return null;
-        const r = e, a = k(r.x1), d = k(r.y1), o = k(r.x2), i = k(r.y2);
-        if (a === null || d === null || o === null || i === null) return null;
-        const u = Math.min(a, o), s = Math.max(a, o), z = Math.min(d, i), m = Math.max(d, i);
+        const r = e, s = A(r.x1), d = A(r.y1), a = A(r.x2), i = A(r.y2);
+        if (s === null || d === null || a === null || i === null) return null;
+        const u = Math.min(s, a), o = Math.max(s, a), I = Math.min(d, i), m = Math.max(d, i);
         return {
             id: typeof r.id == "string" && r.id.length > 0 ? r.id : ne(),
             x1: u,
-            y1: z,
-            x2: s,
+            y1: I,
+            x2: o,
             y2: m,
             mode: oe(r.mode),
-            edge: se(r.edge),
-            enabled: ae(r.enabled),
+            edge: ae(r.edge),
+            enabled: se(r.enabled),
             createdAt: $(r.createdAt, t),
             updatedAt: $(r.updatedAt, t)
         };
@@ -133,9 +133,9 @@
             if (!r) return {
                 error: "Invalid payload"
             };
-            const a = this.items.filter((d)=>d.id !== r.id);
+            const s = this.items.filter((d)=>d.id !== r.id);
             return this.items = this.normalizeAll([
-                ...a,
+                ...s,
                 r
             ]), {};
         }
@@ -144,12 +144,12 @@
             if (!r) return {
                 error: "Invalid payload"
             };
-            const a = this.items.findIndex((o)=>o.id === r.id);
-            if (a < 0) return {
+            const s = this.items.findIndex((a)=>a.id === r.id);
+            if (s < 0) return {
                 error: `Item ${r.id} not found`
             };
             const d = this.items.slice();
-            return d[a] = r, this.items = this.normalizeAll(d), {};
+            return d[s] = r, this.items = this.normalizeAll(d), {};
         }
         remove(t) {
             return this.items = this.items.filter((r)=>r.id !== t), this.items;
@@ -163,24 +163,24 @@
             super(H, ie);
         }
     }
-    const le = q("CpuRenderer"), U = 5, ue = 4279175690, fe = 4294921596, V = 4278190080;
+    const le = q("CpuRenderer"), U = 5, ue = 4279175690, fe = 4294921596, X = 4278190080;
     async function me(e) {
         const t = e.getContext("2d"), { WasmBridge: r } = await import("./index-BC3rHiu_.js").then(async (m)=>{
             await m.__tla;
             return m;
-        }), a = await r.create(), d = U + 1, o = d * a.width + 1, i = d * a.height + 1;
-        e.width = o, e.height = i, le.debug("CPU: bridge ready, grid", a.width, "x", a.height);
-        let u = t.createImageData(o, i), s = new Uint32Array(u.data.buffer);
-        s.fill(V);
-        function z() {
-            const m = a.getCells(), A = a.width, C = a.height, P = o;
+        }), s = await r.create(), d = U + 1, a = d * s.width + 1, i = d * s.height + 1;
+        e.width = a, e.height = i, le.debug("CPU: bridge ready, grid", s.width, "x", s.height);
+        let u = t.createImageData(a, i), o = new Uint32Array(u.data.buffer);
+        o.fill(X);
+        function I() {
+            const m = s.getCells(), E = s.width, C = s.height, P = a;
             for(let y = 0; y < C; y++){
-                const F = y * A, c = y * d + 1;
-                for(let l = 0; l < A; l++){
+                const F = y * E, c = y * d + 1;
+                for(let l = 0; l < E; l++){
                     const G = m[F + l] === 0 ? ue : fe, R = l * d + 1;
                     for(let h = 0; h < U; h++){
                         const K = (c + h) * P + R;
-                        for(let S = 0; S < U; S++)s[K + S] = G;
+                        for(let S = 0; S < U; S++)o[K + S] = G;
                     }
                 }
             }
@@ -188,28 +188,28 @@
         }
         return {
             tick () {
-                a.tick(), z();
+                s.tick(), I();
             },
             renderOnly () {
-                z();
+                I();
             },
-            resize (m, A) {
-                (e.width !== o || e.height !== i) && (e.width = o, e.height = i, u = t.createImageData(o, i), s = new Uint32Array(u.data.buffer), s.fill(V));
+            resize (m, E) {
+                (e.width !== a || e.height !== i) && (e.width = a, e.height = i, u = t.createImageData(a, i), o = new Uint32Array(u.data.buffer), o.fill(X));
             },
             setZones (m) {},
             free () {}
         };
     }
     const f = q("Renderer"), J = self;
-    let n = null, _ = null, I = 0, E = 0, T = null, O = 0;
+    let n = null, _ = null, b = 0, w = 0, M = null, O = 0;
     const p = new de;
-    let b = W, X = !1;
+    let k = W, V = !1;
     const pe = 1e3;
-    let Z = 0, j = 0;
+    let Z = 0, B = 0;
     function g(e) {
         J.postMessage(e);
     }
-    function w(e) {
+    function z(e) {
         return e instanceof Error ? e.message : String(e);
     }
     function he(e) {
@@ -219,23 +219,23 @@
     function ge(e) {
         return e % L === 0 ? "base_tick" : "render_only";
     }
-    function x() {
+    function T() {
         g({
             type: "zones_state",
             zones: p.getAll()
         });
     }
-    function B(e) {
+    function j(e) {
         g({
             type: "zones_error",
             message: e
         });
     }
-    function M() {
+    function x() {
         n?.setZones?.(p.getAll());
     }
     function _e(e) {
-        p.setAll(e), M(), x();
+        p.setAll(e), x(), T();
     }
     J.onmessage = async (e)=>{
         switch(e.data.type){
@@ -243,62 +243,62 @@
                 {
                     _ = e.data.canvas;
                     const { cellPx: t } = e.data;
-                    b = e.data.theme, f.debug("Init received — canvas", _.width, "x", _.height, "cell_px", t);
+                    k = e.data.theme, f.debug("Init received — canvas", _.width, "x", _.height, "cell_px", t);
                     const r = performance.now();
-                    let a = !1;
+                    let s = !1;
                     try {
                         if (!(await navigator.gpu?.requestAdapter() ?? null)) throw new Error("No WebGPU adapter");
-                        a = !0, f.debug("GPU: probe passed — adapter found");
-                    } catch (o) {
-                        f.info("GPU: probe failed, will use CPU renderer:", w(o)), g({
+                        s = !0, f.debug("GPU: probe passed — adapter found");
+                    } catch (a) {
+                        f.info("GPU: probe failed, will use CPU renderer:", z(a)), g({
                             type: "error",
                             phase: "gpu-probe",
-                            message: w(o)
+                            message: z(a)
                         });
                     }
                     const d = performance.now();
-                    if (a) try {
-                        const { GpuGameOfLife: o } = await import("./game_of_life_gpu-BvfIHsZ9.js").then(async (m)=>{
+                    if (s) try {
+                        const { GpuGameOfLife: a } = await import("./game_of_life_gpu-YvDc-Vf2.js").then(async (m)=>{
                             await m.__tla;
                             return m;
                         }), i = performance.now();
                         f.debug("GPU: module loaded, initialising surface...");
-                        const u = Math.floor(Math.random() * 4294967296), s = await o.new_offscreen(_, t, u), z = performance.now(), m = s, A = (c)=>{
+                        const u = Math.floor(Math.random() * 4294967296), o = await a.new_offscreen(_, t, u), I = performance.now(), m = o, E = (c)=>{
                             if (typeof m.set_zones_json == "function") try {
                                 m.set_zones_json(JSON.stringify(c));
                             } catch (l) {
-                                B(`GPU zone update failed: ${w(l)}`);
+                                j(`GPU zone update failed: ${z(l)}`);
                             }
                         }, C = (c)=>{
                             if (typeof m.set_theme_json == "function") try {
                                 m.set_theme_json(Q(c));
                             } catch (l) {
-                                f.error("GPU theme update failed:", w(l));
+                                f.error("GPU theme update failed:", z(l));
                             }
                         }, P = ()=>({
-                                worldCols: s.world_cols(),
-                                worldRows: s.world_rows(),
-                                paddedRows: s.padded_rows(),
-                                wordsPerRow: s.words_per_row(),
-                                gridPitch: s.grid_pitch()
+                                worldCols: o.world_cols(),
+                                worldRows: o.world_rows(),
+                                paddedRows: o.padded_rows(),
+                                wordsPerRow: o.words_per_row(),
+                                gridPitch: o.grid_pitch()
                             });
                         let y = !1;
                         n = {
-                            tick: ()=>s.tick_and_render(),
-                            renderOnly: ()=>s.render_only(),
-                            resize: (c, l)=>s.resize(c, l),
-                            setCamera: (c, l)=>s.set_camera(c, l),
-                            setTransition: (c)=>s.set_transition(c),
-                            setInitFade: (c)=>s.set_init_fade(c),
+                            tick: ()=>o.tick_and_render(),
+                            renderOnly: ()=>o.render_only(),
+                            resize: (c, l)=>o.resize(c, l),
+                            setCamera: (c, l)=>o.set_camera(c, l),
+                            setTransition: (c)=>o.set_transition(c),
+                            setInitFade: (c)=>o.set_init_fade(c),
                             toggleCell: (c, l)=>{
-                                s.toggle_cell(c, l), s.flush_and_render();
+                                o.toggle_cell(c, l), o.flush_and_render();
                             },
-                            setZones: (c)=>A(c),
+                            setZones: (c)=>E(c),
                             setTheme: (c)=>C(c),
                             gridInfo: P,
                             pullGpuPassDurations: ()=>{
-                                if (!s.timestamp_query_supported()) return !y && Y && (y = !0, f.info("GPU timestamp queries unavailable (adapter did not grant TIMESTAMP_QUERY).  In Chrome, enable chrome://flags/#enable-unsafe-webgpu to opt in.  Per-pass GPU breakdown will not be emitted.")), null;
-                                const c = s.last_compute_tick_ms(), l = s.last_xor_edit_ms(), G = s.last_or_edit_ms(), R = s.last_render_pass_ms(), h = {
+                                if (!o.timestamp_query_supported()) return !y && Y && (y = !0, f.info("GPU timestamp queries unavailable (adapter did not grant TIMESTAMP_QUERY).  In Chrome, enable chrome://flags/#enable-unsafe-webgpu to opt in.  Per-pass GPU breakdown will not be emitted.")), null;
+                                const c = o.last_compute_tick_ms(), l = o.last_xor_edit_ms(), G = o.last_or_edit_ms(), R = o.last_render_pass_ms(), h = {
                                     computeTickMs: c ?? null,
                                     xorEditMs: l ?? null,
                                     orEditMs: G ?? null,
@@ -306,15 +306,19 @@
                                 };
                                 return h.computeTickMs === null && h.xorEditMs === null && h.orEditMs === null && h.renderPassMs === null ? null : h;
                             },
-                            free: ()=>s.free()
-                        }, T && (n.resize(T.width, T.height), T = null), n.setCamera?.(I, E), n.setTransition?.(1), n.setZones?.(p.getAll()), n.setTheme?.(b), f.info("GPU renderer ready"), g({
+                            pullTickBreakdown: ()=>({
+                                    reseedMs: o.last_reseed_ms(),
+                                    presentMs: o.last_present_ms()
+                                }),
+                            free: ()=>o.free()
+                        }, M && (n.resize(M.width, M.height), M = null), n.setCamera?.(b, w), n.setTransition?.(1), n.setZones?.(p.getAll()), n.setTheme?.(k), f.info("GPU renderer ready"), g({
                             type: "ready",
                             backend: "gpu",
                             gridInfo: P()
                         });
                         break;
-                    } catch (o) {
-                        const i = w(o);
+                    } catch (a) {
+                        const i = z(a);
                         f.error("GPU init failed after probe passed (canvas may be locked):", i), g({
                             type: "error",
                             phase: "gpu-init",
@@ -323,7 +327,7 @@
                         break;
                     }
                     try {
-                        n = await me(_), n.setCamera?.(I, E), n.setZones?.(p.getAll()), n.setTheme?.(b), f.info("CPU renderer ready"), g({
+                        n = await me(_), n.setCamera?.(b, w), n.setZones?.(p.getAll()), n.setTheme?.(k), f.info("CPU renderer ready"), g({
                             type: "ready",
                             backend: "cpu",
                             gridInfo: {
@@ -334,8 +338,8 @@
                                 gridPitch: 0
                             }
                         });
-                    } catch (o) {
-                        const i = w(o);
+                    } catch (a) {
+                        const i = z(a);
                         f.error("CPU init failed:", i), g({
                             type: "error",
                             phase: "cpu-init",
@@ -347,9 +351,9 @@
             case "frame":
                 {
                     if (!n) break;
-                    if (O++, j < 1) {
+                    if (b = e.data.cameraX, w = e.data.cameraY, n.setCamera?.(b, w), O++, B < 1) {
                         const r = performance.now();
-                        Z === 0 && (Z = r), j = Math.min(1, (r - Z) / pe), n.setInitFade?.(j);
+                        Z === 0 && (Z = r), B = Math.min(1, (r - Z) / pe), n.setInitFade?.(B);
                     }
                     switch(ge(O)){
                         case "base_tick":
@@ -359,7 +363,7 @@
                             n.setTransition?.(he(O % L / L)), n.renderOnly && n.renderOnly();
                             break;
                     }
-                    X || (X = !0, g({
+                    V || (V = !0, g({
                         type: "first_frame_painted"
                     }));
                     break;
@@ -368,20 +372,20 @@
                 {
                     if (f.debug("Resize →", e.data.width, "x", e.data.height), !_) break;
                     if (_.width = e.data.width, _.height = e.data.height, !n) {
-                        T = {
+                        M = {
                             width: e.data.width,
                             height: e.data.height
                         };
                         break;
                     }
-                    n.resize(e.data.width, e.data.height), n.setCamera?.(I, E), n.setTransition?.(1), n.setZones?.(p.getAll()), n.setTheme?.(b), n.gridInfo && g({
+                    n.resize(e.data.width, e.data.height), n.setCamera?.(b, w), n.setTransition?.(1), n.setZones?.(p.getAll()), n.setTheme?.(k), n.gridInfo && g({
                         type: "grid_info",
                         gridInfo: n.gridInfo()
                     });
                     break;
                 }
             case "camera":
-                I = e.data.x, E = e.data.y, n?.setCamera?.(I, E);
+                b = e.data.x, w = e.data.y, n?.setCamera?.(b, w);
                 break;
             case "toggle_cell":
                 n?.toggleCell?.(e.data.cx, e.data.cy);
@@ -393,30 +397,30 @@
                 {
                     const t = p.add(e.data.zone);
                     if (t.error) {
-                        B(t.error);
+                        j(t.error);
                         break;
                     }
-                    M(), x();
+                    x(), T();
                     break;
                 }
             case "update_zone":
                 {
                     const t = p.update(e.data.zone);
                     if (t.error) {
-                        B(t.error);
+                        j(t.error);
                         break;
                     }
-                    M(), x();
+                    x(), T();
                     break;
                 }
             case "remove_zone":
-                p.remove(e.data.id), M(), x();
+                p.remove(e.data.id), x(), T();
                 break;
             case "clear_zones":
-                p.clear(), M(), x();
+                p.clear(), x(), T();
                 break;
             case "set_theme":
-                b = e.data.theme, n?.setTheme?.(b);
+                k = e.data.theme, n?.setTheme?.(k);
                 break;
             case "perf_snapshot":
                 break;
