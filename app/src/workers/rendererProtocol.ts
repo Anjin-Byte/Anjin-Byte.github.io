@@ -29,7 +29,11 @@ export type WorkerInMsg =
   // dark-OS users when their stored preference is `system`.  Subsequent
   // theme changes flow through the `set_theme` message.
   | { type: 'init'; canvas: OffscreenCanvas; cellPx: number; theme: ThemePalette }
-  | { type: 'frame' }
+  // The camera offset (device px) is frame-locked: the main thread samples
+  // scroll + camera on its render rAF and ships it WITH the frame, so the grid
+  // renders the exact position the DOM is at this frame (no separate, lagging
+  // 'camera' message during scroll).
+  | { type: 'frame'; cameraX: number; cameraY: number }
   | { type: 'resize'; width: number; height: number }
   // 2-D camera offset (canvas/device px). Drives the grid's scroll_x/scroll_y
   // uniforms so the world pans in lockstep with the content plane.
@@ -94,6 +98,20 @@ export interface GpuPassDurations {
   renderPassMs:  number | null;
 }
 
+/**
+ * DEV-only memory estimate.  GPU buffer sizes are derived from canvas + grid
+ * dims (wgpu exposes no VRAM total), so they're close estimates of the dominant
+ * allocations, not exact driver figures.  Emitted on the perf-summary cadence.
+ */
+export interface MemoryBreakdown {
+  canvasW: number;
+  canvasH: number;
+  surfaceBytes: number;            // canvas w×h×4 — ONE frame; swapchain is ×2–3
+  cellBytes: number;               // 3 cell-sized buffers (ping-pong pair + frozen)
+  noiseBytes: number;              // paper-noise texture (256² RGBA8)
+  workerHeapBytes: number | null;  // worker JS/WASM heap, if performance.memory exists
+}
+
 export type WorkerOutMsg =
   | { type: 'ready'; backend: RendererBackend; gridInfo: GridInfo }
   // Sent after resize so the main thread can update its CoordSnapshot.
@@ -104,6 +122,10 @@ export type WorkerOutMsg =
   // DEV-only perf signals — see StartupBreakdown / GpuPassDurations.
   | { type: 'startup_breakdown'; phases: StartupBreakdown }
   | { type: 'gpu_pass_breakdown'; frame: number; durations: GpuPassDurations }
+  | { type: 'memory_breakdown'; frame: number; mem: MemoryBreakdown }
+  // DEV-only: CPU-reseed vs GPU-present split of the last tick_and_render,
+  // to attribute the periodic tick spike. Posted on every base tick.
+  | { type: 'tick_breakdown'; frame: number; reseedMs: number; presentMs: number }
   // One-shot signal: the worker successfully painted its first frame.
   // Used by AppBackground.vue to crossfade the canvas in from
   // `opacity: 0`, smoothing the otherwise-instantaneous reveal.

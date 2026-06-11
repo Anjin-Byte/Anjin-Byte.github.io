@@ -43,4 +43,33 @@ export function useWorkerDiagnostics(bridge: WorkerBridge): void {
         `  render_pass    ${fmt(d.renderPassMs)}`,
     );
   });
+
+  bridge.on('tick_breakdown', (msg) => {
+    log.info(
+      `Tick breakdown (frame ${msg.frame}):  ` +
+        `reseed ${msg.reseedMs.toFixed(1)}ms  ·  present ${msg.presentMs.toFixed(1)}ms`,
+    );
+  });
+
+  bridge.on('memory_breakdown', (msg) => {
+    const mb = (b: number): string => `${(b / 1048576).toFixed(2)} MB`;
+    const m = msg.mem;
+    const lines: string[] = [
+      `Memory (frame ${msg.frame}):`,
+      `  GPU surface    ${m.canvasW}×${m.canvasH} × 4B = ${mb(m.surfaceBytes)}  (×2–3 swapchain, browser-managed)`,
+      `  GPU cells      ${mb(m.cellBytes)}  (3 buffers)`,
+      `  GPU noise      ${mb(m.noiseBytes)}`,
+    ];
+    if (m.workerHeapBytes !== null) lines.push(`  worker heap    ${mb(m.workerHeapBytes)} used`);
+    // Main-thread JS heap (Chrome-only `performance.memory`; absent elsewhere).
+    const main = (performance as Performance & {
+      memory?: { usedJSHeapSize: number; totalJSHeapSize: number; jsHeapSizeLimit: number };
+    }).memory;
+    if (main) {
+      lines.push(
+        `  main heap      ${mb(main.usedJSHeapSize)} / ${mb(main.totalJSHeapSize)}  (limit ${mb(main.jsHeapSizeLimit)})`,
+      );
+    }
+    log.info(lines.join('\n'));
+  });
 }

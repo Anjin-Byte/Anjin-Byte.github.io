@@ -41,6 +41,8 @@ interface Renderer {
     orEditMs:      number | null;
     renderPassMs:  number | null;
   } | null;
+  /** DEV-only: CPU-reseed vs GPU-present split (ms) of the last tick_and_render. */
+  pullTickBreakdown?(): { reseedMs: number; presentMs: number } | null;
   free(): void;
 }
 
@@ -109,6 +111,38 @@ function postZonesError(message: string): void {
 
 function applyZonesToRenderer(): void {
   renderer?.setZones?.(zoneState.getAll());
+}
+
+// ── Memory reporting (DEV) ─────────────────────────────────────────────────────
+// wgpu exposes no VRAM total, so GPU allocations are estimated from canvas + grid
+// dims. The dominant buffers are all derivable: the surface texture (canvas
+// w×h×4, the lion's share), 3 cell-sized buffers (the ping-pong pair + frozen),
+// and the 256² RGBA8 paper-noise texture.
+const SURFACE_BYTES_PER_PX = 4; // 8-bit RGBA/BGRA surface
+const NOISE_TEX_BYTES = 256 * 256 * 4;
+const CELL_BUFFER_COUNT = 3;
+
+function workerHeapBytes(): number | null {
+  const mem = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory;
+  return mem ? mem.usedJSHeapSize : null;
+}
+
+function postMemoryBreakdown(): void {
+  if (!canvas) return;
+  const grid = renderer?.gridInfo?.();
+  const cellBytes = grid ? grid.wordsPerRow * grid.paddedRows * 4 * CELL_BUFFER_COUNT : 0;
+  post({
+    type: 'memory_breakdown',
+    frame: frameCount,
+    mem: {
+      canvasW: canvas.width,
+      canvasH: canvas.height,
+      surfaceBytes: canvas.width * canvas.height * SURFACE_BYTES_PER_PX,
+      cellBytes,
+      noiseBytes: NOISE_TEX_BYTES,
+      workerHeapBytes: workerHeapBytes(),
+    },
+  });
 }
 
 function setZonesState(next: unknown): void {
@@ -256,6 +290,7 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
             setTheme:   (theme)  => setThemeOnGpu(theme),
             gridInfo:   getGridInfo,
             pullGpuPassDurations,
+            pullTickBreakdown: () => ({ reseedMs: gpu.last_reseed_ms(), presentMs: gpu.last_present_ms() }),
             free:       () => gpu.free(),
           };
           // A resize that arrived during the async init window updated
@@ -324,6 +359,11 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
 
     case 'frame': {
       if (!renderer) break;
+      // Apply the frame-locked camera offset before rendering, so the grid pans
+      // in sync with this exact render. Also cache it so resize re-applies it.
+      pendingCameraX = e.data.cameraX;
+      pendingCameraY = e.data.cameraY;
+      renderer.setCamera?.(pendingCameraX, pendingCameraY);
       perf?.beginFrame();
       frameCount++;
 
@@ -344,6 +384,12 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
           renderer.setTransition?.(0);
           if (perf) { perf.time('tick', () => renderer!.tick()); }
           else { renderer.tick(); }
+          // Post the CPU-reseed vs GPU-present split for this tick so the spike
+          // can be attributed. Ticks are rare (~every 175 frames), so low volume.
+          if (PERF_ENABLED) {
+            const tb = renderer.pullTickBreakdown?.();
+            if (tb) post({ type: 'tick_breakdown', frame: frameCount, reseedMs: tb.reseedMs, presentMs: tb.presentMs });
+          }
           break;
         case 'render_only':
           renderer.setTransition?.(easeTransition((frameCount % TICK_EVERY) / TICK_EVERY));
@@ -376,6 +422,8 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
             durations,
           });
         }
+        // Memory estimate logs every interval regardless of timestamp support.
+        postMemoryBreakdown();
       }
       break;
     }

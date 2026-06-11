@@ -41,14 +41,12 @@ const style = computed(() => {
 });
 
 // ── Native vertical scroll (the captured island) ─────────────────────────────
-// When this panel is the active route it becomes a real scroll container; its
+// When this panel is the active route it becomes a real scroll container. Its
 // scrollTop folds into the camera's vertical offset so the GoL grid pans with
-// the scroll while the panel frame stays pinned (see useCamera).
+// the scroll while the panel frame stays pinned (see useCamera). The grid reads
+// scrollTop on the render rAF (AppBackground's frame loop), NOT the throttled
+// `scroll` event, so the grid stays frame-locked to the native scroll.
 const panelRef = ref<HTMLElement | null>(null);
-
-function onScroll(): void {
-  if (isActive.value && panelRef.value) setCaptureScroll(panelRef.value.scrollTop);
-}
 
 // Arriving at an island lands at its top.
 watch(isActive, (active) => {
@@ -78,7 +76,6 @@ if (GESTURE_NAV_ENABLED) {
     :aria-label="waypoint.label"
     tabindex="-1"
     data-grid-ignore-click="true"
-    @scroll="onScroll"
   >
     <slot />
   </section>

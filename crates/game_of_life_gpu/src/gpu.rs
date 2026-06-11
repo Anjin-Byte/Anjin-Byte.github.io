@@ -119,6 +119,13 @@ pub struct GpuGameOfLife {
     /// after construction by the worker and forwarded into the
     /// `startup_breakdown` message; not used at runtime.
     init_phases: InitPhases,
+    /// DEV split-timing of the most recent `tick_and_render`: ms (Date::now
+    /// resolution) spent in `auto_reseed()` (CPU) and in the present/submit
+    /// block (GPU/compositor back-pressure).  Lets the worker attribute the
+    /// periodic tick spike to CPU reseed vs GPU present.  `0.0` when a tick
+    /// didn't reseed.
+    last_reseed_ms: f64,
+    last_present_ms: f64,
 }
 
 /// Wall-clock breakdown of `from_surface` phases.  All values in
@@ -227,6 +234,8 @@ async fn from_surface(
         recent_stamps: VecDeque::with_capacity(RECENT_STAMP_MEMORY),
         timestamp_panel,
         init_phases,
+        last_reseed_ms: 0.0,
+        last_present_ms: 0.0,
     })
 }
 
@@ -331,12 +340,18 @@ impl GpuGameOfLife {
             self.ctx.queue.submit([enc.finish()]);
         }
         self.tick_count = self.tick_count.wrapping_add(1);
+        self.last_reseed_ms = 0.0;
         if self.tick_count.is_multiple_of(RESEED_INTERVAL_TICKS) {
+            let reseed_t0 = js_sys::Date::now();
             self.auto_reseed();
+            self.last_reseed_ms = js_sys::Date::now() - reseed_t0;
         }
         // Present + (optionally) resolve query set into the present's
         // encoder so the resolve submit happens after all the timestamp
-        // writes are visible on the GPU timeline.
+        // writes are visible on the GPU timeline.  Timed separately from the
+        // CPU reseed above so the worker can attribute the periodic tick spike
+        // to GPU/compositor back-pressure (get_current_texture / present).
+        let present_t0 = js_sys::Date::now();
         let mut enc = self.ctx.device.create_command_encoder(
             &wgpu::CommandEncoderDescriptor { label: Some("gol_present") },
         );
@@ -358,6 +373,7 @@ impl GpuGameOfLife {
                 self.renderers[0].reconfigure(&self.ctx.device);
             }
         }
+        self.last_present_ms = js_sys::Date::now() - present_t0;
     }
 
     /// Updates the vertical scroll offset (canvas pixels). Call on every scroll event.
@@ -470,6 +486,13 @@ impl GpuGameOfLife {
     pub fn last_render_pass_ms(&self) -> Option<f64> {
         self.timestamp_panel.latest().and_then(|d| d.render_pass_ms())
     }
+
+    /// DEV: wall-clock ms of the most recent `auto_reseed()` (CPU) inside
+    /// `tick_and_render`; `0.0` on ticks where no reseed fired.
+    pub fn last_reseed_ms(&self) -> f64 { self.last_reseed_ms }
+    /// DEV: wall-clock ms of the most recent present/submit block (render +
+    /// `get_current_texture` + present) — i.e. GPU/compositor back-pressure.
+    pub fn last_present_ms(&self) -> f64 { self.last_present_ms }
 
     /// Sub-phase wall-clock breakdown of `from_surface`.  Read once after
     /// init by the worker for inclusion in the `startup_breakdown`

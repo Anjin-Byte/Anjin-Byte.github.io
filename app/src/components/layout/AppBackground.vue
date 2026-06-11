@@ -12,7 +12,6 @@ import { useThemePreference } from '../../composables/useThemePreference';
 import { useCanvasSurface } from '../../composables/useCanvasSurface';
 import { useWorkerDiagnostics } from '../../composables/useWorkerDiagnostics';
 import { useCamera } from '../../composables/useCamera';
-import { useCameraGridSync } from '../../composables/useCameraGridSync';
 import GridBlankZonePanel from './GridBlankZonePanel.vue';
 
 const log = createLogger('AppBackground');
@@ -30,8 +29,8 @@ const anim = useAnimationLoop();
 const drag = useDragTools(coords);
 const surface = useCanvasSurface(bridge.post);
 
-// Forward camera motion to the worker so the grid pans in lockstep (Phase 2).
-useCameraGridSync(bridge);
+// The grid offset is forwarded frame-locked in the render loop below (not via a
+// reactive watch), so the canvas grid tracks the native scroll without juddering.
 // Lane navigation (vertical over-scroll break + horizontal two-finger-scroll
 // break) is wired per-panel in WorldPanel via useLaneScroll, so the wheel
 // listener lives on the captured island it scrolls.
@@ -165,9 +164,17 @@ onMounted(() => {
   document.addEventListener('click', onDocumentClick);
   detachDrag = drag.attachListeners();
 
-  // Animation loop — drives the worker's per-frame tick/render. The camera and
-  // its eased motion live in useCamera; the grid stays fixed in Phase 1.
-  anim.start(() => bridge.post({ type: 'frame' }));
+  // Frame loop — frame-locks the grid to the render. Each rAF we sample the
+  // active island's live scrollTop (NOT the throttled `scroll` event) plus the
+  // camera, and ship the offset WITH the frame, so the worker renders the exact
+  // position the DOM is at this frame. That's what stops the canvas grid from
+  // juddering behind the compositor-smooth native scroll.
+  anim.start(() => {
+    const panel = document.querySelector<HTMLElement>('.world-panel--scroll');
+    if (panel) camera.setCaptureScroll(panel.scrollTop);
+    const off = camera.worldOffsetDevicePx.value;
+    bridge.post({ type: 'frame', cameraX: off.x, cameraY: off.y });
+  });
 });
 
 onUnmounted(() => {
