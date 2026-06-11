@@ -5,12 +5,23 @@
 // touch-primary nav). A full-viewport, click-through overlay: pointer-events
 // are off on the container and on only the clusters, so the empty middle still
 // falls through to the grid (cell toggle) and the compass below.
-import { ref } from 'vue';
+import { onUnmounted, ref } from 'vue';
 import { mdiMenu } from '@mdi/js';
 import { WAYPOINTS } from '../../space/waypoints';
+import { registerElementCollider } from '../../composables/useColliders';
 import ThemeToggle from './ThemeToggle.vue';
 
 const isMenuOpen = ref(false);
+
+// The chrome clusters are fixed colliders so the compass waymarkers route around
+// them; a small positive margin gives the markers a little berth.
+const controlsRef = ref<HTMLElement | null>(null);
+onUnmounted(registerElementCollider(controlsRef, { margin: 8 }));
+
+// The wordmark/home link is a <router-link>, so its template ref is the
+// component instance — reach the underlying <a> via $el.
+const markRef = ref<{ $el?: HTMLElement } | null>(null);
+onUnmounted(registerElementCollider(() => markRef.value?.$el ?? null, { margin: 8 }));
 </script>
 
 <template>
@@ -18,11 +29,11 @@ const isMenuOpen = ref(false);
     <div class="chrome__bar">
       <!-- Identity, doubling as home. Routing to "/" flies to the hero via the
            router→camera sync (cameraSync.ts), so no direct camera call needed. -->
-      <router-link to="/" class="chrome__mark glass-chip" aria-label="Taylor Hale — home">
+      <router-link ref="markRef" to="/" class="chrome__mark glass-chip" aria-label="Taylor Hale — home">
         Taylor Hale
       </router-link>
 
-      <div class="chrome__controls">
+      <div ref="controlsRef" class="chrome__controls">
         <ThemeToggle />
         <v-menu v-model="isMenuOpen" location="bottom end" offset="10">
           <template #activator="{ props }">

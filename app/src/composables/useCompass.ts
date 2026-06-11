@@ -5,6 +5,7 @@ import { WAYPOINTS } from '../space/waypoints';
 import { gridToWorld } from '../space/layout';
 import { bearingTo, worldDistance, markerRadius, bearingTarget, type Box } from '../space/compass';
 import { solveMarkers, type Marker, type Vec2 } from '../space/markerSolver';
+import { collectObstacles } from './useColliders';
 import {
   SUPPRESS_DIST,
   FADE_BAND,
@@ -95,11 +96,19 @@ export function useCompass(): Ref<MarkerView[]> {
       return { pos: st.pos, prevPos: st.prevPos, target, radius };
     });
 
-    const resolved = solveMarkers(input, box, {
-      stiffness: snap ? 1 : COMPASS_STIFFNESS,
-      friction: snap ? 0 : COMPASS_FRICTION,
-      iterations: COMPASS_ITERATIONS,
-    });
+    // Fixed colliders (chrome, the active island) the markers must not overlap;
+    // read at the effectful edge, resolved inside the pure solver.
+    const obstacles = collectObstacles();
+    const resolved = solveMarkers(
+      input,
+      box,
+      {
+        stiffness: snap ? 1 : COMPASS_STIFFNESS,
+        friction: snap ? 0 : COMPASS_FRICTION,
+        iterations: COMPASS_ITERATIONS,
+      },
+      obstacles,
+    );
 
     // Drop state for islands that left the visible set (the current one), so
     // re-entry starts fresh at its target rather than a stale spot.

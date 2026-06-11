@@ -16,6 +16,23 @@ const { cameraStyle, setViewport, isAnimating } = useCamera();
 const stageRef = ref<HTMLDivElement | null>(null);
 let resizeObserver: ResizeObserver | null = null;
 
+// Vertical wheel anywhere in the viewport drives the active island's native
+// scroll — including the side margins outside the content column, where the
+// wheel would otherwise hit the grid canvas and do nothing (the document is
+// overflow:hidden). Over the panel itself, native scroll already handles it, so
+// we forward only from outside it; this leaves margin clicks falling through to
+// the grid untouched. The programmatic scroll fires the panel's `scroll` event,
+// so the existing camera sync is unchanged.
+function onMarginWheel(e: WheelEvent): void {
+  const panel = document.querySelector<HTMLElement>('.world-panel--scroll');
+  if (!panel || panel.contains(e.target as Node)) return;
+  // Normalise wheel delta to px: Firefox reports lines (deltaMode 1) for mouse
+  // wheels; some inputs report pages (2).
+  const step = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? panel.clientHeight : 1;
+  panel.scrollTop += e.deltaY * step;
+  e.preventDefault();
+}
+
 onMounted(() => {
   const el = stageRef.value;
   if (!el) return;
@@ -25,9 +42,13 @@ onMounted(() => {
   sync();
   resizeObserver = new ResizeObserver(sync);
   resizeObserver.observe(el);
+  window.addEventListener('wheel', onMarginWheel, { passive: false });
 });
 
-onUnmounted(() => resizeObserver?.disconnect());
+onUnmounted(() => {
+  resizeObserver?.disconnect();
+  window.removeEventListener('wheel', onMarginWheel);
+});
 </script>
 
 <template>
