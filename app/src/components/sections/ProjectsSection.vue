@@ -308,10 +308,11 @@ const projectIndex: ProjectIndexItem[] = rawProjectIndex.map((project) => ({
 .project-tech-tag {
   font-size: 0.72rem;
   letter-spacing: 0.04em;
-  color: var(--theme-text-tertiary);
-  padding: 0.24rem 0.6rem;
-  border: 1px solid var(--theme-grid-minor);
-  border-radius: 999px;
+  color: var(--theme-text-secondary);
+  padding: 0.26rem 0.62rem;
+  background: var(--badge-fill);
+  border: 1px solid var(--island-edge);
+  border-radius: var(--radius-pill);
 }
 
 @media (max-width: 960px) {

@@ -63,6 +63,30 @@ import CompassNav from '@/components/space/CompassNav.vue';
   --measure: 64ch; /* prose line-length cap */
   --container-max: 1120px; /* content reading column (inside the 1200px panel) */
   --text-ui: 1.05rem; /* fixed chrome label — controls don't balloon */
+
+  /* ── Island elevation (soft realism) ──────────────────────────────────────
+     Islands are clean sheets of paper resting on the graph-paper field, lifted
+     just off the page. Principles: light comes from straight ABOVE (shadows
+     drop vertically, never diagonally); depth is a LAYERED penumbra — a tight
+     contact shadow + a soft cast — tinted toward the scene, never pure black;
+     a crisp hairline edge + a 1px lit top lip define the shape INDEPENDENT of
+     the shadow, so an island stays legible over the busy grid and for low-
+     vision users (the edge is structure, the shadow is flair). Elevation is a
+     small fixed scale (--elev-1 resting, --elev-2 hero), not per-element
+     guesses. Values are LIGHT defaults; `data-theme-mode="dark"` overrides. */
+  --island-fill: color-mix(in oklab, var(--theme-surface) 97%, white 3%);
+  --island-edge: color-mix(in oklab, var(--theme-surface) 90%, var(--theme-ink) 10%);
+  --shadow-1: rgba(54, 48, 40, 0.12); /* contact: tight, slightly stronger */
+  --shadow-2: rgba(54, 48, 40, 0.08); /* cast: soft, faint */
+  --island-lip: inset 0 1px 0 rgba(255, 255, 255, 0.55); /* lit top edge */
+  --elev-1: 0 1px 2px var(--shadow-1), 0 6px 18px var(--shadow-2);  /* resting */
+  --elev-2: 0 2px 4px var(--shadow-1), 0 14px 34px var(--shadow-2); /* hero */
+  --well-recess: color-mix(in oklab, var(--theme-surface) 96%, var(--theme-ink) 4%);
+  /* Metadata badges (tech tags): a flat tonal token, not a plate. A wash of the
+     INK color reads correctly in both modes (dark wash on light paper, light
+     wash on dark) — so one token, no per-mode override. Pairs with
+     --island-edge; no shadow, because depth cues this small read as grime. */
+  --badge-fill: color-mix(in oklab, var(--theme-ink) 6%, transparent);
 }
 
 /*
@@ -142,32 +166,33 @@ body {
   overflow: hidden;
 }
 
-.glass-panel {
-  background: color-mix(in oklab, var(--theme-surface) 84%, transparent);
-  border: 1px solid color-mix(in oklab, var(--theme-grid-border) 62%, white 10%);
+/* Raised island — a clean paper plate lifted off the field. The lit top lip is
+   listed first so it composites above the drop shadows. */
+.glass-panel,
+.content-surface {
+  background: var(--island-fill);
+  border: 1px solid var(--island-edge);
   border-radius: var(--radius-lg);
-  backdrop-filter: blur(14px) saturate(1.08);
-  -webkit-backdrop-filter: blur(14px) saturate(1.08);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 18px 60px rgba(0, 0, 0, 0.14);
+  box-shadow: var(--island-lip), var(--elev-1);
 }
 
+/* The hero plate sits one elevation step higher. */
 .glass-panel--strong {
-  background: color-mix(in oklab, var(--theme-surface) 88%, transparent);
+  box-shadow: var(--island-lip), var(--elev-2);
 }
 
+/* Nested fields (skill notes, project items) — pressed INTO the plate. A single
+   soft top-inner shadow reads as a recess under top-down light; this is the one
+   inset cue that stays legible at low contrast, so it survives here. */
 .quiet-sheet {
-  background: color-mix(in oklab, var(--theme-surface) 78%, transparent);
-  border: 1px solid color-mix(in oklab, var(--theme-grid-border) 54%, white 8%);
+  background: var(--well-recess);
+  border: 1px solid var(--island-edge);
   border-radius: var(--radius-md);
-  backdrop-filter: blur(8px) saturate(1.04);
-  -webkit-backdrop-filter: blur(8px) saturate(1.04);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 10px 28px rgba(0, 0, 0, 0.07);
+  box-shadow: inset 0 1px 3px var(--shadow-1);
 }
 
+/* Kicker / tag pills — small, so just the hairline + lit lip; a cast shadow on
+   a pill this size reads as fussy. Crisp, essentially flat. */
 .glass-chip {
   display: inline-flex;
   align-items: center;
@@ -177,22 +202,10 @@ body {
   min-height: 1.8rem;
   padding: 0.34rem 0.78rem 0.32rem;
   border-radius: var(--radius-pill);
-  border: 1px solid color-mix(in oklab, var(--theme-grid-border) 58%, white 8%);
-  background: color-mix(in oklab, var(--theme-surface) 74%, transparent);
-  backdrop-filter: blur(10px) saturate(1.05);
-  -webkit-backdrop-filter: blur(10px) saturate(1.05);
+  border: 1px solid var(--island-edge);
+  background: var(--island-fill);
+  box-shadow: var(--island-lip);
   line-height: 1;
-}
-
-.content-surface {
-  background: color-mix(in oklab, var(--theme-surface) 84%, transparent);
-  border: 1px solid color-mix(in oklab, var(--theme-grid-border) 62%, white 10%);
-  border-radius: var(--radius-lg);
-  backdrop-filter: blur(14px) saturate(1.08);
-  -webkit-backdrop-filter: blur(14px) saturate(1.08);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 18px 60px rgba(0, 0, 0, 0.14);
 }
 
 .section-kicker {
@@ -223,33 +236,17 @@ body {
   max-width: var(--measure);
 }
 
-html[data-theme-mode="light"] .glass-panel {
-  background: color-mix(in oklab, var(--theme-surface) 93%, white 7%);
-  border-color: color-mix(in oklab, var(--theme-grid-major) 38%, white 42%);
-  backdrop-filter: blur(10px) saturate(1.02);
-  -webkit-backdrop-filter: blur(10px) saturate(1.02);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.92),
-    0 16px 44px rgba(130, 120, 108, 0.08);
-}
-
-html[data-theme-mode="light"] .glass-panel--strong {
-  background: color-mix(in oklab, var(--theme-surface) 96%, white 4%);
-}
-
-html[data-theme-mode="light"] .quiet-sheet {
-  background: color-mix(in oklab, var(--theme-surface) 95%, white 5%);
-  border-color: color-mix(in oklab, var(--theme-grid-major) 36%, white 42%);
-  backdrop-filter: blur(6px) saturate(1.01);
-  -webkit-backdrop-filter: blur(6px) saturate(1.01);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.88),
-    0 10px 24px rgba(130, 120, 108, 0.06);
-}
-
-html[data-theme-mode="light"] .glass-chip {
-  background: color-mix(in oklab, var(--theme-surface) 92%, white 8%);
-  border-color: color-mix(in oklab, var(--theme-grid-major) 36%, white 45%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88);
+/* Dark mode: a raised object catches more light, so the plate rides LIGHTER
+   than the deep field and the edge is a lit rim; shadows go near-black and
+   stronger (low-L surfaces need more shadow to read). The lit lip warms toward
+   the surface rather than pure white to avoid a glassy specular. The well
+   recedes to field level so it reads pressed back down to the page. */
+html[data-theme-mode="dark"] {
+  --island-fill: color-mix(in oklab, var(--theme-surface) 88%, var(--theme-ink) 12%);
+  --island-edge: color-mix(in oklab, var(--theme-surface) 80%, white 8%);
+  --shadow-1: rgba(0, 0, 0, 0.55);
+  --shadow-2: rgba(0, 0, 0, 0.40);
+  --island-lip: inset 0 1px 0 color-mix(in oklab, var(--theme-surface) 72%, white 16%);
+  --well-recess: var(--theme-surface);
 }
 </style>
