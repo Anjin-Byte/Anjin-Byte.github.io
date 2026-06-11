@@ -1,37 +1,83 @@
 ---
-title: Cut and laid
+title: "Lorem ipsum: lists & nesting"
 date: 2026-06-11
-summary: How the site's surfaces stopped pretending to be glass and became sheets of paper, cut and laid on the grid.
-tags: [design, css]
+summary: A stress page for nested lists, mixed ordered/unordered structures, and list items that carry paragraphs, quotes, and code.
+tags: [lorem, lists]
 ---
 
-The surfaces here used to be frosted glass — `backdrop-filter`, a floaty drop
-shadow, the whole 2020 aesthetic. It read as *clever but tacky*, and worse, it
-fought the one thing the site is actually about: an engineering notebook.
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis
+nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu
+fugiat nulla pariatur excepteur sint occaecat cupidatat non proident.
 
-So we tore the glass out and rebuilt every panel as **a sheet of paper, cut and
-laid** on the graph-paper field. The metaphor turned out to be generative —
-every later decision fell out of it.
+## Unordered, three levels deep
 
-## The rules that followed
+Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium
+doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo:
 
-- **Edges are cuts, not strokes.** A hairline plus a 1px lit top lip; no glows,
-  no blur. The cut catches the light.
-- **Depth is a layered penumbra** — a tight contact shadow and a soft cast,
-  dropped straight down (light from above), never diagonal.
-- **Matte, opaque stock.** The living grid breathes in the gaps *between* sheets,
-  not behind them.
+- Lorem ipsum dolor sit amet, with `inline_code()` and *emphasis* mixed in.
+- Consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore.
+  - Nested item one: ut labore et dolore magna aliqua with **strong** text.
+  - Nested item two: ut enim ad minim veniam, quis nostrud.
+    - Third level: quis nostrud exercitation ullamco laboris nisi ut aliquip.
+    - Third level again, and this one runs deliberately long so we can see how a deeply nested list item wraps across several lines and whether the marker stays put relative to the hanging indent of the wrapped text.
+  - Back to the second level after the third.
+- Duis aute irure dolor in reprehenderit in voluptate velit.
 
-## The one trick worth remembering
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+incididunt ut labore et dolore magna aliqua.
 
-The cut edge is expressed as a perceptual lightness delta, derived from the
-sheet's own fill, so both themes get the same edge and the clamp handles the
-asymmetry for free:
+## Ordered, with rich items
 
-```css
---island-lip:
-  inset 0  1px 0 oklab(from var(--island-fill) calc(l + var(--cut)) a b),
-  inset 0 -1px 0 oklab(from var(--island-fill) calc(l - var(--cut)) a b);
-```
+1. Primum: lorem ipsum dolor sit amet.
+2. Secundum: consectetur adipiscing elit, sed do eiusmod.
+3. Tertium, carrying a nested unordered list:
+   - sub-point alpha, short
+   - sub-point beta, long enough to wrap onto a second line within the item
+4. Quartum: a list item that contains a whole second paragraph.
 
-One knob — `--cut` — tunes every edge in the system.
+   This is a second paragraph inside the fourth list item. Lorem ipsum dolor sit
+   amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore.
+
+5. Quintum: a list item with a blockquote inside it.
+
+   > Lorem ipsum dolor sit amet — a quotation nested within a list item, which is
+   > a layout combination worth checking carefully.
+
+6. Sextum: a list item with embedded code.
+
+   ```ts
+   const item = "lorem ipsum";
+   ```
+
+7. Septimum.
+8. Octavum.
+9. Nonum.
+10. Decimum — note where the two-digit marker sits against the single-digit ones.
+
+### Mixed ordered and unordered nesting
+
+1. Ordered outer item one.
+   - Unordered inner.
+     1. Ordered, two levels deep inside an unordered list.
+     2. Another deep ordered item that wraps a little to test alignment here too.
+   - Back to the unordered level.
+2. Ordered outer item two.
+
+A list immediately followed by a heading, with no paragraph between them:
+
+- last item alpha
+- last item beta
+
+## Heading directly after a list
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis
+nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+
+---
+
+Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia
+deserunt mollit anim id est laborum. Sed ut perspiciatis unde omnis iste natus
+error sit voluptatem accusantium doloremque laudantium.

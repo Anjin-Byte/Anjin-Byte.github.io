@@ -1,32 +1,55 @@
 ---
-title: A grid that's alive
+title: "Lorem ipsum: tables & inline"
 date: 2026-05-20
-summary: Why the background is a real Game of Life running on the GPU, and what it cost to make it pan with the page.
-tags: [webgpu, rust]
+summary: A stress page for tables (narrow and very wide), long URLs, unbreakable strings, and dense inline formatting.
+tags: [lorem]
 ---
 
-The graph paper behind everything isn't an image — it's **Conway's Game of Life,
-simulated and rendered on the GPU** in a Rust/WASM worker, with the cells drawn
-as sponge-stamped ink on procedurally-shaded paper.
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis
+nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
 
-It started as decoration. It became the spine of the navigation.
+## A small table
 
-## Pages are coordinates
+| Term  | Definition                                   | Notes                              |
+| ----- | -------------------------------------------- | ---------------------------------- |
+| Lorem | dolor sit amet                               | short                              |
+| Ipsum | consectetur adipiscing elit, sed do eiusmod  | a longer cell that may wrap        |
+| Dolor | `inline_code()` inside a cell                | with [a link](https://example.com) |
 
-The site is one continuous space. "Going to a page" animates a camera across a
-plane, and the living grid pans in lockstep with it — the same `scroll_x` /
-`scroll_y` uniform drives both the content and the cells.
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+incididunt ut labore et dolore magna aliqua.
 
-That lockstep is the hard part. The DOM scrolls on the compositor; the canvas
-renders in a worker on its own clock. Keeping them in phase meant frame-locking
-the grid offset to the render, sampled fresh every frame.
+## A very wide table
 
-## What's cheap and what isn't
+| A     | B      | C       | D      | E          | F           | G          | H            |
+| ----- | ------ | ------- | ------ | ---------- | ----------- | ---------- | ------------ |
+| lorem | ipsum  | dolor   | sit    | amet       | consectetur | adipiscing | elit         |
+| sed   | do     | eiusmod | tempor | incididunt | ut          | labore     | dolore       |
+| magna | aliqua | enim    | minim  | veniam     | quis        | nostrud    | exercitation |
 
-A surprising amount of the budget goes to *seeding*, not rendering:
+The table above has eight columns and should test horizontal overflow within the
+reading column.
 
-1. The fragment shader is ~2ms on a desktop GPU.
-2. The simulation tick is effectively free.
-3. Re-seeding the world with fresh patterns is the expensive part.
+## Dense inline formatting
 
-Atmosphere, it turns out, is more work than it looks.
+Lorem ipsum **dolor** sit *amet*, ***consectetur*** adipiscing `elit`, sed do
+`eiusmod()` tempor `incididunt` ut `labore.dolore(magna)` et dolore magna aliqua.
+Here is an ordinary link in the flow: [the documentation](https://example.com/docs).
+
+Here is a very long URL with no break points, which may overflow the column:
+[https://example.com/some/very/long/path/that/keeps/going/and/going/without/any/break/points/at/all/forever/and/ever](https://example.com/some/very/long/path/that/keeps/going/and/going/without/any/break/points/at/all/forever/and/ever)
+
+And a long unbreakable token in prose:
+Loremipsumdolorsitametconsecteturadipiscingelitseddoeiusmodtemporincididuntutlaboreetdoloremagnaaliqua
+— does it overflow its column?
+
+Inline math appears in the flow too, like $E = mc^2$ and
+$\int_0^1 x^2\,\mathrm{d}x = \tfrac{1}{3}$, set among the lorem so we can see it
+sit on the baseline.
+
+## Closing
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+incididunt ut labore et dolore magna aliqua, ut enim ad minim veniam, quis
+nostrud exercitation ullamco laboris.

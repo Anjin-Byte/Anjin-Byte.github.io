@@ -1,49 +1,80 @@
 ---
-title: The lightness of a cut edge
+title: "Lorem ipsum: kitchen sink"
 date: 2026-05-15
-summary: Why the paper edges are a perceptual lightness delta in OKLab, and how one number tunes the whole system across both themes.
-tags: [design, color, math]
+summary: Everything at once — math breakout amid prose, lists with embedded code and quotes, tables beside code blocks, deep nesting, and wide unbreakable content.
+tags: [lorem, mixed, everything]
 ---
 
-Every surface here is a sheet of paper, and every edge is a *cut* — a lit lip on
-top, a shadowed one beneath. The trick is that the edge isn't a fixed colour.
-It's a **lightness delta** measured from the paper's own fill, in OKLab.
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis
+nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
 
-## Why OKLab
+## Math amid prose
 
-In OKLab the $L$ axis is built to be perceptually uniform: a step of
-$\Delta L = 0.05$ reads as the same lightness change whether the paper is
-near-white ($L \approx 0.98$) or charcoal ($L \approx 0.18$). That's the property
-sRGB lacks, and it's exactly what an edge needs to look identical in both themes.
-
-The lit and shadowed lips are simply
+A display equation breaking out of the column among lorem text:
 
 $$
-L_{\text{lip}}^{\pm} = \operatorname{clamp}\!\left(L_{\text{fill}} \pm \Delta L,\; 0,\; 1\right),
+\oint_{\partial \Omega} \mathbf{F} \cdot \mathrm{d}\mathbf{S}
+  = \int_{\Omega} (\nabla \cdot \mathbf{F})\, \mathrm{d}V
 $$
 
-with a single knob $\Delta L = 0.05$ driving every edge in the system.
+And a very wide one, to test breakout together with horizontal overflow:
 
-## In CSS
+$$
+L_o(\mathbf{x}, \omega_o) = L_e(\mathbf{x}, \omega_o) + \int_{\Omega} f_r(\mathbf{x}, \omega_i, \omega_o)\, L_i(\mathbf{x}, \omega_i)\, (\omega_i \cdot \mathbf{n})\, \mathrm{d}\omega_i + \sum_{k=1}^{\infty} \mathcal{T}^k L_e \quad \text{(lorem ipsum dolor sit amet)}
+$$
 
-Relative-colour syntax lets the browser do the OKLab arithmetic at paint time —
-no precomputed palette, no two-theme duplication:
+Inline math $a^2 + b^2 = c^2$ sits in the lorem flow alongside `inline code`.
 
-```css
---island-lip:
-  inset 0  1px 0 oklab(from var(--island-fill) calc(l + var(--cut)) a b),
-  inset 0 -1px 0 oklab(from var(--island-fill) calc(l - var(--cut)) a b);
+## Lists with embedded blocks
+
+1. First step, carrying code:
+
+   ```ts
+   const step = 1;
+   ```
+
+2. Second step, carrying a nested list and a quote:
+
+   - sub-item alpha
+   - sub-item beta
+
+   > a quote nested inside the second list item
+
+3. Third step, plain.
+
+## Table beside code
+
+| Key   | Value |
+| ----- | ----- |
+| lorem | ipsum |
+| dolor | sit   |
+
+```rust
+let table = vec![("lorem", "ipsum"), ("dolor", "sit")];
 ```
 
-## A note on contrast
+## Deep nesting
 
-Text is tuned the same way. Weber's law says perceived contrast scales with the
-*ratio* of luminances,
+> Level one quote. Lorem ipsum dolor sit amet.
+>
+> > Level two quote, containing a list:
+> >
+> > - alpha
+> > - beta
+> >
+> > And some `inline code` for good measure.
 
-$$
-C = \frac{\Delta L}{L_{\text{bg}}},
-$$
+## Wide and unbreakable
 
-so the dark theme needs a slightly larger gap between ink tiers to feel as
-separated as the light one — which is why the tertiary ink is bumped from $0.54$
-to $0.60$ in the dark palette rather than left to match.
+A long unbreakable string in prose:
+Loremipsumdolorsitametconsecteturadipiscingelitseddoeiusmodtemporincididuntutlaboreetdolore.
+
+A long inline code span:
+`lorem_ipsum_dolor_sit_amet_consectetur_adipiscing_elit_sed_do_eiusmod_tempor_incididunt()`.
+
+## Closing
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+incididunt ut labore et dolore magna aliqua, ut enim ad minim veniam, quis
+nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.

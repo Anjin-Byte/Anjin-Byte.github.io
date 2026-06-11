@@ -1,49 +1,73 @@
 ---
-title: Bitpacking a million cells
+title: "Lorem ipsum: headings & hierarchy"
 date: 2026-05-28
-summary: The Game of Life world is a 1024×1024 bit array. Here's how the cells pack, and how a neighbour count falls out of it.
-tags: [rust, webgpu]
+summary: A stress page for heading rhythm — consecutive headings, headings carrying inline code and math, very long headings, and headings pressed against other blocks.
+tags: [lorem, structure, hierarchy, depth, test]
 ---
 
-The background world is $1024 \times 1024 = 2^{20}$ cells — just over a million.
-Stored one bit per cell that's 128 KiB; stored as bytes it'd be eight times that.
-At a million cells the constant factor *is* the game.
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+incididunt ut labore et dolore magna aliqua.
 
-## Packing
+## A section
 
-Each row of 1024 cells is 16 `u64` words. Cell $(x, y)$ lives in bit
-$x \bmod 64$ of word $\lfloor x / 64 \rfloor$ in row $y$:
+### A subsection immediately under it
 
-```rust
-#[inline]
-fn get(&self, x: usize, y: usize) -> bool {
-    let word = self.cells[y * WORDS_PER_ROW + (x >> 6)];
-    (word >> (x & 63)) & 1 == 1
-}
+No paragraph separates the h2 and the h3 above. Lorem ipsum dolor sit amet,
+consectetur adipiscing elit.
+
+## Another section
+
+## And another immediately after
+
+Two h2s in a row, with no body between them. Lorem ipsum dolor sit amet,
+consectetur adipiscing elit, sed do eiusmod tempor incididunt.
+
+## A heading with `inline code` and *emphasis*
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+
+## A heading with math like $\alpha + \beta = \gamma$
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
+
+## A very long heading that runs well past the measure and therefore must wrap onto a second and perhaps even a third line, which is exactly when the cut-rule underneath it tends to misbehave
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+
+## Short sections in sequence
+
+### One
+
+Lorem.
+
+### Two
+
+Ipsum.
+
+### Three
+
+Dolor sit amet.
+
+---
+
+## Heading right after a horizontal rule
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+
+- a list item
+- right before a heading
+
+## Heading right after a list
+
+```ts
+const beforeHeading = true;
 ```
 
-The `x >> 6` and `x & 63` are exactly $\lfloor x/64 \rfloor$ and $x \bmod 64$ —
-the compiler knows it, but it's worth seeing the arithmetic under the bit-twiddle.
+## Heading right after a code block
 
-## Counting neighbours
+> A quote that sits right before a heading.
 
-A cell's next state depends on its eight neighbours. The packed form can count a
-whole word at a time, but the readable definition is just
+## Heading right after a quote
 
-$$
-n(x,y) = \sum_{\substack{dx,\,dy \,\in\, \{-1,0,1\} \\ (dx,dy)\,\neq\,(0,0)}} \operatorname{cell}(x + dx,\; y + dy),
-$$
-
-and the rule itself is the classic $B3/S23$:
-
-```rust
-let alive = self.get(x, y);
-let next = matches!((alive, n), (true, 2) | (_, 3));
-```
-
-> A live cell with two or three neighbours survives; a dead cell with exactly
-> three is born. Everything else dies. Three integers of state, a universe of
-> behaviour.
-
-The GPU runs this over the whole grid in a compute pass in ~0.01 ms — the
-simulation was never the expensive part. (The *seeding* is. But that's another note.)
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+incididunt ut labore et dolore magna aliqua, ut enim ad minim veniam.
