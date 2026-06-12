@@ -16,7 +16,6 @@ import {
   mdiViewGridOutline,
   mdiFileAccountOutline,
   mdiEmailOutline,
-  mdiAccountOutline,
   mdiNotebookOutline,
 } from '@mdi/js';
 import type { Waypoint } from '../types/space';
@@ -26,8 +25,7 @@ export const WAYPOINTS = [
   { id: 'projects', route: '/projects', label: 'Demos', gx: 1, gy: 0, icon: mdiViewGridOutline },
   { id: 'resume', route: '/resume', label: 'Resume', gx: -1, gy: 0, icon: mdiFileAccountOutline },
   { id: 'contact', route: '/contact', label: 'Contact', gx: 0, gy: 1, icon: mdiEmailOutline },
-  { id: 'about', route: '/about', label: 'About', gx: 0, gy: -1, icon: mdiAccountOutline },
-  { id: 'notebook', route: '/notebook', label: 'Notebook', gx: 1, gy: -1, icon: mdiNotebookOutline },
+  { id: 'notebook', route: '/notebook', label: 'Notebook', gx: 0, gy: -1, icon: mdiNotebookOutline },
 ] as const satisfies readonly Waypoint[];
 
 /** Strict union of valid waypoint ids, derived from the table above. */

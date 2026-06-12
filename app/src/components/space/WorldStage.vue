@@ -6,7 +6,6 @@ import HeroSection from '../sections/HeroSection.vue';
 import ProjectsSection from '../sections/ProjectsSection.vue';
 import ResumeSection from '../sections/ResumeSection.vue';
 import ContactSection from '../sections/ContactSection.vue';
-import AboutSection from '../sections/AboutSection.vue';
 import NotebookSection from '../sections/NotebookSection.vue';
 import NotebookPage from '../sections/NotebookPage.vue';
 import { findWaypoint } from '../../space/waypoints';
@@ -24,7 +23,6 @@ const coreNodes = {
   projects: findWaypoint('projects'),
   resume: findWaypoint('resume'),
   contact: findWaypoint('contact'),
-  about: findWaypoint('about'),
   notebook: findWaypoint('notebook'),
 };
 
@@ -73,7 +71,6 @@ onUnmounted(() => {
       <WorldPanel :node="coreNodes.projects" waypoint-id="projects"><ProjectsSection /></WorldPanel>
       <WorldPanel :node="coreNodes.resume" waypoint-id="resume"><ResumeSection /></WorldPanel>
       <WorldPanel :node="coreNodes.contact" waypoint-id="contact"><ContactSection /></WorldPanel>
-      <WorldPanel :node="coreNodes.about" waypoint-id="about"><AboutSection /></WorldPanel>
       <WorldPanel :node="coreNodes.notebook" waypoint-id="notebook"><NotebookSection /></WorldPanel>
       <WorldPanel v-for="entry in notebookNodes" :key="entry.slug" :node="entry">
         <NotebookPage :entry="entry" />
