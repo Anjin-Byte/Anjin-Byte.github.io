@@ -21,7 +21,7 @@ rand_xoshiro         = { version = "0.6", default-features = false }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys = { version = "0.3", features = ["HtmlCanvasElement", "OffscreenCanvas", "Window", "console"] }
-wgpu    = { version = "22", default-features = false, features = ["webgpu", "wgsl"] }
+wgpu    = { version = "22", default-features = false, features = ["webgpu", "webgl", "wgsl"] }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

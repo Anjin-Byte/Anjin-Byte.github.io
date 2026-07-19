@@ -1,13 +1,13 @@
 ---
 title: The rendering equation
 date: 2026-06-12
-summary: A long test piece — light transport from first principles, from radiance and the BRDF to the Monte Carlo estimator a path tracer actually runs.
+summary: "A long test piece: light transport from first principles, from radiance and the BRDF to the Monte Carlo estimator a path tracer actually runs."
 tags: [graphics, math, rendering]
 ---
 
 Almost all of physically based rendering is one equation, written down by Kajiya
 in 1986, and a great deal of cleverness spent *not* solving it exactly. It is an
-integral equation: the unknown — outgoing light — appears on both sides, once
+integral equation: the unknown, outgoing light, appears on both sides, once
 outside an integral and once buried inside it. Everything from a path tracer to a
 real-time global-illumination probe is an approximation to the same expression.
 
@@ -16,7 +16,7 @@ actually evaluates.
 
 ## Radiometry: what we solve for
 
-The quantity of interest is **radiance**, $L$ — power per unit projected area per
+The quantity of interest is **radiance**, $L$: power per unit projected area per
 unit solid angle, measured in $\mathrm{W}\,\mathrm{m}^{-2}\,\mathrm{sr}^{-1}$.
 Radiance is the right unknown because it is *constant along a ray* in a vacuum and
 it is exactly what a pixel integrates. Formally,
@@ -28,7 +28,7 @@ $$
 
 where $\Phi$ is radiant flux, $\mathrm{d}A^{\perp}$ is area projected perpendicular
 to $\omega$, and $\theta$ is the angle between $\omega$ and the surface normal
-$\mathbf{n}$. Irradiance — flux *arriving* per unit area — is radiance gathered
+$\mathbf{n}$. Irradiance, flux *arriving* per unit area, is radiance gathered
 over the hemisphere:
 
 $$
@@ -37,8 +37,8 @@ $$
 
 The two radiometric quantities worth keeping straight:
 
-- **Radiance** $L$ — directional, conserved along a ray, what we trace.
-- **Irradiance** $E$ — the cosine-weighted integral of incoming radiance; what a
+- **Radiance** $L$: directional, conserved along a ray, what we trace.
+- **Irradiance** $E$: the cosine-weighted integral of incoming radiance; what a
   diffuse surface "feels."
 
 ## The equation
@@ -56,7 +56,7 @@ Read it left to right: $L_e$ is emission (zero unless $\mathbf{x}$ is a light);
 the integral sweeps every incoming direction $\omega_i$ over the hemisphere
 $\Omega$; $f_r$ is the **BRDF**; $L_i$ is the incoming radiance from $\omega_i$;
 and $(\omega_i \cdot \mathbf{n}) = \cos\theta_i$ is the foreshortening cosine. The
-recursion hides in $L_i$ — the light arriving along $\omega_i$ is itself the
+recursion hides in $L_i$: the light arriving along $\omega_i$ is itself the
 outgoing radiance of *another* point, so `L_i` is `L_o` evaluated elsewhere.
 
 > The equation is a fixed point: light is the thing that, when you reflect it off
@@ -66,7 +66,7 @@ outgoing radiance of *another* point, so `L_i` is `L_o` evaluated elsewhere.
 ## The BRDF
 
 The **bidirectional reflectance distribution function** is the surface's entire
-optical character — the ratio of reflected radiance in $\omega_o$ to the
+optical character: the ratio of reflected radiance in $\omega_o$ to the
 irradiance arriving from $\omega_i$:
 
 $$
@@ -87,7 +87,7 @@ f_r(\mathbf{x}, \omega_i, \omega_o) &= f_r(\mathbf{x}, \omega_o, \omega_i)
 $$
 
 The simplest case is the **Lambertian** (ideal diffuse) surface, whose BRDF is a
-constant — the albedo $\rho$ spread evenly over the hemisphere:
+constant: the albedo $\rho$ spread evenly over the hemisphere:
 
 $$
 f_r^{\text{Lambert}} = \frac{\rho}{\pi}, \qquad 0 \le \rho \le 1 .
@@ -139,7 +139,7 @@ G(\mathbf{x} \leftrightarrow \mathbf{x}')
 $$
 
 The inverse-square falloff and the two cosines are the entire reason a distant or
-grazing light contributes less — they are not added by hand, they fall out of the
+grazing light contributes less; they are not added by hand, they fall out of the
 measure.
 
 ## Operator form and the Neumann series
@@ -152,7 +152,7 @@ L = L_e + \mathcal{T}L .
 $$
 
 Solving formally for $L$ and expanding the inverse as a geometric series gives the
-**Neumann series** — the path-integral view of light transport:
+**Neumann series**: the path-integral view of light transport:
 
 $$
 L = (\mathbf{I} - \mathcal{T})^{-1} L_e = \sum_{k=0}^{\infty} \mathcal{T}^{k} L_e .
@@ -160,7 +160,7 @@ $$
 
 Each term is one more bounce: $\mathcal{T}^0 L_e$ is directly visible emitters,
 $\mathcal{T}^1 L_e$ is light that bounced once, and so on. Because every physical
-BRDF loses some energy, $\lVert \mathcal{T} \rVert < 1$ and the series converges —
+BRDF loses some energy, $\lVert \mathcal{T} \rVert < 1$ and the series converges,
 which is *why* truncating at a finite bounce count is legitimate.
 
 ## Monte Carlo: the estimator a renderer runs
@@ -175,7 +175,7 @@ $$
 $$
 
 This is unbiased for any $p > 0$ where the integrand is nonzero, with variance
-$\propto 1/N$ — so error falls as $\mathcal{O}(N^{-1/2})$, the slow convergence
+$\propto 1/N$, so error falls as $\mathcal{O}(N^{-1/2})$, the slow convergence
 that makes path tracing noisy. The lever is **importance sampling**: choose $p$ to
 resemble the integrand. For a diffuse surface the ideal choice is the
 cosine-weighted density
@@ -234,8 +234,8 @@ The full image is this estimator, averaged over many samples per pixel:
 
 ## Why it stays hard
 
-Everything past this point — bidirectional tracing, Metropolis transport, photon
-maps, ReSTIR, denoisers — is variance reduction on the same integral. The
+Everything past this point (bidirectional tracing, Metropolis transport, photon
+maps, ReSTIR, denoisers) is variance reduction on the same integral. The
 rendering equation didn't get easier; we just got better at spending samples where
 the integrand is large. The grid behind this page is GPU work; a renderer is the
 same equation with the integral left in.

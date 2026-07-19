@@ -11,7 +11,8 @@ import type { BlankZone } from '../types/blankZones';
 import type { ThemePalette } from '../types/theme';
 import { LIGHT_THEME, serializeTheme } from '../types/theme';
 import { BlankZoneState } from './BlankZoneState';
-import { makeCpuRenderer } from './cpuRenderer';
+import { makeStaticRenderer } from './staticRenderer';
+import { shouldRenderFrame } from './frameGate';
 
 const log = createLogger('Renderer');
 const ws  = self as unknown as DedicatedWorkerGlobalScope;
@@ -62,6 +63,25 @@ let pendingCameraY = 0;
 // the init handler after the renderer object is assigned.
 let pendingResize: { width: number; height: number } | null = null;
 let frameCount  = 0;
+// Render-gate state (the decision itself is the pure, tested
+// `shouldRenderFrame` in frameGate.ts — the throttle/motion/burst rationale
+// lives there): timestamp of the last render, the camera offset of the last
+// RENDERED frame (NaN-seeded so the first frame always renders), and the
+// burst deadline armed by 'set_theme'.
+let lastRenderTime = 0;
+let lastRenderedCameraX = Number.NaN;
+let lastRenderedCameraY = Number.NaN;
+// Present-burst deadline: while performance.now() is below this, the throttle
+// is bypassed and every 'frame' message renders. Armed by 'set_theme' — after
+// a theme flip the swapchain's 2-3 buffers in rotation still hold OLD-theme
+// frames, and Firefox (unlike Chrome, which always composites the latest
+// present) can alternate those stale buffers with the already-flipped page
+// background behind the PreMultiplied canvas, flashing old/new until every
+// buffer has been re-rendered. A short unthrottled run of presents refreshes
+// the whole rotation back-to-back — the same cure the camera-motion bypass
+// applies to the identical stale-buffer ghosting during pans and scrolls.
+const THEME_PRESENT_BURST_MS = 300;
+let forceRenderUntil = 0;
 const zoneState  = new BlankZoneState();
 // Cached so the current theme survives renderer hand-offs (GPU→CPU fallback,
 // resize, etc). Defaults to light until the main thread sends `set_theme`.
@@ -116,11 +136,12 @@ function applyZonesToRenderer(): void {
 // ── Memory reporting (DEV) ─────────────────────────────────────────────────────
 // wgpu exposes no VRAM total, so GPU allocations are estimated from canvas + grid
 // dims. The dominant buffers are all derivable: the surface texture (canvas
-// w×h×4, the lion's share), 3 cell-sized buffers (the ping-pong pair + frozen),
-// and the 256² RGBA8 paper-noise texture.
+// w×h×4, the lion's share), 5 cell-plane-sized buffers (the ping-pong pair +
+// frozen + the interleaved 2-plane packed render buffer), and the 256² RGBA8
+// paper-noise texture.
 const SURFACE_BYTES_PER_PX = 4; // 8-bit RGBA/BGRA surface
 const NOISE_TEX_BYTES = 256 * 256 * 4;
-const CELL_BUFFER_COUNT = 3;
+const CELL_BUFFER_COUNT = 5;
 
 function workerHeapBytes(): number | null {
   const mem = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory;
@@ -151,6 +172,79 @@ function setZonesState(next: unknown): void {
   postZonesState();
 }
 
+// Grid info for backends with no addressable cell grid (static fallback, and
+// the WebGL2 renderer until its sim lands). gridPitch 0 makes the main
+// thread's coordinate snapshot null, so click-to-toggle cleanly no-ops.
+const ZERO_GRID_INFO: GridInfo = { worldCols: 0, worldRows: 0, paddedRows: 0, wordsPerRow: 0, gridPitch: 0 };
+
+/**
+ * Probe WebGL2 availability WITHOUT touching the presentation canvas — a
+ * throwaway 1x1 OffscreenCanvas, mirroring the WebGPU pre-probe. A context can
+ * only be claimed once per canvas, so we must know WebGL2 works before
+ * committing the real canvas to it.
+ */
+function webgl2Available(): boolean {
+  try {
+    return new OffscreenCanvas(1, 1).getContext('webgl2') != null;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Build the WebGL2 ping-pong fallback renderer, assign it to `renderer`, and
+ * post `ready` on success. The canvas is committed to a WebGL2 context here, so
+ * only call this after the WebGPU probe has been declined and `webgl2Available`
+ * confirmed the context can be created. Returns true on success.
+ */
+async function initWebgl2Renderer(): Promise<boolean> {
+  if (!canvas) return false;
+  try {
+    const { WebglGameOfLife } = await import('@gpu-pkg/game_of_life_gpu.js');
+    const seed = Math.floor(Math.random() * 0x1_0000_0000);
+    const gl = await WebglGameOfLife.new_offscreen(canvas, seed);
+    renderer = {
+      tick: () => gl.tick_and_render(),
+      renderOnly: () => gl.render_only(),
+      resize: (w, h) => gl.resize(w, h),
+      setCamera: (x, y) => gl.set_camera(x, y),
+      setTransition: (t) => gl.set_transition(t),
+      setInitFade: (t) => gl.set_init_fade(t),
+      toggleCell: (cx, cy) => gl.toggle_cell(cx, cy),
+      setTheme: (theme) => {
+        try {
+          gl.set_theme_json(serializeTheme(theme));
+        } catch (err) {
+          log.error('WebGL2 theme update failed:', errorMessage(err));
+        }
+      },
+      free: () => gl.free(),
+    };
+    renderer.setCamera?.(pendingCameraX, pendingCameraY);
+    renderer.setTheme?.(currentTheme);
+    log.info('WebGL2 fallback renderer ready');
+    // Real grid info: worldCols/Rows + gridPitch drive click→cell mapping and
+    // the CSS-grid pitch cross-check. paddedRows/wordsPerRow are unused by the
+    // main thread's coordinate math, so 0 is fine.
+    post({
+      type: 'ready',
+      backend: 'webgl2',
+      gridInfo: {
+        worldCols: gl.world_cols(),
+        worldRows: gl.world_rows(),
+        paddedRows: 0,
+        wordsPerRow: 0,
+        gridPitch: gl.grid_pitch(),
+      },
+    });
+    return true;
+  } catch (err) {
+    log.error('WebGL2 init failed:', errorMessage(err));
+    post({ type: 'error', phase: 'gpu-init', message: errorMessage(err) });
+    return false;
+  }
+}
+
 // ── Message handler ───────────────────────────────────────────────────────────
 
 ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
@@ -160,35 +254,46 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
       // Hoist the OffscreenCanvas to module scope so the resize handler can
       // update its dimensions even before the renderer is created.
       canvas = e.data.canvas;
-      const { cellPx } = e.data;
       // Take the resolved theme from the main thread before any GPU work,
       // so the first `renderer.setTheme(currentTheme)` call below sends
       // the correct palette and the first rendered frame doesn't flash
       // light against a dark html background on dark-OS users with the
       // `system` default.
       currentTheme = e.data.theme;
-      log.debug('Init received — canvas', canvas.width, 'x', canvas.height, 'cell_px', cellPx);
+      log.debug('Init received — canvas', canvas.width, 'x', canvas.height);
 
       // Tier 1 perf timing markers — capture a stamp before each major
       // async phase of init so the main thread can render a startup
       // breakdown.  DEV-only via PERF_ENABLED gate further down.
       const startupT0 = performance.now();
+      const force = e.data.forceBackend;
+
+      // ── Forced WebGL2 (dev/testing via ?renderer=webgl2) ──────────────
+      // Build the ping-pong fallback directly, skipping the WebGPU probe.
+      // (initWebgl2Renderer posts `ready` itself.)
+      if (force === 'webgl2') {
+        await initWebgl2Renderer();
+        break;
+      }
 
       // ── WebGPU pre-probe (no canvas involved) ─────────────────────────
       // We must verify WebGPU works BEFORE calling new_offscreen(), because
       // create_surface() permanently claims the canvas as a WebGPU context.
       // If that call succeeds but requestDevice() then fails, getContext('2d')
       // can never be obtained on the same canvas, breaking the CPU fallback.
+      // `?renderer=static` forces the static fallback by skipping the probe.
       log.debug('GPU: probing WebGPU availability...');
       let gpuProbeOk = false;
-      try {
-        const probeAdapter = await navigator.gpu?.requestAdapter() ?? null;
-        if (!probeAdapter) throw new Error('No WebGPU adapter');
-        gpuProbeOk = true;
-        log.debug('GPU: probe passed — adapter found');
-      } catch (probeErr) {
-        log.info('GPU: probe failed, will use CPU renderer:', errorMessage(probeErr));
-        post({ type: 'error', phase: 'gpu-probe', message: errorMessage(probeErr) });
+      if (force !== 'static') {
+        try {
+          const probeAdapter = await navigator.gpu?.requestAdapter() ?? null;
+          if (!probeAdapter) throw new Error('No WebGPU adapter');
+          gpuProbeOk = true;
+          log.debug('GPU: probe passed — adapter found');
+        } catch (probeErr) {
+          log.info('GPU: probe failed, will use CPU renderer:', errorMessage(probeErr));
+          post({ type: 'error', phase: 'gpu-probe', message: errorMessage(probeErr) });
+        }
       }
       const startupT1 = performance.now();
 
@@ -203,7 +308,11 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
           // is enough variety; the Rust side widens it to u64.  A future
           // URL-seeded mode would parse `?seed=` here instead.
           const seed = Math.floor(Math.random() * 0x1_0000_0000);
-          const gpu = await GpuGameOfLife.new_offscreen(canvas, cellPx, seed);
+          // Second arg is the legacy `_grid_pitch` parameter — gpu.rs ignores
+          // it (cell size is its own CELL_PX constant, reported back via
+          // GridInfo.gridPitch); 0 is passed only to satisfy the generated
+          // signature until the next wasm rebuild drops the parameter.
+          const gpu = await GpuGameOfLife.new_offscreen(canvas, 0, seed);
           const startupT3 = performance.now();
           // Verify set_zones_json is present at init time so a future rename/removal
           // produces a visible warning rather than silently failing on every zone update.
@@ -339,19 +448,34 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
         }
       }
 
-      // ── CPU fallback (canvas is clean — probe failed before canvas commit) ──
-      log.debug('CPU: starting software renderer...');
+      // ── WebGL2 fallback (WebGPU unavailable, canvas still clean) ──────────
+      // The GPU pre-probe touches no canvas, so on WebGPU-absent browsers the
+      // canvas is uncommitted here and we can try the WebGL2 ping-pong tier.
+      // Probe on a throwaway canvas FIRST (a context claims the canvas
+      // permanently), then commit. `?renderer=static` skips this.
+      if (force !== 'static' && webgl2Available()) {
+        log.debug('WebGL2: WebGPU unavailable, trying WebGL2 fallback...');
+        if (await initWebgl2Renderer()) break;
+        // If init failed after the probe passed, the canvas may now be a dead
+        // WebGL2 context; the static path's getContext('2d') would then fail
+        // and post its own error. Rare, and better than not trying WebGL2.
+      }
+
+      // ── Static fallback (last resort) ─────────────────────────────────────
+      // No simulation: a frozen, theme-aware image in the GPU effect's visual
+      // language. See staticRenderer.ts for why this replaced the CPU GoL port.
+      log.debug('CPU: starting static fallback renderer...');
       try {
-        renderer = await makeCpuRenderer(canvas);
+        renderer = makeStaticRenderer(canvas);
         renderer.setCamera?.(pendingCameraX, pendingCameraY);
-        renderer.setZones?.(zoneState.getAll());
         renderer.setTheme?.(currentTheme);
-        log.info('CPU renderer ready');
-        // CPU renderer has no grid info; supply zeroed placeholder.
-        post({ type: 'ready', backend: 'cpu', gridInfo: { worldCols: 0, worldRows: 0, paddedRows: 0, wordsPerRow: 0, gridPitch: 0 } });
+        log.info('Static fallback renderer ready');
+        // gridPitch 0 makes the main thread's coordinate snapshot null, so
+        // click-to-toggle cleanly no-ops (nothing to toggle).
+        post({ type: 'ready', backend: 'cpu', gridInfo: ZERO_GRID_INFO });
       } catch (cpuErr) {
         const message = errorMessage(cpuErr);
-        log.error('CPU init failed:', message);
+        log.error('Static fallback init failed:', message);
         post({ type: 'error', phase: 'cpu-init', message });
       }
       break;
@@ -364,6 +488,23 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
       pendingCameraX = e.data.cameraX;
       pendingCameraY = e.data.cameraY;
       renderer.setCamera?.(pendingCameraX, pendingCameraY);
+
+      // Render/tick gate (pure decision + rationale in frameGate.ts) — placed
+      // AFTER setCamera so a throttled-out frame still leaves the GPU uniform
+      // fresh; only the expensive tick/render + its bookkeeping (frameCount,
+      // and hence TICK_EVERY's cadence) are skipped.
+      const nowMs = performance.now();
+      const render = shouldRenderFrame(nowMs, pendingCameraX, pendingCameraY, {
+        lastRenderTime,
+        lastCameraX: lastRenderedCameraX,
+        lastCameraY: lastRenderedCameraY,
+        forceRenderUntil,
+      });
+      if (!render) break;
+      lastRenderTime = nowMs;
+      lastRenderedCameraX = pendingCameraX;
+      lastRenderedCameraY = pendingCameraY;
+
       perf?.beginFrame();
       frameCount++;
 
@@ -485,6 +626,16 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
     case 'set_theme':
       currentTheme = e.data.theme;
       renderer?.setTheme?.(currentTheme);
+      // Arm the present burst (see THEME_PRESENT_BURST_MS): every 'frame'
+      // message inside the window renders, so the swapchain's whole buffer
+      // rotation is refreshed with the new theme back-to-back. A single
+      // forced render was tried and did NOT cure the Firefox old/new flicker
+      // — it refreshes one buffer while the others in rotation still hold
+      // old-theme frames that Firefox may re-composite on non-presenting
+      // ticks. All presents stay on the normal per-'frame' path (no extra
+      // out-of-band submit here), so present ordering is never in question.
+      forceRenderUntil = performance.now() + THEME_PRESENT_BURST_MS;
+      lastRenderTime = 0;
       break;
 
     case 'perf_snapshot':
@@ -493,10 +644,8 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
       }
       break;
 
-    case 'stop':
-      log.debug('Stop received, freeing renderer');
-      renderer?.free();
-      renderer = null;
-      break;
+    // (No 'stop' message: WorkerBridge.terminate() kills the thread
+    // synchronously, so a farewell message could never be processed — the
+    // browser reclaims the GPU device with the worker.)
   }
 };

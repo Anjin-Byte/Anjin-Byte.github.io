@@ -9,7 +9,12 @@ import { useCoordinateMapper } from '../../composables/useCoordinateMapper';
 import { useAnimationLoop } from '../../composables/useAnimationLoop';
 import { useDragTools } from '../../composables/useDragTools';
 import { useThemePreference } from '../../composables/useThemePreference';
-import { useCanvasSurface } from '../../composables/useCanvasSurface';
+import {
+  useCanvasSurface,
+  applyGridPitchVars,
+  GRID_CELL_DEVICE_PX,
+} from '../../composables/useCanvasSurface';
+import { useRendererBackend } from '../../composables/useRendererBackend';
 import { useWorkerDiagnostics } from '../../composables/useWorkerDiagnostics';
 import { useCamera } from '../../composables/useCamera';
 import GridBlankZonePanel from './GridBlankZonePanel.vue';
@@ -28,6 +33,7 @@ const coords = useCoordinateMapper(bridge.gridInfo, camera.worldOffsetDevicePx);
 const anim = useAnimationLoop();
 const drag = useDragTools(coords);
 const surface = useCanvasSurface(bridge.post);
+const { activeBackend } = useRendererBackend();
 
 // The grid offset is forwarded frame-locked in the render loop below (not via a
 // reactive watch), so the canvas grid tracks the native scroll without juddering.
@@ -117,12 +123,7 @@ function onDocumentClick(event: MouseEvent): void {
   const cell = screenToCell(event.clientX, event.clientY, snap);
   const wrapped = wrapCell(cell, snap);
   log.debug('Click →', event.clientX, event.clientY, '→ cell', wrapped.cx, wrapped.cy);
-  bridge.post({
-    type: 'toggle_cell',
-    cx: wrapped.cx,
-    cy: wrapped.cy,
-    scrollCanvasPx: snap.offsetY,
-  });
+  bridge.post({ type: 'toggle_cell', cx: wrapped.cx, cy: wrapped.cy });
 }
 
 // ── Lifecycle ───────────────────────────────────────────────────────────────
@@ -133,13 +134,34 @@ onMounted(() => {
   const canvas = canvasRef.value;
   if (!shell || !canvas) return;
 
-  const { offscreen, gridPitch } = surface.initialize(shell, canvas);
-  bridge.init(offscreen, gridPitch, currentTheme.value);
-  log.debug('Worker spawned, gridPitch', gridPitch.toFixed(2));
+  const { offscreen } = surface.initialize(shell, canvas);
+  // `?renderer=webgpu|webgl2|static` pins the backend for testing any tier in
+  // any browser (e.g. exercising the WebGL2 fallback on a WebGPU-capable one).
+  // Invalid values are ignored (normal probe order applies).
+  const forced = new URLSearchParams(window.location.search).get('renderer');
+  const forceBackend =
+    forced === 'webgpu' || forced === 'webgl2' || forced === 'static' ? forced : undefined;
+  bridge.init(offscreen, currentTheme.value, forceBackend);
+  log.debug('Worker spawned', forceBackend ? `(forced ${forceBackend})` : '');
 
   // Worker message handlers
   bridge.on('ready', (msg) => {
     log.info(`${msg.backend.toUpperCase()} renderer active`);
+    activeBackend.value = msg.backend; // surfaced to the dev renderer toggle
+
+    // Cross-check the TS mirror of the renderer's cell pitch (GRID_CELL_
+    // DEVICE_PX sizes the CSS fallback grid before the worker exists) against
+    // the authoritative value the renderer just reported, and correct the CSS
+    // vars from the real one if they ever drift. Guards the constant the same
+    // way types.rs asserts guard the uniform offsets. gridPitch 0 = the
+    // static fallback backend, which reports no grid.
+    if (msg.gridInfo.gridPitch > 0 && msg.gridInfo.gridPitch !== GRID_CELL_DEVICE_PX) {
+      log.error(
+        `Grid pitch mirror drifted: TS GRID_CELL_DEVICE_PX=${GRID_CELL_DEVICE_PX}, ` +
+        `renderer reports ${msg.gridInfo.gridPitch} — update the TS constant`,
+      );
+      applyGridPitchVars(msg.gridInfo.gridPitch);
+    }
     bridge.post({ type: 'set_theme', theme: currentTheme.value });
     bridge.post({ type: 'set_zones', zones: toWorkerZones(blankZones.zones.value) });
     // Deliver the current camera offset now the worker accepts commands — covers

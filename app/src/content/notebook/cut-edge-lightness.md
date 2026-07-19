@@ -1,7 +1,7 @@
 ---
 title: "Lorem ipsum: kitchen sink"
 date: 2026-05-15
-summary: Everything at once — math breakout amid prose, lists with embedded code and quotes, tables beside code blocks, deep nesting, and wide unbreakable content.
+summary: "Everything at once: math breakout amid prose, lists with embedded code and quotes, tables beside code blocks, deep nesting, and wide unbreakable content."
 tags: [lorem, mixed, everything]
 ---
 

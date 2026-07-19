@@ -13,17 +13,31 @@ export const vuetify = createVuetify({
     aliases,
     sets: { mdi },
   },
+  // Hex approximations of the cut-paper palette (theme.ts is authoritative —
+  // these were derived from it via oklab→srgb; regenerate if the palette
+  // changes). Vuetify paints few surfaces directly (tooltips, menu/list
+  // defaults not overridden by component CSS), but those must not leak the
+  // pre-redesign neon theme this block used to declare. The active theme NAME
+  // is synced with the user's light/dark preference by useThemePreference.
   theme: {
-    defaultTheme: 'dark',
+    defaultTheme: 'light',
     themes: {
+      light: {
+        dark: false,
+        colors: {
+          background: '#fafaf7', // LIGHT_THEME.surface
+          surface: '#fafaf7',
+          'on-surface': '#2a2926', // LIGHT_THEME.ink
+          primary: '#ffc3c7', // LIGHT_THEME.accent (pastel rose)
+        },
+      },
       dark: {
         dark: true,
         colors: {
-          background: '#0a0a0f',
-          surface: '#12121a',
-          primary: '#7c4dff',
-          secondary: '#00e5ff',
-          accent: '#69ff47',
+          background: '#111213', // DARK_THEME.surface
+          surface: '#111213',
+          'on-surface': '#cacacc', // DARK_THEME.ink
+          primary: '#ad9cc3', // DARK_THEME.accent (muted purple)
         },
       },
     },

@@ -107,8 +107,8 @@ export const projects: Project[] = [
       'A GPU-driven voxel mesh renderer built with Rust + WASM + Svelte 5 + WebGPU.',
     tech: ['Rust', 'WASM', 'WebGPU', 'Svelte 5'],
     links: [
-      { kind: 'demo', href: 'https://anjin-byte.github.io/Gestalt/' },
-      { kind: 'source', href: 'https://github.com/Anjin-Byte/Gestalt' },
+      { kind: 'demo', href: 'https://anjin-byte.github.io/friendly-journey/' },
+      { kind: 'source', href: 'https://github.com/Anjin-Byte/friendly-journey' },
     ],
   },
   {

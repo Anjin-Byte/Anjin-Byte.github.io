@@ -1,8 +1,17 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue';
 import AppBackground from '@/components/layout/AppBackground.vue';
 import AppChrome from '@/components/layout/AppChrome.vue';
 import WorldStage from '@/components/space/WorldStage.vue';
 import CompassNav from '@/components/space/CompassNav.vue';
+
+// DEV-only renderer backend switcher. Dynamically imported ONLY under
+// import.meta.env.DEV so the whole component (and its dynamic-import chunk) is
+// absent from the production bundle — a plain static import + `v-if` would
+// leave the dead component code shipping. `null` in prod; the v-if drops it.
+const RendererDebugToggle = import.meta.env.DEV
+  ? defineAsyncComponent(() => import('@/components/layout/RendererDebugToggle.vue'))
+  : null;
 </script>
 
 <template>
@@ -11,6 +20,7 @@ import CompassNav from '@/components/space/CompassNav.vue';
     <AppChrome />
     <WorldStage />
     <CompassNav />
+    <component :is="RendererDebugToggle" v-if="RendererDebugToggle" />
   </v-app>
 </template>
 
@@ -87,6 +97,8 @@ import CompassNav from '@/components/space/CompassNav.vue';
      carries it; in dark both faces have headroom. Keeping the origin's a/b
      tints the edge like lit/shadowed paper (never a glassy pure-white spec).
      One knob — --cut — tunes the edge across every surface and both themes. */
+  /* Pre-JS fallback only — the authoritative value is CUT in types/theme.ts,
+     which useThemePreference republishes as this var on every theme apply. */
   --cut: 0.05;
   --island-lip:
     inset 0  1px 0 oklab(from var(--island-fill) calc(l + var(--cut)) a b),
@@ -142,7 +154,15 @@ html {
       color-mix(in oklab, var(--theme-grid-major, rgba(0, 0, 0, 0.14)) 56%, transparent) 1px,
       transparent 1px
     );
-  background-size: 16px 16px, 16px 16px, 80px 80px, 80px 80px;
+  /* Pitch vars are set by useCanvasSurface from the renderer's device-px cell
+     size ÷ the effective DPR, so this fallback grid matches the canvas grid on
+     EVERY display density (the old hardcoded 16px/80px only matched at 2×).
+     The 16px/80px fallbacks cover the pre-JS moment and remain correct for 2×. */
+  background-size:
+    var(--grid-pitch-minor, 16px) var(--grid-pitch-minor, 16px),
+    var(--grid-pitch-minor, 16px) var(--grid-pitch-minor, 16px),
+    var(--grid-pitch-major, 80px) var(--grid-pitch-major, 80px),
+    var(--grid-pitch-major, 80px) var(--grid-pitch-major, 80px);
   background-position: 0 0, 0 0, 0 0, 0 0;
 }
 

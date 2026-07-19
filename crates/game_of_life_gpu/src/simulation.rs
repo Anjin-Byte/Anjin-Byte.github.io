@@ -37,6 +37,13 @@ impl ComputeUniforms {
 pub struct Simulation {
     pub buf_a: wgpu::Buffer,
     pub buf_b: wgpu::Buffer,
+    /// Render-facing interleaved cell-state planes: flat u32 pairs where
+    /// element `2i` = current word `i` and `2i+1` = previous word `i`.  The
+    /// render shader views this as `array<vec2<u32>>` so one fetch answers
+    /// both planes.  Maintained by the tick shader (writes both words) and
+    /// the edit shaders (atomically patch the current plane at `2i`);
+    /// replaces the old renderer-owned `prev_visible_buf` + pre-tick copy.
+    pub packed_buf: wgpu::Buffer,
     // `frozen_buf`, `bgl`, `uniform_buf` back live bind groups (which hold
     // their GPU handles).  After the world-decouple, resize no longer
     // rebuilds bind groups, so these aren't read directly from Rust —
@@ -86,6 +93,7 @@ impl Simulation {
         });
 
         let (buf_a, buf_b) = make_cell_buffers(device, world);
+        let packed_buf = make_packed_buffer(device, world);
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("compute"),
@@ -106,6 +114,7 @@ impl Simulation {
                 bgl_entry(1, wgpu::BufferBindingType::Storage { read_only: true }, false),
                 bgl_entry(2, wgpu::BufferBindingType::Storage { read_only: false }, false),
                 bgl_entry(3, wgpu::BufferBindingType::Storage { read_only: true }, false),
+                bgl_entry(4, wgpu::BufferBindingType::Storage { read_only: false }, false),
             ],
         });
 
@@ -125,15 +134,16 @@ impl Simulation {
         });
 
         let bind_group_a = make_bind_group(
-            device, &bgl, &uniform_buf, &buf_a, &buf_b, &frozen_buf, "bg_a",
+            device, &bgl, &uniform_buf, &buf_a, &buf_b, &frozen_buf, &packed_buf, "bg_a",
         );
         let bind_group_b = make_bind_group(
-            device, &bgl, &uniform_buf, &buf_b, &buf_a, &frozen_buf, "bg_b",
+            device, &bgl, &uniform_buf, &buf_b, &buf_a, &frozen_buf, &packed_buf, "bg_b",
         );
 
         Simulation {
             buf_a,
             buf_b,
+            packed_buf,
             frozen_buf,
             bind_group_a,
             bind_group_b,
@@ -181,18 +191,11 @@ impl Simulation {
         self.frame += 1;
     }
 
-    /// Overwrite the current visible GPU buffer with the World's bitmap.
-    /// Used after a stamp operation to push CPU-side world changes to the
-    /// GPU.  Both `world.buffer().len()` and the GPU buffer size must match
-    /// `grid.total_words()` — they do, because the World was the source of
-    /// the GPU layout at construction.
-    ///
-    /// Currently unused — Phase 3's auto-reseed loop is the first consumer.
-    #[allow(dead_code)]
-    pub fn sync_world_to_visible(&self, queue: &wgpu::Queue, world: &World) {
-        let target = self.current_visible_buffer();
-        queue.write_buffer(target, 0, bytemuck::cast_slice(world.buffer()));
-    }
+    // (A dead `sync_world_to_visible` helper used to live here.  It wrote the
+    // World bitmap straight into the visible buffer, which would now desync
+    // the packed render planes — deleted rather than left as a trap.  If a
+    // bulk CPU→GPU sync is ever needed again, it must also rewrite
+    // `packed_buf`'s current plane.)
 
     /// Queue a cell toggle.  `cx` and `cy` must be pre-wrapped into
     /// `[0, world_cols) × [0, world_rows)` by the caller.
@@ -285,6 +288,7 @@ impl Simulation {
                 device,
                 queue,
                 self.current_visible_buffer(),
+                &self.packed_buf,
                 XOR_EDIT_SHADER,
                 "xor",
                 &self.pending_edits,
@@ -304,6 +308,7 @@ impl Simulation {
                 device,
                 queue,
                 self.current_visible_buffer(),
+                &self.packed_buf,
                 OR_EDIT_SHADER,
                 "or",
                 &self.pending_set_edits,
@@ -371,6 +376,25 @@ fn make_cell_buffers(
     (buf_a, buf_b)
 }
 
+/// Create + seed the render-facing interleaved planes.  Both planes start as
+/// the initial world state — matching the old scheme, which seeded the
+/// renderer's `prev_visible_buf` by copying `buf_a` — so pre-first-tick
+/// frames render cells as static-alive (prev == curr), not as births.
+fn make_packed_buffer(device: &wgpu::Device, world: &World) -> wgpu::Buffer {
+    let words = world.buffer();
+    let mut interleaved: Vec<u32> = Vec::with_capacity(words.len() * 2);
+    for &w in words {
+        interleaved.push(w); // current plane
+        interleaved.push(w); // previous plane
+    }
+    device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("cells_packed"),
+        contents: bytemuck::cast_slice(&interleaved),
+        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
 fn make_bind_group(
     device: &wgpu::Device,
     bgl: &wgpu::BindGroupLayout,
@@ -378,6 +402,7 @@ fn make_bind_group(
     read_buf: &wgpu::Buffer,
     write_buf: &wgpu::Buffer,
     frozen_buf: &wgpu::Buffer,
+    packed_buf: &wgpu::Buffer,
     label: &str,
 ) -> wgpu::BindGroup {
     device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -388,6 +413,7 @@ fn make_bind_group(
             wgpu::BindGroupEntry { binding: 1, resource: read_buf.as_entire_binding() },
             wgpu::BindGroupEntry { binding: 2, resource: write_buf.as_entire_binding() },
             wgpu::BindGroupEntry { binding: 3, resource: frozen_buf.as_entire_binding() },
+            wgpu::BindGroupEntry { binding: 4, resource: packed_buf.as_entire_binding() },
         ],
     })
 }
@@ -412,13 +438,17 @@ fn bgl_entry(
 /// Build, dispatch, and submit a one-shot compute pipeline that
 /// applies a list of `(word_idx, mask)` edits to `target_buf` via the
 /// atomic op encoded in `shader_src` (`atomicXor` for the toggle queue,
-/// `atomicOr` for the stamp queue).  All three resources (uniform meta,
-/// read-only edits buffer, read-write cells buffer) match a fixed bind
+/// `atomicOr` for the stamp queue).  Each edit is applied twice: to the
+/// visible ping-pong buffer (the simulation's source of truth) and to the
+/// current plane of `packed_buf` (word `2i`), keeping the render-facing
+/// interleaved planes in sync.  All four resources match a fixed bind
 /// group layout that both shaders share.
+#[allow(clippy::too_many_arguments)]
 fn dispatch_edit_shader(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     target_buf: &wgpu::Buffer,
+    packed_buf: &wgpu::Buffer,
     shader_src: &str,
     label: &str,
     edits: &[(u32, u32)],
@@ -454,6 +484,7 @@ fn dispatch_edit_shader(
             bgl_entry(0, wgpu::BufferBindingType::Uniform, false),
             bgl_entry(1, wgpu::BufferBindingType::Storage { read_only: true }, false),
             bgl_entry(2, wgpu::BufferBindingType::Storage { read_only: false }, false),
+            bgl_entry(3, wgpu::BufferBindingType::Storage { read_only: false }, false),
         ],
     });
 
@@ -479,6 +510,7 @@ fn dispatch_edit_shader(
             wgpu::BindGroupEntry { binding: 0, resource: count_buf.as_entire_binding() },
             wgpu::BindGroupEntry { binding: 1, resource: edit_buf.as_entire_binding() },
             wgpu::BindGroupEntry { binding: 2, resource: target_buf.as_entire_binding() },
+            wgpu::BindGroupEntry { binding: 3, resource: packed_buf.as_entire_binding() },
         ],
     });
 
@@ -501,18 +533,22 @@ fn dispatch_edit_shader(
 /// Tiny compute shader that applies XOR edits to the cell buffer in-place.
 /// Used by the toggle path (`queue_toggle`) — XOR is self-inverse, so
 /// double-clicking the same cell reverts it regardless of GPU state.
+/// The same mask is applied to the packed render buffer's current plane
+/// (flat u32 view: word `i`'s current bits live at index `2i`).
 const XOR_EDIT_SHADER: &str = r#"
 struct EditCount { count: u32, _pad0: u32, _pad1: u32, _pad2: u32 }
 
-@group(0) @binding(0) var<uniform>             edit_meta: EditCount;
-@group(0) @binding(1) var<storage, read>       edits:     array<vec2<u32>>;
-@group(0) @binding(2) var<storage, read_write> cells:     array<atomic<u32>>;
+@group(0) @binding(0) var<uniform>             edit_meta:    EditCount;
+@group(0) @binding(1) var<storage, read>       edits:        array<vec2<u32>>;
+@group(0) @binding(2) var<storage, read_write> cells:        array<atomic<u32>>;
+@group(0) @binding(3) var<storage, read_write> packed_cells: array<atomic<u32>>;
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let idx = gid.x;
     if idx >= edit_meta.count { return; }
     atomicXor(&cells[edits[idx].x], edits[idx].y);
+    atomicXor(&packed_cells[2u * edits[idx].x], edits[idx].y);
 }
 "#;
 
@@ -520,18 +556,21 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 /// buffer in-place.  Used by the pattern-stamp path (`queue_set`,
 /// `queue_pattern_stamp`) — OR is idempotent, which is the right
 /// semantic for "draw this pattern" (you don't want to toggle off
-/// cells that happen to already be alive).
+/// cells that happen to already be alive).  Mirrored into the packed
+/// render buffer's current plane exactly like the XOR shader.
 const OR_EDIT_SHADER: &str = r#"
 struct EditCount { count: u32, _pad0: u32, _pad1: u32, _pad2: u32 }
 
-@group(0) @binding(0) var<uniform>             edit_meta: EditCount;
-@group(0) @binding(1) var<storage, read>       edits:     array<vec2<u32>>;
-@group(0) @binding(2) var<storage, read_write> cells:     array<atomic<u32>>;
+@group(0) @binding(0) var<uniform>             edit_meta:    EditCount;
+@group(0) @binding(1) var<storage, read>       edits:        array<vec2<u32>>;
+@group(0) @binding(2) var<storage, read_write> cells:        array<atomic<u32>>;
+@group(0) @binding(3) var<storage, read_write> packed_cells: array<atomic<u32>>;
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let idx = gid.x;
     if idx >= edit_meta.count { return; }
     atomicOr(&cells[edits[idx].x], edits[idx].y);
+    atomicOr(&packed_cells[2u * edits[idx].x], edits[idx].y);
 }
 "#;

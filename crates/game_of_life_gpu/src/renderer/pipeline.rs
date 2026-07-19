@@ -16,19 +16,23 @@ use super::types::{PaperParams, RenderUniforms, ThemeParams};
 pub struct GpuRenderer {
     pub surface: wgpu::Surface<'static>,
     surface_config: wgpu::SurfaceConfiguration,
+    /// The -srgb sibling of the surface format (or the surface format itself
+    /// when no sibling exists).  Frames render through a view of this format
+    /// so gamma encode happens in fixed-function hardware on store; the
+    /// shader outputs linear and does no manual encode.
+    view_format: wgpu::TextureFormat,
     pipeline: wgpu::RenderPipeline,
     // Core resources (group 0).  `paper_buf`, `theme_buf`, `noise_view`,
-    // `noise_sampler`, `core_bgl`, `prev_visible_buf` are referenced by
-    // the bind groups (which hold them by GPU handle); the Rust fields
-    // hold ownership so the resources outlive the bind groups.  They're
-    // not read directly after construction now that resize doesn't
-    // rebuild bind groups, hence the dead_code allows.
+    // `noise_sampler`, `core_bgl` are referenced by the bind group (which
+    // holds them by GPU handle); the Rust fields hold ownership so the
+    // resources outlive it.  They're not read directly after construction
+    // now that resize doesn't rebuild bind groups, hence the dead_code
+    // allows.  Cell state (both planes) lives in the Simulation's packed
+    // buffer — the renderer no longer owns any cell buffer.
     uniform_buf: wgpu::Buffer,
     #[allow(dead_code)]
     paper_buf: wgpu::Buffer,
     theme_buf: wgpu::Buffer,
-    #[allow(dead_code)]
-    prev_visible_buf: wgpu::Buffer,
     _noise_texture: wgpu::Texture,
     #[allow(dead_code)]
     noise_view: wgpu::TextureView,
@@ -36,8 +40,7 @@ pub struct GpuRenderer {
     noise_sampler: wgpu::Sampler,
     #[allow(dead_code)]
     core_bgl: wgpu::BindGroupLayout,
-    core_bg_a: wgpu::BindGroup,
-    core_bg_b: wgpu::BindGroup,
+    core_bg: wgpu::BindGroup,
     // Overlay resources (group 1)
     zone_meta_buf: wgpu::Buffer,
     zone_buf: wgpu::Buffer,
@@ -55,11 +58,18 @@ impl GpuRenderer {
         surface: wgpu::Surface<'static>,
         grid: &Grid,
         grid_pitch: f32,
-        buf_a: &wgpu::Buffer,
-        buf_b: &wgpu::Buffer,
+        packed_buf: &wgpu::Buffer,
     ) -> Self {
         let caps = surface.get_capabilities(adapter);
         let format = caps.formats.iter().copied().find(|f| !f.is_srgb()).unwrap_or(caps.formats[0]);
+        // Render through the format's -srgb sibling view so gamma encode is
+        // fixed-function hardware, not shader ALU.  The surface format itself
+        // must stay non-sRGB (WebGPU canvas configuration only accepts unorm
+        // formats); the sibling is declared via `view_formats`.  When the
+        // format has no sibling (add_srgb_suffix returns it unchanged) the
+        // view list stays empty and rendering targets the surface directly.
+        let view_format = format.add_srgb_suffix();
+        let view_formats = if view_format != format { vec![view_format] } else { vec![] };
         // Prefer PreMultiplied so the canvas composites over the themed page
         // background.  With Opaque (Chrome's default first-listed mode), the
         // freshly-allocated backing texture flashes black during resize before
@@ -73,7 +83,7 @@ impl GpuRenderer {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT, format,
             width: grid.canvas_width, height: grid.canvas_height,
             present_mode: wgpu::PresentMode::AutoVsync, alpha_mode,
-            view_formats: vec![], desired_maximum_frame_latency: 2,
+            view_formats, desired_maximum_frame_latency: 2,
         };
         surface.configure(device, &surface_config);
 
@@ -89,35 +99,25 @@ impl GpuRenderer {
         let uniform_buf = mk_uniform("render_uniforms", bytes_of(&RenderUniforms::from_grid(grid)));
         let paper_buf = mk_uniform("paper_params", bytes_of(&PaperParams::for_pitch(grid_pitch)));
         let theme_buf = mk_uniform("theme_params", bytes_of(&ThemeParams::light()));
-        let prev_visible_buf = mk_storage("prev_visible_cells", grid.buffer_bytes());
         let (noise_texture, noise_view, noise_sampler) = make_noise_texture(device, queue);
 
         // Overlay resources
         let zone_meta_buf = mk_uniform("blank_zone_meta", bytes_of(&ZoneMetaGpu::default()));
         let zone_buf = mk_storage("blank_zone_entries", (MAX_BLANK_ZONES * std::mem::size_of::<ZoneEntryGpu>()) as u64);
 
-        // Seed prev_visible from buf_a
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("seed_prev_visible_cells"),
-        });
-        encoder.copy_buffer_to_buffer(buf_a, 0, &prev_visible_buf, 0, grid.buffer_bytes());
-        queue.submit([encoder.finish()]);
-
         // Create bind group layouts
         let core_bgl = core_bind_group_layout(device);
         let overlay_bgl = overlay_bind_group_layout(device);
 
-        // Create bind groups
-        let core_bg_a = make_core_bind_group(device, &core_bgl, &CoreBindGroupResources {
-            uniform_buf: &uniform_buf, current_buf: buf_a, previous_buf: &prev_visible_buf,
+        // One core bind group: the packed buffer carries both cell-state
+        // planes, so nothing in group 0 depends on the ping-pong phase any
+        // more (the a/b bind-group pair and the prev-visible snapshot buffer
+        // are gone with it).
+        let core_bg = make_core_bind_group(device, &core_bgl, &CoreBindGroupResources {
+            uniform_buf: &uniform_buf, packed_buf,
             paper_buf: &paper_buf, noise_view: &noise_view, noise_sampler: &noise_sampler,
             theme_buf: &theme_buf,
-        }, "core_bg_a");
-        let core_bg_b = make_core_bind_group(device, &core_bgl, &CoreBindGroupResources {
-            uniform_buf: &uniform_buf, current_buf: buf_b, previous_buf: &prev_visible_buf,
-            paper_buf: &paper_buf, noise_view: &noise_view, noise_sampler: &noise_sampler,
-            theme_buf: &theme_buf,
-        }, "core_bg_b");
+        }, "core_bg");
 
         let overlay_bg = make_overlay_bind_group(device, &overlay_bgl, &OverlayBindGroupResources {
             zone_meta_buf: &zone_meta_buf, zone_buf: &zone_buf,
@@ -148,7 +148,9 @@ impl GpuRenderer {
                 module: &shader,
                 entry_point: "fs_main",
                 targets: &[Some(wgpu::ColorTargetState {
-                    format,
+                    // Matches the -srgb view the render pass targets, so the
+                    // shader's linear output is hardware-encoded on store.
+                    format: view_format,
                     blend: None,
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
@@ -162,10 +164,10 @@ impl GpuRenderer {
         });
 
         GpuRenderer {
-            surface, surface_config, pipeline,
-            uniform_buf, paper_buf, theme_buf, prev_visible_buf,
+            surface, surface_config, view_format, pipeline,
+            uniform_buf, paper_buf, theme_buf,
             _noise_texture: noise_texture, noise_view, noise_sampler,
-            core_bgl, core_bg_a, core_bg_b,
+            core_bgl, core_bg,
             zone_meta_buf, zone_buf,
             overlay_bg,
             grid_pitch,
@@ -175,13 +177,15 @@ impl GpuRenderer {
     pub fn render(
         &self,
         encoder: &mut wgpu::CommandEncoder,
-        current_visible_is_a: bool,
         timestamp_query_set: Option<&wgpu::QuerySet>,
     ) -> Result<wgpu::SurfaceTexture, wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
-        let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-        let core_bg = if current_visible_is_a { &self.core_bg_a } else { &self.core_bg_b };
+        // View through the -srgb sibling format: the store performs the gamma
+        // encode the shader used to do manually with pow().
+        let view = output.texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(self.view_format),
+            ..Default::default()
+        });
 
         let timestamp_writes = timestamp_query_set.map(|qs| {
             wgpu::RenderPassTimestampWrites {
@@ -213,7 +217,7 @@ impl GpuRenderer {
             occlusion_query_set: None,
         });
         pass.set_pipeline(&self.pipeline);
-        pass.set_bind_group(0, core_bg, &[]);
+        pass.set_bind_group(0, &self.core_bg, &[]);
         pass.set_bind_group(1, &self.overlay_bg, &[]);
         pass.draw(0..3, 0..1);
         drop(pass);
@@ -247,26 +251,17 @@ impl GpuRenderer {
         queue.write_buffer(&self.uniform_buf, 52, bytemuck::bytes_of(&t));
     }
 
-    pub fn capture_previous_state(
-        &self,
-        encoder: &mut wgpu::CommandEncoder,
-        current_visible_buf: &wgpu::Buffer,
-        grid: &Grid,
-    ) {
-        encoder.copy_buffer_to_buffer(
-            current_visible_buf, 0,
-            &self.prev_visible_buf, 0,
-            grid.buffer_bytes(),
-        );
-    }
+    // (capture_previous_state is gone: the tick compute shader now writes the
+    // previous plane into the Simulation's packed buffer itself, so there is
+    // no pre-tick snapshot copy — one fewer encoder + submit per tick.)
 
     pub fn reconfigure(&mut self, device: &wgpu::Device) {
         self.surface.configure(device, &self.surface_config);
     }
 
     /// Update the WebGPU surface and viewport uniforms to match the new
-    /// canvas dimensions.  The world-sized buffers (`prev_visible_buf`,
-    /// the simulation's ping-pong) are unchanged — only the surface
+    /// canvas dimensions.  The world-sized buffers (the simulation's
+    /// ping-pong + packed planes) are unchanged — only the surface
     /// configuration and the viewport-derived uniforms change.
     pub fn resize(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, grid: &Grid) {
         self.surface_config.width = grid.canvas_width;

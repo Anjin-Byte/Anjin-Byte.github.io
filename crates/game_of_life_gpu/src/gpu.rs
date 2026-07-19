@@ -209,8 +209,7 @@ async fn from_surface(
         surface,
         &grid,
         grid_pitch,
-        &simulation.buf_a,
-        &simulation.buf_b,
+        &simulation.packed_buf,
     );
     let t5 = js_sys::Date::now();
 
@@ -330,7 +329,9 @@ impl GpuGameOfLife {
             let qs = if sample { self.timestamp_panel.query_set() } else { None };
             self.simulation.flush_edits(&self.ctx.device, &self.ctx.queue, qs);
         }
-        self.snapshot_pre_tick();
+        // (No pre-tick snapshot pass: the tick shader writes both cell-state
+        // planes into the packed buffer itself — new state as current, its
+        // src read as previous.)
         {
             let mut enc = self.ctx.device.create_command_encoder(
                 &wgpu::CommandEncoderDescriptor { label: Some("gol_sim_tick") },
@@ -355,9 +356,8 @@ impl GpuGameOfLife {
         let mut enc = self.ctx.device.create_command_encoder(
             &wgpu::CommandEncoderDescriptor { label: Some("gol_present") },
         );
-        let visible_a = self.simulation.current_visible_is_a();
         let qs = if sample { self.timestamp_panel.query_set() } else { None };
-        let render_result = self.renderers[0].render(&mut enc, visible_a, qs);
+        let render_result = self.renderers[0].render(&mut enc, qs);
         match render_result {
             Ok(output) => {
                 if sample {
@@ -534,7 +534,7 @@ impl GpuGameOfLife {
 
 // ── Composable GPU phases ────────────────────────────────────────────────────
 //
-// Each phase owns a single concern (flush, snapshot, tick, present).
+// Each phase owns a single concern (flush, tick, present).
 // The public entry points (`tick_and_render`, `render_only`) compose these
 // phases in the order required by their scheduling context.  Each phase that
 // dispatches GPU work creates its own CommandEncoder and calls
@@ -592,17 +592,6 @@ impl GpuGameOfLife {
         }
     }
 
-    /// Snapshot pre-tick state for transition animation.
-    fn snapshot_pre_tick(&mut self) {
-        let mut enc = self.ctx.device.create_command_encoder(
-            &wgpu::CommandEncoderDescriptor { label: Some("gol_snapshot") },
-        );
-        self.renderers[0].capture_previous_state(
-            &mut enc, self.simulation.current_visible_buffer(), &self.grid,
-        );
-        self.ctx.queue.submit([enc.finish()]);
-    }
-
     /// Render the current state and present the frame.  Used by
     /// `render_only` (not on the timestamp-sample path) and by
     /// `flush_and_render` after a click-driven edit.
@@ -610,7 +599,7 @@ impl GpuGameOfLife {
         let mut enc = self.ctx.device.create_command_encoder(
             &wgpu::CommandEncoderDescriptor { label: Some("gol_present") },
         );
-        match self.renderers[0].render(&mut enc, self.simulation.current_visible_is_a(), None) {
+        match self.renderers[0].render(&mut enc, None) {
             Ok(output) => {
                 self.ctx.queue.submit([enc.finish()]);
                 output.present();
@@ -654,14 +643,15 @@ fn parse_theme_json(theme_json: &str) -> Result<ThemeParams, JsValue> {
             .unwrap_or(default)
     };
 
-    Ok(ThemeParams {
-        surface: read_lab("surface")?,
-        ink: read_lab("ink")?,
-        minor_t: read_f32("minor_t", 0.08),
-        major_t: read_f32("major_t", 0.14),
-        border_t: read_f32("border_t", 0.24),
-        ink_opacity: read_f32("ink_opacity", 0.88),
-        grain_intensity: read_f32("grain_intensity", 0.0),
-        _pad0: 0.0, _pad1: 0.0, _pad2: 0.0,
-    })
+    // `border_t` may still appear in the JSON payload (the JS serializer is
+    // unchanged) but has no consumer: the page border was removed from the
+    // shader, so the value is simply ignored here.
+    Ok(ThemeParams::from_endpoints(
+        read_lab("surface")?,
+        read_lab("ink")?,
+        read_f32("minor_t", 0.08),
+        read_f32("major_t", 0.14),
+        read_f32("ink_opacity", 0.88),
+        read_f32("grain_intensity", 0.0),
+    ))
 }

@@ -1,6 +1,7 @@
 import MarkdownIt from 'markdown-it';
 import texmath from 'markdown-it-texmath';
 import highlightjs from 'markdown-it-highlightjs';
+import rustGrammar from 'highlight.js/lib/languages/rust';
 import katex from 'katex';
 import type { NotebookEntry } from '../types/notebook';
 import { parseFrontMatter, validateMeta } from './notebook-parse';
@@ -16,16 +17,28 @@ const md = new MarkdownIt({ html: false, linkify: true, typographer: true });
 md.use(texmath, { engine: katex, delimiters: 'dollars', katexOptions: { throwOnError: false } });
 // Syntax highlighting (highlight.js token classes; coloured by NotebookPage's
 // palette-driven theme). inline:false leaves inline code as a plain chip.
-md.use(highlightjs, { inline: false, ignoreUnknown: true });
+// highlight.js ships no WGSL grammar, so ```wgsl fences logged a console
+// error on every load; Rust's grammar is close enough (fn/let/var/attributes)
+// to token-colour WGSL, registered under the wgsl name. The fence label tab
+// still reads "wgsl" — data-lang comes from the fence info, not the grammar.
+md.use(highlightjs, { inline: false, ignoreUnknown: true, register: { wgsl: rustGrammar } });
 
 // Wrap each fenced block with a language tab — NotebookPage renders the label
-// from `data-lang` via CSS, so the markup stays simple.
+// from `data-lang` via CSS, so the markup stays simple. A ```mermaid fence is
+// NOT a code block: emit it as <pre class="mermaid"> carrying the (escaped)
+// diagram source, which useMermaid renders to SVG on the client. Escaping keeps
+// the browser from mis-parsing mermaid's own `<`, `>`, `&`; mermaid reads the
+// element's decoded textContent, so the round-trip is exact.
 const renderFence = md.renderer.rules.fence;
 if (renderFence) {
   md.renderer.rules.fence = (tokens, idx, options, env, self) => {
-    const html = renderFence(tokens, idx, options, env, self);
-    const info = tokens[idx]?.info.trim() ?? '';
+    const token = tokens[idx];
+    const info = token?.info.trim() ?? '';
     const lang = info.split(/\s+/)[0] ?? '';
+    if (lang === 'mermaid' && token) {
+      return `<pre class="mermaid">${md.utils.escapeHtml(token.content)}</pre>`;
+    }
+    const html = renderFence(tokens, idx, options, env, self);
     return lang ? `<div class="code-block" data-lang="${lang}">${html}</div>` : html;
   };
 }

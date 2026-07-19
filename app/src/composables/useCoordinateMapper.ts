@@ -10,6 +10,7 @@ import {
   cellToScreen as cellToScreenUtil,
   cellSpanToCssPx as cellSpanUtil,
 } from '../utils/gridCoords';
+import { effectiveDpr } from '../utils/devicePixelRatio';
 import type { GridInfo } from '../workers/rendererProtocol';
 import type { BlankZoneRect } from '../types/blankZones';
 
@@ -40,7 +41,7 @@ export function useCoordinateMapper(
       gridPitch: info.gridPitch,
       offsetX: worldOffset.value.x,
       offsetY: worldOffset.value.y,
-      dpr: devicePixelRatio,
+      dpr: effectiveDpr(),
       worldCols: info.worldCols,
       worldRows: info.worldRows,
     };

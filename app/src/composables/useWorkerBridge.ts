@@ -1,6 +1,6 @@
 import { ref, type Ref } from 'vue';
 import { createLogger } from '../logger';
-import type { WorkerInMsg, WorkerOutMsg, GridInfo } from '../workers/rendererProtocol';
+import type { WorkerInMsg, WorkerOutMsg, GridInfo, ForcedBackend } from '../workers/rendererProtocol';
 import type { ThemePalette } from '../types/theme';
 
 const log = createLogger('WorkerBridge');
@@ -12,7 +12,7 @@ export interface WorkerBridge {
   gridInfo: Ref<GridInfo | null>;
   post(msg: WorkerInMsg, transfer?: Transferable[]): void;
   on<T extends OutMsgType>(type: T, handler: (data: Extract<WorkerOutMsg, { type: T }>) => void): () => void;
-  init(canvas: OffscreenCanvas, cellPx: number, theme: ThemePalette): void;
+  init(canvas: OffscreenCanvas, theme: ThemePalette, forceBackend?: ForcedBackend): void;
   terminate(): void;
 }
 
@@ -51,7 +51,7 @@ export function useWorkerBridge(): WorkerBridge {
     }
   }
 
-  function init(canvas: OffscreenCanvas, cellPx: number, theme: ThemePalette): void {
+  function init(canvas: OffscreenCanvas, theme: ThemePalette, forceBackend?: ForcedBackend): void {
     const w = new Worker(
       new URL('../workers/backgroundRenderer.ts', import.meta.url),
       { type: 'module' },
@@ -61,11 +61,14 @@ export function useWorkerBridge(): WorkerBridge {
       log.error('Worker uncaught exception:', e.message, `at ${e.filename}:${e.lineno}`);
     };
     worker = w;
-    post({ type: 'init', canvas, cellPx, theme }, [canvas]);
+    post({ type: 'init', canvas, theme, forceBackend }, [canvas]);
   }
 
   function terminate(): void {
-    post({ type: 'stop' });
+    // terminate() kills the thread synchronously; a farewell message posted
+    // here would never be processed (a previous 'stop' message lost that race
+    // on every call). The browser reclaims the worker's GPU device with the
+    // thread, so there is nothing to flush.
     worker?.terminate();
     worker = null;
   }

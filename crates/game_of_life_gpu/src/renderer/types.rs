@@ -109,40 +109,94 @@ impl PaperParams {
 
 /// Palette parameters — must match `ThemeParams` struct in render.wgsl.
 ///
-/// All colors are expressed in OKLab (L, a, b). The grid lines are derived
-/// proportionally by interpolating along the surface→ink lightness axis.
-/// Swapping light ↔ dark is a single substitution of `surface` and `ink`.
+/// The palette is authored as two OKLab endpoints (surface + ink) plus grid
+/// lerp positions, but those are uniforms — converting them per fragment was
+/// pure waste.  `from_endpoints` does the conversions ONCE here, mirroring
+/// the shader's OKLab math exactly: the paper color ships as linear sRGB
+/// (it feeds the lighting), the grid/ink endpoints ship as OKLab (they feed
+/// the perceptual compositing mixes).
 ///
-/// Size: 64 bytes, 16-byte aligned. Grain + three pad scalars round out the
-/// tail block so the uniform layout stays on a 16-byte boundary (WGSL rule).
+/// Size: 80 bytes, 16-byte aligned (4 × vec4 + 4 scalars).
 #[repr(C)]
 #[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy)]
 pub struct ThemeParams {
-    pub surface: [f32; 4],    // paper color OKLab (L, a, b, _pad)
-    pub ink: [f32; 4],        // cell ink OKLab (L, a, b, _pad)
-    pub minor_t: f32,         // lerp position surface→ink for minor grid
-    pub major_t: f32,         // lerp position surface→ink for major grid
-    pub border_t: f32,        // lerp position surface→ink for page border
-    pub ink_opacity: f32,     // max alpha of cell ink at full coverage
-    pub grain_intensity: f32, // ± dither amplitude added before gamma encode
+    pub surface_linear: [f32; 4], // paper color, linear sRGB (r, g, b, _pad)
+    pub ink_lab: [f32; 4],        // cell ink OKLab (L, a, b, _pad)
+    pub minor_lab: [f32; 4],      // minor grid line OKLab
+    pub major_lab: [f32; 4],      // major grid line OKLab
+    pub ink_opacity: f32,         // max alpha of cell ink at full coverage
+    pub grain_intensity: f32,     // ± dither amplitude; 0 skips grain in-shader
     pub _pad0: f32,
     pub _pad1: f32,
-    pub _pad2: f32,
+}
+
+/// OKLab → linear sRGB, mirroring render.wgsl's `oklab_to_linear` with the
+/// same literals (https://bottosson.github.io/posts/oklab/). f32 throughout
+/// so the precomputed uniform matches what the shader would have produced
+/// (up to the usual GPU/CPU last-ULP latitude).
+#[allow(clippy::excessive_precision)]
+fn oklab_to_linear(lab: [f32; 4]) -> [f32; 4] {
+    let l_ = lab[0] + 0.3963377774_f32 * lab[1] + 0.2158037573_f32 * lab[2];
+    let m_ = lab[0] - 0.1055613458_f32 * lab[1] - 0.0638541728_f32 * lab[2];
+    let s_ = lab[0] - 0.0894841775_f32 * lab[1] - 1.2914855480_f32 * lab[2];
+    let l = l_ * l_ * l_;
+    let m = m_ * m_ * m_;
+    let s = s_ * s_ * s_;
+    [
+        4.0767416621_f32 * l - 3.3077115913_f32 * m + 0.2309699292_f32 * s,
+        -1.2684380046_f32 * l + 2.6097574011_f32 * m - 0.3413193965_f32 * s,
+        -0.0041960863_f32 * l - 0.7034186147_f32 * m + 1.7076147010_f32 * s,
+        0.0,
+    ]
+}
+
+/// Component-wise `mix` on the Lab channels, using the WGSL spec formula
+/// `e1 * (1 - t) + e2 * t` so the precomputed grid colors match what the
+/// shader's per-pixel `mix` produced.
+fn mix_lab(a: [f32; 4], b: [f32; 4], t: f32) -> [f32; 4] {
+    [
+        a[0] * (1.0 - t) + b[0] * t,
+        a[1] * (1.0 - t) + b[1] * t,
+        a[2] * (1.0 - t) + b[2] * t,
+        0.0,
+    ]
 }
 
 impl ThemeParams {
+    /// Build the GPU-facing palette from OKLab endpoints + lerp positions.
+    /// This is the single place the surface→ink axis is evaluated; the JSON
+    /// theme path (gpu.rs `parse_theme_json`) and the built-in default both
+    /// route through it.
+    pub fn from_endpoints(
+        surface_lab: [f32; 4],
+        ink_lab: [f32; 4],
+        minor_t: f32,
+        major_t: f32,
+        ink_opacity: f32,
+        grain_intensity: f32,
+    ) -> Self {
+        ThemeParams {
+            surface_linear: oklab_to_linear(surface_lab),
+            ink_lab,
+            minor_lab: mix_lab(surface_lab, ink_lab, minor_t),
+            major_lab: mix_lab(surface_lab, ink_lab, major_t),
+            ink_opacity,
+            grain_intensity,
+            _pad0: 0.0,
+            _pad1: 0.0,
+        }
+    }
+
     /// Default light palette. Grain off — bright surface has no banding.
     pub fn light() -> Self {
-        ThemeParams {
-            surface: [0.985, -0.001,  0.004, 0.0],
-            ink:     [0.280,  0.001,  0.005, 0.0],
-            minor_t:  0.08,
-            major_t:  0.14,
-            border_t: 0.24,
-            ink_opacity: 0.88,
-            grain_intensity: 0.0,
-            _pad0: 0.0, _pad1: 0.0, _pad2: 0.0,
-        }
+        Self::from_endpoints(
+            [0.985, -0.001, 0.004, 0.0], // surface OKLab
+            [0.280, 0.001, 0.005, 0.0],  // ink OKLab
+            0.08,                        // minor_t
+            0.14,                        // major_t
+            0.88,                        // ink_opacity
+            0.0,                         // grain_intensity
+        )
     }
 }
 

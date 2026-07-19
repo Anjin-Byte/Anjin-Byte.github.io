@@ -40,9 +40,8 @@ Here is an ordinary link in the flow: [the documentation](https://example.com/do
 Here is a very long URL with no break points, which may overflow the column:
 [https://example.com/some/very/long/path/that/keeps/going/and/going/without/any/break/points/at/all/forever/and/ever](https://example.com/some/very/long/path/that/keeps/going/and/going/without/any/break/points/at/all/forever/and/ever)
 
-And a long unbreakable token in prose:
+And a long unbreakable token in prose, to see whether it overflows its column:
 Loremipsumdolorsitametconsecteturadipiscingelitseddoeiusmodtemporincididuntutlaboreetdoloremagnaaliqua
-— does it overflow its column?
 
 Inline math appears in the flow too, like $E = mc^2$ and
 $\int_0^1 x^2\,\mathrm{d}x = \tfrac{1}{3}$, set among the lorem so we can see it

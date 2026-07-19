@@ -1,7 +1,7 @@
 ---
 title: "Lorem ipsum: headings & hierarchy"
 date: 2026-05-28
-summary: A stress page for heading rhythm — consecutive headings, headings carrying inline code and math, very long headings, and headings pressed against other blocks.
+summary: "A stress page for heading rhythm: consecutive headings, headings carrying inline code and math, very long headings, and headings pressed against other blocks."
 tags: [lorem, structure, hierarchy, depth, test]
 ---
 

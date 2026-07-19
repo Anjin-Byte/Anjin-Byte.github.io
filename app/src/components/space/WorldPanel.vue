@@ -35,13 +35,30 @@ const style = computed(() => {
   return {
     transform: `translate(${world.value.x}px, ${world.value.y}px) translate(-50%, -50%) scale(${scale})`,
     opacity: focus.value,
-    pointerEvents: (focus.value > 0.5 ? 'auto' : 'none') as 'auto' | 'none',
-    // The active island's scroll box must match the TRUE viewport — the stage
-    // height the camera centres on. A CSS `svh` unit diverges from it under
-    // html{zoom}, leaving the box short and centred, so content clipped a
-    // ~chrome-height early at top (masked by the header) and bottom (was masked
-    // by the footer). Driving the height from the measured viewport fixes both.
-    maxHeight: isActive.value ? `${viewport.value.h}px` : undefined,
+    // Only the ACTIVE island is interactive; receded neighbours are true
+    // click-through (grid cell-toggling works over them, and their links
+    // can't catch stray clicks mid-fly). This used to be a focus threshold
+    // (focus > 0.5), but FOCUS_FLOOR = 0.7 means focus never drops that low,
+    // so the threshold silently made EVERY island permanently clickable —
+    // the opposite of the documented intent. Keyboard focus is unaffected
+    // (pointer-events doesn't gate tab order); cameraSync moves focus to the
+    // active panel on arrival.
+    pointerEvents: (isActive.value ? 'auto' : 'none') as 'auto' | 'none',
+    // EVERY panel's box is bounded to the TRUE viewport height (the stage
+    // height the camera centres on), not just the active one. Two reasons:
+    //   1. The active island's scroll box must match the viewport exactly — a
+    //      CSS `svh` unit diverges from it under html{zoom}, clipping content a
+    //      ~chrome-height early at top/bottom. The measured height fixes that.
+    //   2. An INACTIVE panel is centred on its constellation point via
+    //      translate(-50%,-50%); with no height cap its box is as tall as its
+    //      content, so a long article (the notebook entries run to many
+    //      thousands of px) extends half its height in EACH direction and
+    //      bleeds over neighbouring islands laid out nearby (e.g. a notebook
+    //      entry reaching down across the Demos section one row below). Capping
+    //      every box at viewport height + clipping inactive panels (overflow
+    //      hidden, in CSS) makes a tall island a bounded preview card instead.
+    // Same value in both states also means no box-size jump on activation.
+    maxHeight: `${viewport.value.h}px`,
   };
 });
 
@@ -93,6 +110,13 @@ if (GESTURE_NAV_ENABLED && waypointId) {
   left: 0;
   top: 0;
   width: min(100vw, 1200px);
+  /* Bounded to the viewport-height cap set inline (see the style computed):
+     an inactive panel taller than its box is CLIPPED to a preview card rather
+     than overflowing past its constellation point onto neighbouring islands.
+     The active panel re-opens the vertical axis to a scroll container below;
+     the horizontal axis stays clipped either way (content never exceeds the
+     panel width, so there is nothing to scroll sideways). */
+  overflow: hidden;
   /* pointer-events + opacity are driven inline by the focal falloff. */
   outline: none;
   /* No permanent will-change: 5 viewport-sized layers blow Firefox's tiny
@@ -105,7 +129,10 @@ if (GESTURE_NAV_ENABLED && waypointId) {
    stops scroll-chaining and is the break-away edge signal. */
 .world-panel--scroll {
   /* max-height is set inline from the measured viewport height (see the style
-     computed) so it matches the camera's centring basis exactly under zoom. */
+     computed) so it matches the camera's centring basis exactly under zoom.
+     This re-opens the vertical axis over the base's `overflow: hidden` — an
+     active island scrolls; an inactive one clips. Both land at scrollTop 0
+     showing the content top, so activation is seamless (no jump). */
   overflow-y: auto;
   overscroll-behavior: contain;
   /* Touch keeps vertical native-scroll; horizontal-swipe nav is deferred. */

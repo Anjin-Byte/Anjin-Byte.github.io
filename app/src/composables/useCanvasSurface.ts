@@ -1,11 +1,28 @@
 import { createLogger } from '../logger';
-import { alignedPitch } from '../utils/gridCoords';
+import { effectiveDpr } from '../utils/devicePixelRatio';
 import type { WorkerInMsg } from '../workers/rendererProtocol';
 
 const log = createLogger('AppBackground');
 
+/** Cell pitch in device px — mirrors `CELL_PX` in gpu.rs (the renderer's
+ *  single source of truth; it reports it back as `GridInfo.gridPitch` and
+ *  AppBackground cross-checks this constant against it on 'ready'). Also
+ *  mirrored by staticRenderer.ts. Used here to size the CSS fallback grid
+ *  (App.vue's html background) so the backdrop revealed at first paint and
+ *  during resize-masks matches the canvas grid at EVERY device pixel ratio —
+ *  the old hardcoded 16px background only matched at exactly dpr 2. */
+export const GRID_CELL_DEVICE_PX = 32;
 const MAJOR_EVERY = 5;
-const TARGET_CELL_CSS_PX = 16;
+
+/** Publish the fallback-grid pitch to CSS (App.vue consumes the vars in the
+ *  html background). `devicePitch` is in device px; CSS gets it ÷ the same
+ *  capped DPR the canvas backing store uses, so backdrop and canvas agree. */
+export function applyGridPitchVars(devicePitch: number): void {
+  const cssPitch = devicePitch / effectiveDpr();
+  const s = document.documentElement.style;
+  s.setProperty('--grid-pitch-minor', `${cssPitch.toFixed(2)}px`);
+  s.setProperty('--grid-pitch-major', `${(cssPitch * MAJOR_EVERY).toFixed(2)}px`);
+}
 // Floor for the canvas backing-texture height: max(initial shell, screen
 // height × dpr, MIN_CANVAS_HEIGHT_DEVICE_PX). The shell clips overflow so
 // excess height is purely fragment-shader overdraw; we pay sub-millisecond
@@ -19,7 +36,7 @@ export interface CanvasSurface {
    * width-only ResizeObserver + DPR listener (both publish to the worker), and
    * return what `WorkerBridge.init` needs. Call once, after refs are mounted.
    */
-  initialize(shell: HTMLElement, canvas: HTMLCanvasElement): { offscreen: OffscreenCanvas; gridPitch: number };
+  initialize(shell: HTMLElement, canvas: HTMLCanvasElement): { offscreen: OffscreenCanvas };
   /** Crossfade the canvas in on the worker's first painted frame. */
   revealCanvas(): void;
   teardown(): void;
@@ -59,21 +76,33 @@ export function useCanvasSurface(post: (msg: WorkerInMsg) => void): CanvasSurfac
 
   function readCanvasPixelSize(el: Element): { width: number; height: number } {
     const rect = el.getBoundingClientRect();
+    const dpr = effectiveDpr();
     return {
-      width: Math.max(1, Math.round(rect.width * devicePixelRatio)),
-      height: Math.max(1, Math.round(rect.height * devicePixelRatio)),
+      width: Math.max(1, Math.round(rect.width * dpr)),
+      height: Math.max(1, Math.round(rect.height * dpr)),
     };
   }
 
-  /** Read width in device pixels with sub-pixel precision when available. */
+  /** Read width in device pixels with sub-pixel precision when available.
+   *  `devicePixelContentBoxSize` reports TRUE device pixels (uncapped) — when
+   *  the effective DPR is capped below the true ratio, rescale it down to the
+   *  same capped space the rest of this module (and the canvas backing store)
+   *  uses, so a width change still compares correctly against `canvasW`.
+   *  Rounded to an integer (matching `canvasW`, always an integer) — an
+   *  unrounded rescale can land a hair off an otherwise-unchanged width,
+   *  which defeats the `w === canvasW` no-op check below and spuriously
+   *  replays the whole resize/hide/reconfigure dance (visible as a flicker)
+   *  on any incidental layout nudge, e.g. a scrollbar appearing after a
+   *  `color-scheme` change on theme toggle. */
   function readWidthDevicePx(entry: ResizeObserverEntry): number {
+    const dpr = effectiveDpr();
     const dp = entry.devicePixelContentBoxSize?.[0]?.inlineSize;
-    if (typeof dp === 'number' && dp > 0) return dp;
-    return Math.max(1, Math.round(entry.contentRect.width * devicePixelRatio));
+    if (typeof dp === 'number' && dp > 0) return Math.round(dp * (dpr / devicePixelRatio));
+    return Math.max(1, Math.round(entry.contentRect.width * dpr));
   }
 
   function pickCanvasHeight(initialShellHeightDevicePx: number): number {
-    const screenDevicePx = Math.round(screen.height * devicePixelRatio);
+    const screenDevicePx = Math.round(screen.height * effectiveDpr());
     return Math.max(initialShellHeightDevicePx, screenDevicePx, MIN_CANVAS_HEIGHT_DEVICE_PX);
   }
 
@@ -96,18 +125,18 @@ export function useCanvasSurface(post: (msg: WorkerInMsg) => void): CanvasSurfac
     return Math.abs(measured - 100) > 0.1;
   }
 
-  function alignedGridPitch(widthPx: number): number {
-    return alignedPitch(widthPx, TARGET_CELL_CSS_PX, devicePixelRatio);
-  }
-
   function applyCanvasBox(canvas: HTMLCanvasElement, widthPx: number, heightPx: number): void {
-    // Intended visual size is `widthPx / devicePixelRatio` CSS px. Under
-    // Chrome's effective-zoom model with `html { zoom: !=1 }`, `style.width` is
-    // interpreted as pre-zoom logical CSS px and re-scaled by the html zoom
-    // factor on render — so we pre-divide by zoom to land at the right visual
-    // size. Safari's classic-zoom model agrees on coord systems and skips this.
-    const visualWCss = widthPx / devicePixelRatio;
-    const visualHCss = heightPx / devicePixelRatio;
+    // Intended visual size is `widthPx / effectiveDpr()` CSS px — MUST divide by
+    // the same (possibly capped) ratio `widthPx`/`heightPx` were multiplied by
+    // when sized, not the raw devicePixelRatio, or the canvas renders under/over
+    // its intended CSS box. Under Chrome's effective-zoom model with
+    // `html { zoom: !=1 }`, `style.width` is interpreted as pre-zoom logical CSS
+    // px and re-scaled by the html zoom factor on render — so we pre-divide by
+    // zoom to land at the right visual size. Safari's classic-zoom model agrees
+    // on coord systems and skips this.
+    const dpr = effectiveDpr();
+    const visualWCss = widthPx / dpr;
+    const visualHCss = heightPx / dpr;
     let logicalWCss = visualWCss;
     let logicalHCss = visualHCss;
     if (effectiveZoomActive) {
@@ -130,19 +159,10 @@ export function useCanvasSurface(post: (msg: WorkerInMsg) => void): CanvasSurfac
     }, 120);
   }
 
-  function applyGridMargin(widthPx: number): void {
-    const gp = alignedGridPitch(widthPx);
-    document.documentElement.style.setProperty(
-      '--grid-margin',
-      `${((0.8 * gp * MAJOR_EVERY) / devicePixelRatio).toFixed(1)}px`,
-    );
-  }
-
   function publishCanvasResize(canvas: HTMLCanvasElement, widthPx: number): void {
     canvasW = widthPx;
     applyCanvasBox(canvas, canvasW, canvasH);
     hideCanvasDuringResize(canvas);
-    applyGridMargin(canvasW);
     // Reconfigure the GPU surface only once the resize settles (see note at the
     // declaration). During a drag this keeps resetting, so the worker sees one
     // resize on release instead of ~60/s — which is what crashes Firefox WebGPU.
@@ -204,11 +224,17 @@ export function useCanvasSurface(post: (msg: WorkerInMsg) => void): CanvasSurfac
     canvas.width = canvasW;
     canvas.height = canvasH;
     applyCanvasBox(canvas, canvasW, canvasH);
-    log.debug('Canvas initialised', canvasW, 'x', canvasH, 'dpr', devicePixelRatio, 'effectiveZoom', effectiveZoomActive);
+    log.debug(
+      'Canvas initialised', canvasW, 'x', canvasH,
+      'dpr', devicePixelRatio, '(effective', effectiveDpr() + ')',
+      'effectiveZoom', effectiveZoomActive,
+    );
 
     const offscreen = canvas.transferControlToOffscreen();
-    const gridPitch = alignedGridPitch(canvasW);
-    applyGridMargin(canvasW);
+    // Size the CSS fallback grid to the renderer's pitch at the current DPR.
+    // (AppBackground re-applies this from the authoritative GridInfo.gridPitch
+    // when the worker reports 'ready', which also cross-checks the constant.)
+    applyGridPitchVars(GRID_CELL_DEVICE_PX);
 
     // Resize observer — width-only. Shell-height changes are deliberately
     // ignored: the canvas is fixed-positioned and clipped by the shell's
@@ -231,12 +257,14 @@ export function useCanvasSurface(post: (msg: WorkerInMsg) => void): CanvasSurfac
     detachDprListener = watchDevicePixelRatio(() => {
       if (!canvasEl) return;
       effectiveZoomActive = probeEffectiveZoomAsymmetry();
-      const shellH = Math.round(shell.getBoundingClientRect().height * devicePixelRatio);
+      const shellH = Math.round(shell.getBoundingClientRect().height * effectiveDpr());
       canvasH = pickCanvasHeight(shellH);
+      // The CSS pitch is device-pitch ÷ effectiveDpr, so a DPR change moves it.
+      applyGridPitchVars(GRID_CELL_DEVICE_PX);
       publishCanvasResize(canvasEl, canvasW);
     });
 
-    return { offscreen, gridPitch };
+    return { offscreen };
   }
 
   function revealCanvas(): void {

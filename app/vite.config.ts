@@ -81,5 +81,32 @@ export default defineConfig({
       '@gpu-pkg': new URL('../crates/game_of_life_gpu/pkg', import.meta.url).pathname,
     },
   },
-  build: { outDir: 'dist' },
+  build: {
+    outDir: 'dist',
+    rollupOptions: {
+      output: {
+        // Keep mermaid's entire dependency graph (mermaid + d3 + dagre +
+        // cytoscape + friends) in ONE lazy chunk. Left to its own devices,
+        // Rollup splits it across many chunks that cross-import the app's
+        // index chunk, and because index is wrapped by vite-plugin-top-level-
+        // await (needed for the WASM), mermaid ends up awaiting the app's TLA
+        // cycle. That coupling reorders d3-color's circular init and throws
+        // "Cannot set properties of undefined (setting 'prototype')" at load.
+        // Isolating the graph removes the cross-import, so d3 initialises in
+        // dependency order (as it does under esbuild in dev). katex is shared
+        // with the app's own math rendering, so it is deliberately left out.
+        manualChunks(id) {
+          if (!id.includes('node_modules') || id.includes('/katex/')) return;
+          const mermaidGraph = [
+            '/mermaid/', '/d3', '/dagre', '/cytoscape', '/khroma/', '/roughjs/',
+            '/@mermaid-js/', '/dompurify/', '/@braintree/', '/stylis/',
+            '/ts-dedent/', '/uuid/', '/marked/', '/dayjs/', '/@iconify/',
+            '/robust-predicates/', '/internmap/', '/delaunator/', '/elkjs/',
+            '/cose-base/', '/layout-base/', '/point-at-length/', '/web-worker/',
+          ];
+          if (mermaidGraph.some((dep) => id.includes(dep))) return 'mermaid';
+        },
+      },
+    },
+  },
 });

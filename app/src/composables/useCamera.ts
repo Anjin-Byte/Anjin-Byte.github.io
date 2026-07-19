@@ -1,5 +1,6 @@
 import { ref, computed, watch, type ComputedRef, type Ref } from 'vue';
 import type { Camera } from '../types/space';
+import { effectiveDpr } from '../utils/devicePixelRatio';
 import { findWaypoint, homeWaypoint, type WaypointId } from '../space/waypoints';
 import {
   responsiveSpacing,
@@ -173,7 +174,7 @@ const worldOffsetDevicePx = computed(() =>
       y: cameraRef.value.y + captureScrollRef.value,
       zoom: cameraRef.value.zoom,
     },
-    typeof window !== 'undefined' ? window.devicePixelRatio : 1,
+    effectiveDpr(),
     GRID_FOLLOW_RATE,
   ),
 );

@@ -1,9 +1,10 @@
 /// Resources for the core bind group (group 0):
-/// uniforms, current/previous cells, paper params, noise texture+sampler, theme.
+/// uniforms, packed cell planes, paper params, noise texture+sampler, theme.
 pub(super) struct CoreBindGroupResources<'a> {
     pub uniform_buf: &'a wgpu::Buffer,
-    pub current_buf: &'a wgpu::Buffer,
-    pub previous_buf: &'a wgpu::Buffer,
+    /// Interleaved (current, previous) cell-state planes owned by the
+    /// Simulation; the render shader reads it as `array<vec2<u32>>`.
+    pub packed_buf: &'a wgpu::Buffer,
     pub paper_buf: &'a wgpu::Buffer,
     pub noise_view: &'a wgpu::TextureView,
     pub noise_sampler: &'a wgpu::Sampler,
@@ -24,8 +25,7 @@ pub(super) fn core_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLa
         label: Some("core_bgl"),
         entries: &[
             uniform_bgl_entry(0),   // RenderUniforms
-            storage_bgl_entry(1),   // current_cells
-            storage_bgl_entry(2),   // previous_cells
+            storage_bgl_entry(1),   // packed_cells (current+previous planes)
             uniform_bgl_entry(3),   // PaperParams
             texture_bgl_entry(4),   // noise_tex
             sampler_bgl_entry(5),   // noise_smp
@@ -45,8 +45,7 @@ pub(super) fn make_core_bind_group(
         layout: bgl,
         entries: &[
             wgpu::BindGroupEntry { binding: 0, resource: res.uniform_buf.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 1, resource: res.current_buf.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 2, resource: res.previous_buf.as_entire_binding() },
+            wgpu::BindGroupEntry { binding: 1, resource: res.packed_buf.as_entire_binding() },
             wgpu::BindGroupEntry { binding: 3, resource: res.paper_buf.as_entire_binding() },
             wgpu::BindGroupEntry { binding: 4, resource: wgpu::BindingResource::TextureView(res.noise_view) },
             wgpu::BindGroupEntry { binding: 5, resource: wgpu::BindingResource::Sampler(res.noise_sampler) },

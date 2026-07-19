@@ -12,11 +12,10 @@
 //   cx = floor((px + scroll_x) / grid_pitch_px)
 //   cy = floor((py + scroll_y) / grid_pitch_px)
 //
-// Uses the same float grid_pitch as the shader's PaperParams.grid_pitch_px,
-// NOT the rounded integer cell_px used for grid dimension calculations.
-// This guarantees the click lands on the same cell the shader drew.
-
-const MAJOR_EVERY = 5;
+// `gridPitch` is the renderer's authoritative cell size (gpu.rs CELL_PX,
+// reported back via GridInfo.gridPitch — see GRID_CELL_DEVICE_PX in
+// useCanvasSurface.ts for the TS mirror and its runtime cross-check), so a
+// click lands on the same cell the shader drew.
 
 /**
  * Snapshot of every value needed to map a screen click to a world cell.
@@ -43,18 +42,6 @@ export interface CellCoord {
   cx: number;
   /** Row index in the simulation grid. */
   cy: number;
-}
-
-/**
- * Compute the float grid pitch from canvas width, matching both
- * AppBackground.vue and gpu.rs `aligned_pitch()`.
- *
- * canvasWidth = nTotal × MAJOR_EVERY × result, exactly.
- */
-export function alignedPitch(canvasWidth: number, targetCellCssPx: number, dpr: number): number {
-  const targetPx = targetCellCssPx * dpr;
-  const nTotal = Math.max(1, Math.round(canvasWidth / (targetPx * MAJOR_EVERY)));
-  return canvasWidth / (nTotal * MAJOR_EVERY);
 }
 
 /**
@@ -99,22 +86,6 @@ export function wrapCell(coord: CellCoord, snap: CoordSnapshot): CellCoord {
 }
 
 /**
- * Compute the bitpacked buffer location for a wrapped cell coordinate.
- *
- * Layout (matches compute.wgsl and render.wgsl):
- *   word_idx = cy * words_per_row + floor(cx / 32)
- *   bit_offset = cx & 31
- *
- * The safe_idx bitmask from the shader is NOT needed here because
- * the caller has already wrapped cx/cy into [0, worldCols)/[0, worldRows).
- * Those always fit inside the power-of-2 padded grid.
- */
-export interface BitAddress {
-  wordIndex: number;
-  bitOffset: number;
-}
-
-/**
  * Map a simulation grid cell back to CSS screen coordinates.
  * Exact inverse of screenToCell().
  */
@@ -132,15 +103,4 @@ export function cellToScreen(
 /** Convert a cell-count span to CSS pixels. */
 export function cellSpanToCssPx(cellCount: number, snap: CoordSnapshot): number {
   return cellCount * snap.gridPitch / snap.dpr;
-}
-
-export function cellToBitAddress(
-  cx: number,
-  cy: number,
-  wordsPerRow: number,
-): BitAddress {
-  return {
-    wordIndex: cy * wordsPerRow + (cx >>> 5),  // cx / 32
-    bitOffset: cx & 31,
-  };
 }

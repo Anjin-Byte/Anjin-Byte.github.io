@@ -1,10 +1,18 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import type { NotebookNode } from '../../space/notebookNodes';
+import { useMermaid } from '../../composables/useMermaid';
 
-defineProps<{ entry: NotebookNode }>();
+const props = defineProps<{ entry: NotebookNode }>();
 
 const dateFmt = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 const formatDate = (iso: string): string => dateFmt.format(new Date(`${iso}T12:00:00`));
+
+// The prose is v-html'd markdown; any ```mermaid fences arrive as
+// <pre class="mermaid"> and are rendered to SVG here (theme-synced, lazy,
+// and scoped to this note only being active — see useMermaid's docstring).
+const proseRef = ref<HTMLElement | null>(null);
+useMermaid(proseRef, props.entry.route);
 </script>
 
 <template>
@@ -20,7 +28,7 @@ const formatDate = (iso: string): string => dateFmt.format(new Date(`${iso}T12:0
       </header>
       <!-- entry.html is rendered from trusted local markdown (markdown-it html:false). -->
       <!-- eslint-disable-next-line vue/no-v-html -->
-      <div class="note-prose" v-html="entry.html"></div>
+      <div ref="proseRef" class="note-prose" v-html="entry.html"></div>
     </article>
   </section>
 </template>
@@ -143,8 +151,8 @@ const formatDate = (iso: string): string => dateFmt.format(new Date(`${iso}T12:0
   height: 2px;
   background: linear-gradient(
     to bottom,
-    oklab(from var(--island-fill) calc(l - var(--cut)) a b) 0 1px,
-    oklab(from var(--island-fill) calc(l + var(--cut)) a b) 1px 2px
+    var(--island-fill-shadow) 0 1px,
+    var(--island-fill-lit) 1px 2px
   );
 }
 .note-prose :deep(h3) {
@@ -161,8 +169,8 @@ const formatDate = (iso: string): string => dateFmt.format(new Date(`${iso}T12:0
   margin: 2.5rem 0;
   background: linear-gradient(
     to bottom,
-    oklab(from var(--island-fill) calc(l - var(--cut)) a b) 0 1px,
-    oklab(from var(--island-fill) calc(l + var(--cut)) a b) 1px 2px
+    var(--island-fill-shadow) 0 1px,
+    var(--island-fill-lit) 1px 2px
   );
 }
 
@@ -205,7 +213,7 @@ const formatDate = (iso: string): string => dateFmt.format(new Date(`${iso}T12:0
 }
 .note-prose :deep(a) {
   color: var(--theme-accent);
-  text-decoration-color: oklab(from var(--theme-accent) l a b / 0.4);
+  text-decoration-color: var(--theme-accent-underline);
   text-underline-offset: 3px;
 }
 .note-prose :deep(a:hover) {
@@ -234,7 +242,7 @@ const formatDate = (iso: string): string => dateFmt.format(new Date(`${iso}T12:0
   background: var(--well-recess);
   border-left: 2px solid var(--theme-accent);
   border-radius: var(--radius-sm);
-  box-shadow: inset 0 1px 2px oklab(from var(--well-recess) calc(l - var(--cut)) a b);
+  box-shadow: inset 0 1px 2px var(--well-recess-shadow);
   color: var(--theme-text-secondary);
 }
 .note-prose :deep(blockquote p) {
@@ -249,7 +257,7 @@ const formatDate = (iso: string): string => dateFmt.format(new Date(`${iso}T12:0
   padding: 0.12em 0.4em;
   background: var(--well-recess);
   border-radius: var(--radius-xs);
-  box-shadow: inset 0 0 0 1px oklab(from var(--island-fill) calc(l - var(--cut)) a b);
+  box-shadow: inset 0 0 0 1px var(--island-fill-shadow);
 }
 
 /* ── Code block — a deep inset well carrying a language tab ───────────────── */
@@ -279,7 +287,7 @@ const formatDate = (iso: string): string => dateFmt.format(new Date(`${iso}T12:0
   background: var(--well-recess);
   border-radius: var(--radius-md);
   overflow-x: auto;
-  box-shadow: inset 0 1px 3px oklab(from var(--well-recess) calc(l - var(--cut)) a b);
+  box-shadow: inset 0 1px 3px var(--well-recess-shadow);
 }
 .note-prose :deep(pre code) {
   font-family: var(--font-mono);
@@ -339,9 +347,42 @@ const formatDate = (iso: string): string => dateFmt.format(new Date(`${iso}T12:0
   color: var(--theme-text-tertiary);
 }
 
-/* The reading column: body text, headings, lists, quotes AND code blocks centre
-   at the measure — one shared spine. Only display math (section/eqn) is left out,
-   so equations alone break out to the fuller page width. */
+/* ── Mermaid figure — a diagram laid on the page like a cut plate ──────────────
+   The ```mermaid fence arrives as <pre class="mermaid"> holding the source;
+   useMermaid swaps it for an SVG and flags data-processed. Hide the raw source
+   until then so the diagram never flashes its text. The frame is the island
+   vocabulary; the SVG inside is mermaid's, themed to match (see useMermaid). */
+.note-prose :deep(pre.mermaid) {
+  display: flex;
+  justify-content: center;
+  margin: 1.8rem auto;
+  padding: 1.4rem 1.2rem;
+  background: var(--island-fill);
+  border: 1px solid var(--island-edge);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  visibility: hidden; /* raw source hidden until rendered */
+}
+.note-prose :deep(pre.mermaid[data-processed]) {
+  visibility: visible;
+}
+.note-prose :deep(pre.mermaid svg) {
+  max-width: 100%;
+  height: auto;
+}
+/* Mermaid sizes each label box by measuring the text in the font passed to
+   mermaid.initialize (our --font-mono). The label markup then inherits the
+   article's serif from .note-prose, which is wider, so text overflows and
+   clips. Pin the whole diagram subtree back to the measurement font so boxes
+   and glyphs agree. !important beats mermaid's own inline label styles. */
+.note-prose :deep(pre.mermaid svg),
+.note-prose :deep(pre.mermaid svg *) {
+  font-family: var(--font-mono) !important;
+}
+
+/* The reading column: body text, headings, lists, quotes, code blocks AND
+   diagrams centre at the measure — one shared spine. Only display math
+   (section/eqn) is left out, so equations alone break out to the fuller width. */
 .note-prose :deep(p),
 .note-prose :deep(h2),
 .note-prose :deep(h3),
@@ -349,7 +390,8 @@ const formatDate = (iso: string): string => dateFmt.format(new Date(`${iso}T12:0
 .note-prose :deep(ol),
 .note-prose :deep(blockquote),
 .note-prose :deep(hr),
-.note-prose :deep(.code-block) {
+.note-prose :deep(.code-block),
+.note-prose :deep(pre.mermaid) {
   max-width: var(--measure);
   margin-inline: auto;
 }

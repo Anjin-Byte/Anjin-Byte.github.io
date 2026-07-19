@@ -24,6 +24,17 @@
 export type OkLab = readonly [L: number, a: number, b: number];
 export type OkLch = readonly [L: number, C: number, H: number];
 
+/**
+ * The cut-paper edge depth: a perceptual lightness half-step (OKLab ΔL)
+ * applied ± to a surface's own fill to produce its lit top lip and shadowed
+ * cut edge — "one knob tunes the edge across every surface and both themes".
+ * SINGLE SOURCE: useThemePreference both consumes this for the precomputed
+ * lip/shadow tokens AND publishes it as the `--cut` CSS var, so the
+ * stylesheet formulas that still reference var(--cut) (App.vue,
+ * NotebookPage.vue fallbacks) can never disagree with the precomputed values.
+ */
+export const CUT = 0.05;
+
 export interface ThemePalette {
   // ── Shader-bound ─────────────────────────────────────────────────────────
   surface: OkLab;        // paper / page background
@@ -181,4 +192,39 @@ export function oklchCss([L, C, H]: OkLch, chromaScale = 1, alpha = 1): string {
   return alpha === 1
     ? `oklch(${L.toFixed(4)} ${cs.toFixed(4)} ${H.toFixed(2)})`
     : `oklch(${L.toFixed(4)} ${cs.toFixed(4)} ${H.toFixed(2)} / ${alpha.toFixed(3)})`;
+}
+
+/** Convert an OKLCH color (with an optional chroma multiplier) to OKLab. */
+export function oklchToOklab([L, C, H]: OkLch, chromaScale = 1): OkLab {
+  const c = C * chromaScale;
+  const hRad = (H * Math.PI) / 180;
+  return [L, c * Math.cos(hRad), c * Math.sin(hRad)];
+}
+
+/** Clamp OKLab lightness to the valid [0, 1] range (matches the display-gamut
+ *  clamp the browser already applies to `oklab()` values). */
+export function clampL([L, a, b]: OkLab): OkLab {
+  return [Math.min(1, Math.max(0, L)), a, b];
+}
+
+/**
+ * Replicates CSS `color-mix(in oklab, a aPct%, b bPct%)`: normalizes the two
+ * percentages to sum to 100 (the mix ratio) and, per the CSS Color 5 spec,
+ * scales the result's alpha by `min(1, (aPct + bPct) / 100)` when they don't
+ * already sum to (at least) 100 — e.g. `color-mix(in oklab, X 80%, Y 8%)`
+ * mixes at a 80:8 ratio but the result is only 88% opaque, not fully opaque.
+ */
+export function mixOkLab(
+  a: OkLab, aPct: number,
+  b: OkLab, bPct: number,
+): { color: OkLab; alpha: number } {
+  const sum = aPct + bPct;
+  const t = sum === 0 ? 0 : bPct / sum;
+  return { color: lerpOkLab(a, b, t), alpha: Math.min(1, sum / 100) };
+}
+
+/** Replicates CSS `color-mix(in oklab, a aPct%, transparent)`: the opaque
+ *  color's own channels pass through unchanged; only alpha scales down. */
+export function fadeOkLab(a: OkLab, aPct: number): { color: OkLab; alpha: number } {
+  return { color: a, alpha: Math.min(1, aPct / 100) };
 }

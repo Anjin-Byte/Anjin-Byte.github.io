@@ -42,7 +42,7 @@ incididunt ut labore et dolore magna aliqua.
 
 5. Quintum: a list item with a blockquote inside it.
 
-   > Lorem ipsum dolor sit amet — a quotation nested within a list item, which is
+   > Lorem ipsum dolor sit amet, a quotation nested within a list item, which is
    > a layout combination worth checking carefully.
 
 6. Sextum: a list item with embedded code.
@@ -54,7 +54,7 @@ incididunt ut labore et dolore magna aliqua.
 7. Septimum.
 8. Octavum.
 9. Nonum.
-10. Decimum — note where the two-digit marker sits against the single-digit ones.
+10. Decimum: note where the two-digit marker sits against the single-digit ones.
 
 ### Mixed ordered and unordered nesting
 

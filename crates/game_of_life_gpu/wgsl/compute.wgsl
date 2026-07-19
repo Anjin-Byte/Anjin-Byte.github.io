@@ -18,6 +18,13 @@ struct Uniforms {
 @group(0) @binding(1) var<storage, read>      src: array<u32>;
 @group(0) @binding(2) var<storage, read_write> dst: array<u32>;
 @group(0) @binding(3) var<storage, read>      frozen: array<u32>;
+// Render-facing interleaved planes: element i = (current word i, previous
+// word i).  The tick has both in hand — the new word it just computed and
+// the src word it read — so it maintains the pair with one extra store,
+// replacing the old copy-before-tick snapshot pass.  The render shader
+// reads this as array<vec2<u32>> (same 8-byte layout); the edit shaders
+// patch .x atomically as flat u32 pairs (index 2i).
+@group(0) @binding(4) var<storage, read_write> packed: array<vec2<u32>>;
 
 // Half-adder: returns (sum, carry).
 fn ha(a: u32, b: u32) -> vec2<u32> {
@@ -109,5 +116,10 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let raw = count3 | (count2 & c);
     let idx = wy * wpr + wx;
     // Frozen cells forced alive: one OR per word, branch-free.
-    dst[idx] = raw | frozen[idx];
+    let result = raw | frozen[idx];
+    dst[idx] = result;
+    // Maintain the render-facing interleaved planes: the new state becomes
+    // current (.x), the pre-tick src word becomes previous (.y).  This is
+    // exactly what the old snapshot-copy-then-tick sequence produced.
+    packed[idx] = vec2<u32>(result, c);
 }

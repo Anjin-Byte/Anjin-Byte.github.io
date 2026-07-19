@@ -4,20 +4,23 @@
 //   Porous interior + pressure falloff + drying ring + ragged perimeter.
 //   All edges use fwidth-based AA (no constant feather needed at this scale).
 //
-// Color pipeline (linear light throughout):
-//   Colors are defined in OKLab — perceptually uniform, correct gamut path.
-//   Converted to linear sRGB for all lighting/filtering math.
-//   Paper→ink transition mixed in OKLab for perceptual linearity.
-//   Output gamma-encodes to sRGB (non-sRGB surface format, manual encode).
+// Color pipeline (linear light for lighting, OKLab for compositing):
+//   Palette endpoints arrive PRE-CONVERTED from the CPU (ThemeParams in
+//   types.rs mirrors this file's OKLab math): paper as linear sRGB (it feeds
+//   the lighting), grid + ink endpoints as OKLab (they feed the compositing
+//   mixes). Per pixel, the lit paper converts to OKLab once, every mix runs
+//   in OKLab, and the result converts back to linear once. Output goes
+//   through an -srgb surface VIEW, so gamma encode is fixed-function
+//   hardware on store — no manual pow-based encode.
 //
 // Fragment pipeline:
 //   1. Paper fiber noise  (textureSample — must be first; uniform control flow)
 //   2. Fiber lighting     (ambient-dominant; tiny directional; matte specular)
-//   3. Paper albedo       (OKLab → linear; ±1.25% fiber variation)
+//   3. Paper albedo       (precomputed linear; ±1.25% fiber variation)
 //   4. Grid lines         (cyan-blue dye: multiplicative transmittance filter)
 //   5. Sponge stamp       (computed unconditionally, then masked by cell_alive)
 //   6. Ink absorption     (Beer-Lambert; paper→ink mix in OKLab)
-//   7. sRGB encode
+//   7. Grain (uniform-gated) + hardware sRGB encode via the surface view
 
 struct RenderUniforms {
     world_cols:         u32,
@@ -51,25 +54,25 @@ struct PaperParams {
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
 //
-// Palette is defined by two OKLab endpoints — `surface` (paper) and `ink` (cell
-// fill) — plus three lerp positions that place the grid lines and page border
-// along the surface→ink axis. Every color in the scene is derived from these.
+// Palette colors are PRECOMPUTED on the CPU from the two OKLab endpoints and
+// the grid lerp positions (see ThemeParams::from_endpoints in types.rs, which
+// mirrors this file's OKLab math). They're uniforms — converting them per
+// fragment was pure waste. `surface_linear` is linear sRGB because it feeds
+// the lighting math; the grid/ink endpoints stay OKLab because they feed the
+// perceptual compositing mixes.
 //
-// Swapping light ↔ dark is a single substitution of `surface` and `ink`; the
-// `*_t` positions stay the same, so the *proportional* relationships between
-// paper, grid, and ink are preserved across themes.
+// Swapping light ↔ dark is still a single palette substitution upstream; the
+// proportional surface→ink relationships are baked in by the CPU.
 
 struct ThemeParams {
-    surface:         vec4f,  // OKLab (L, a, b, _pad) — paper color
-    ink:             vec4f,  // OKLab (L, a, b, _pad) — cell fill color
-    minor_t:         f32,    // lerp position for minor grid (surface→ink)
-    major_t:         f32,    // lerp position for major grid
-    border_t:        f32,    // lerp position for page border
+    surface_linear:  vec4f,  // linear sRGB (r, g, b, _pad) — paper color
+    ink_lab:         vec4f,  // OKLab (L, a, b, _pad) — cell fill color
+    minor_lab:       vec4f,  // OKLab — minor grid line color
+    major_lab:       vec4f,  // OKLab — major grid line color
     ink_opacity:     f32,    // max alpha of cell ink at full coverage
-    grain_intensity: f32,    // ± dither amplitude added before gamma encode
+    grain_intensity: f32,    // ± dither amplitude; 0 skips the grain block
     _pad0:           f32,
     _pad1:           f32,
-    _pad2:           f32,
 }
 
 struct ZoneMeta {
@@ -94,14 +97,17 @@ struct ZoneEntry {
 //   group(0) = core rendering (uniforms, cells, paper, noise)
 //   group(1) = overlays (zones)
 
-// Core rendering
-@group(0) @binding(0)  var<uniform>       uniforms:       RenderUniforms;
-@group(0) @binding(1)  var<storage, read> current_cells:  array<u32>;
-@group(0) @binding(2)  var<storage, read> previous_cells: array<u32>;
-@group(0) @binding(3)  var<uniform>       paper:          PaperParams;
-@group(0) @binding(4)  var                noise_tex:      texture_2d<f32>;
-@group(0) @binding(5)  var                noise_smp:      sampler;
-@group(0) @binding(6)  var<uniform>       theme:          ThemeParams;
+// Core rendering.  `packed_cells` interleaves both cell-state planes per
+// word — .x = current, .y = previous — so one 8-byte fetch answers both
+// "is it alive" and "was it alive" for 32 cells.  The tick compute shader
+// and the edit shaders maintain the interleaving (they view the same
+// buffer as flat u32 pairs); see compute.wgsl and simulation.rs.
+@group(0) @binding(0)  var<uniform>       uniforms:      RenderUniforms;
+@group(0) @binding(1)  var<storage, read> packed_cells:  array<vec2<u32>>;
+@group(0) @binding(3)  var<uniform>       paper:         PaperParams;
+@group(0) @binding(4)  var                noise_tex:     texture_2d<f32>;
+@group(0) @binding(5)  var                noise_smp:     sampler;
+@group(0) @binding(6)  var<uniform>       theme:         ThemeParams;
 
 // Overlays (zones)
 @group(1) @binding(0)  var<uniform>       zone_meta:      ZoneMeta;
@@ -152,43 +158,10 @@ fn linear_to_oklab(c: vec3f) -> vec3f {
     );
 }
 
-// Mix two linear-sRGB colors along a perceptually uniform path through OKLab.
-fn oklab_mix(a: vec3f, b: vec3f, t: f32) -> vec3f {
-    return oklab_to_linear(mix(linear_to_oklab(a), linear_to_oklab(b), t));
-}
-
-// sRGB → Linear sRGB (IEC 61966-2-1).
-fn srgb_to_linear(c: vec3f) -> vec3f {
-    let lo = c / 12.92;
-    let hi = pow((c + 0.055) / 1.055, vec3f(2.4));
-    return select(hi, lo, c < vec3f(0.04045));
-}
-
-// Linear sRGB → sRGB (IEC 61966-2-1). Applied at output for non-sRGB surfaces.
-fn linear_to_srgb(c: vec3f) -> vec3f {
-    let lo = c * 12.92;
-    let hi = 1.055 * pow(max(c, vec3f(0.0031308)), vec3f(1.0 / 2.4)) - 0.055;
-    return select(hi, lo, c < vec3f(0.0031308));
-}
-
-// ── Theme helpers ─────────────────────────────────────────────────────────────
-// Linear sRGB colors derived from the palette, expressed as proportions along
-// the surface→ink OKLab axis. These stay correct under light/dark swap because
-// the lerp positions are invariant; only the endpoints change.
-
-fn theme_surface_linear() -> vec3f {
-    return oklab_to_linear(theme.surface.xyz);
-}
-
-fn theme_ink_linear() -> vec3f {
-    return oklab_to_linear(theme.ink.xyz);
-}
-
-// Compute a linear-sRGB grid color at lerp position `t` between surface and ink.
-// The mix runs in OKLab so perceived brightness steps are uniform.
-fn theme_grid_linear(t: f32) -> vec3f {
-    return oklab_to_linear(mix(theme.surface.xyz, theme.ink.xyz, t));
-}
+// (No sRGB encode/decode helpers: gamma encode happens in hardware via the
+// -srgb surface view, and every palette color arrives pre-converted from the
+// CPU. The two OKLab transforms above are the only color-space code left —
+// linear_to_oklab for the lit paper, oklab_to_linear for the final result.)
 
 // ── Hash / noise ──────────────────────────────────────────────────────────────
 
@@ -280,20 +253,17 @@ fn grid_line_aa(coord: f32, pitch: f32, half_w: f32) -> f32 {
 
 // ── Cell helpers ──────────────────────────────────────────────────────────────
 
-fn cell_alive_current(cx: u32, cy: u32) -> u32 {
+// One fetch answers both planes: returns (current, previous) as 0/1 for the
+// cell.  The packed buffer interleaves the planes per word (vec2 element =
+// one 8-byte load), halving the storage reads of the old two-buffer scheme.
+fn cell_states(cx: u32, cy: u32) -> vec2<u32> {
     let cx_w = cx % uniforms.world_cols;
     let cy_w = cy % uniforms.world_rows;
     let word_idx = cy_w * uniforms.words_per_row + cx_w / 32u;
     let safe_idx = word_idx & (uniforms.words_per_row * uniforms.padded_rows - 1u);
-    return (current_cells[safe_idx] >> (cx_w & 31u)) & 1u;
-}
-
-fn cell_alive_prev(cx: u32, cy: u32) -> u32 {
-    let cx_w = cx % uniforms.world_cols;
-    let cy_w = cy % uniforms.world_rows;
-    let word_idx = cy_w * uniforms.words_per_row + cx_w / 32u;
-    let safe_idx = word_idx & (uniforms.words_per_row * uniforms.padded_rows - 1u);
-    return (previous_cells[safe_idx] >> (cx_w & 31u)) & 1u;
+    let words = packed_cells[safe_idx];
+    let bit = cx_w & 31u;
+    return vec2<u32>((words.x >> bit) & 1u, (words.y >> bit) & 1u);
 }
 
 // ── Blank-zone helpers ───────────────────────────────────────────────────────
@@ -535,8 +505,8 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     let diffuse = 0.85 + 0.15 * NdotL;        // 85% ambient + 15% directional
     let spec    = pow(NdotH, paper.spec_power) * paper.spec_weight;
 
-    // ── 3. Paper albedo (theme-driven, OKLab → linear) ───────────────────────
-    let paper_base   = theme_surface_linear();
+    // ── 3. Paper albedo (pre-converted linear from the theme uniform) ────────
+    let paper_base   = theme.surface_linear.rgb;
     let fiber_albedo = mix(0.975, 1.0, ns.r);  // ±1.25% cellulose density variation
     let paper_lit    = paper_base * (diffuse * fiber_albedo) + vec3f(spec);
 
@@ -609,8 +579,9 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     let wrows    = i32(uniforms.world_rows);
     let base_cx  = u32(((i32(floor(px      / gp)) % wcols) + wcols) % wcols);
     let base_cy  = u32(((i32(floor(world_y / gp)) % wrows) + wrows) % wrows);
-    let prev_state = cell_alive_prev(base_cx, base_cy);
-    let curr_state = cell_alive_current(base_cx, base_cy);
+    let center     = cell_states(base_cx, base_cy);
+    let curr_state = center.x;
+    let prev_state = center.y;
 
     // Transition staging: the old state fades before the new state fills in,
     // so a dying cell never overlaps with an arriving one.
@@ -645,10 +616,14 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     let left_cx  = base_cx + uniforms.world_cols - 1u;
     let top_cy   = base_cy + uniforms.world_rows - 1u;
     let bot_cy   = base_cy + 1u;
-    let right_alive  = cell_alive_current(right_cx, base_cy) | cell_alive_prev(right_cx, base_cy);
-    let left_alive   = cell_alive_current(left_cx,  base_cy) | cell_alive_prev(left_cx,  base_cy);
-    let top_alive    = cell_alive_current(base_cx,  top_cy)  | cell_alive_prev(base_cx,  top_cy);
-    let bottom_alive = cell_alive_current(base_cx,  bot_cy)  | cell_alive_prev(base_cx,  bot_cy);
+    let right_s  = cell_states(right_cx, base_cy);
+    let left_s   = cell_states(left_cx,  base_cy);
+    let top_s    = cell_states(base_cx,  top_cy);
+    let bot_s    = cell_states(base_cx,  bot_cy);
+    let right_alive  = right_s.x | right_s.y;
+    let left_alive   = left_s.x  | left_s.y;
+    let top_alive    = top_s.x   | top_s.y;
+    let bottom_alive = bot_s.x   | bot_s.y;
     // Extension amount: 0.1 in cell-local space pushes d_square ~2 px past the
     // AA band for our typical ~20px grid pitch.  Scales with fill_t so the
     // join matures with the cell during birth/death transitions.
@@ -668,48 +643,45 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
                   * uniforms.init_fade_t;
     let grid_mask = 1.0 - coverage;  // grid fades proportionally inside cells
 
-    // ── 6. Grid lines (composited with cell-aware suppression) ───────────────
-    // Grid blends in OKLab toward the theme's minor/major lerp positions,
-    // multiplied by `grid_mask` so cells replace rather than overlay the grid.
-    let minor_color = theme_grid_linear(theme.minor_t);
-    let major_color = theme_grid_linear(theme.major_t);
-    let after_minor = oklab_mix(paper_lit,   minor_color, minor_cov * grid_mask);
-    let paper_grid  = oklab_mix(after_minor, major_color, major_cov * grid_mask);
+    // ── 6-8. Compositing chain, entirely in OKLab ────────────────────────────
+    // The lit paper converts to OKLab ONCE; the minor-grid, major-grid, and
+    // ink mixes all run in OKLab against the pre-converted theme endpoints
+    // (multiplied by `grid_mask` so cells replace rather than overlay the
+    // grid), and the result converts back to linear ONCE at the end. The old
+    // chain round-tripped through linear between every mix — mathematically
+    // the identity, numerically just extra cube/cbrt work per pixel.
+    // (The engineering-paper page border is gone: an infinite toroidal grid
+    // has no page edge, so there is no border term in the chain.)
+    let paper_lab       = linear_to_oklab(paper_lit);
+    let after_minor_lab = mix(paper_lab,       theme.minor_lab.xyz, minor_cov * grid_mask);
+    let paper_grid_lab  = mix(after_minor_lab, theme.major_lab.xyz, major_cov * grid_mask);
+    let result_lab      = mix(paper_grid_lab,  theme.ink_lab.xyz,   coverage * theme.ink_opacity);
 
-    // ── 7. (Page border removed) ──────────────────────────────────────────────
-    // The engineering-paper page border was a bold rectangle at the page edges
-    // (px = 0 / canvas_width, world_y = 0). An infinite grid has no page edge,
-    // so there is no border to draw.
-    let paper_bordered = paper_grid;
-
-    // ── 8. Ink application (theme-driven) ────────────────────────────────────
-    // The cell ink color comes from the theme's `ink` endpoint, modulated by
-    // `ink_opacity` so the overall contrast stays in the atmospheric band.
-    let ink_color  = theme_ink_linear();
-    let result_lin = oklab_mix(paper_bordered, ink_color, coverage * theme.ink_opacity);
-
-    // ── 9. Material grain ─────────────────────────────────────────────────────
+    // ── 9. Material grain (uniform-gated) ────────────────────────────────────
     // Procedural value noise at a high spatial frequency gives fine-grained
     // variation (~1.5-2 px features on canvas, roughly 1 CSS-px on 2× DPI)
-    // with proper inter-pixel correlation — each feature is smoothly shaded
-    // rather than a single isolated pixel.  That reads as material texture
-    // (film grain, canvas weave) instead of either digital static (per-pixel
-    // hash) or splotchy low-frequency blobs (dense sample of the fiber noise
-    // texture, which only has 8 features per tile and is too low-frequency
-    // to look like grain).
+    // with proper inter-pixel correlation — material texture rather than
+    // digital static.  Perturbation is applied to OKLab L (perceptual
+    // lightness) so the same `grain_intensity` reads equivalently on light
+    // and dark surfaces.
     //
-    // Perturbation is applied to OKLab L (perceptual lightness) so the same
-    // `grain_intensity` reads equivalently on light and dark surfaces. Light
-    // mode ships with grain_intensity=0 — its bright surface has no banding.
-    let grain_sample = value_noise(vec2f(px, world_y) * 0.6) - 0.5;
-    let result_lab   = linear_to_oklab(result_lin);
-    let grained_lab  = vec3f(
-        result_lab.x + grain_sample * theme.grain_intensity,
-        result_lab.y,
-        result_lab.z,
-    );
-    let grained      = oklab_to_linear(grained_lab);
+    // The branch is uniform control flow (`grain_intensity` is a uniform, and
+    // no derivative/textureSample calls occur past this point), so themes
+    // with grain off — light mode ships 0.0 — skip the noise evaluation
+    // entirely instead of computing a term that multiplies to zero.
+    var final_lab = result_lab;
+    if theme.grain_intensity != 0.0 {
+        let grain_sample = value_noise(vec2f(px, world_y) * 0.6) - 0.5;
+        final_lab = vec3f(
+            result_lab.x + grain_sample * theme.grain_intensity,
+            result_lab.y,
+            result_lab.z,
+        );
+    }
 
-    // ── 10. Gamma encode for non-sRGB surface ─────────────────────────────────
-    return vec4f(linear_to_srgb(clamp(grained, vec3f(0.0), vec3f(1.0))), 1.0);
+    // ── 10. Output ────────────────────────────────────────────────────────────
+    // Written through the -srgb surface view: gamma encode happens in fixed-
+    // function hardware on store, replacing the old manual linear_to_srgb.
+    let result_lin = oklab_to_linear(final_lab);
+    return vec4f(clamp(result_lin, vec3f(0.0), vec3f(1.0)), 1.0);
 }

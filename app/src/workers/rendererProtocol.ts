@@ -4,7 +4,13 @@ import type { BlankZone } from '../types/blankZones';
 import type { ThemePalette } from '../types/theme';
 import type { FrameStats } from '../perf';
 
-export type RendererBackend = 'gpu' | 'cpu';
+// 'gpu' = WebGPU (compute); 'webgl2' = WebGL2 GPGPU ping-pong fallback;
+// 'cpu' = the static (no-simulation) fallback of last resort.
+export type RendererBackend = 'gpu' | 'webgl2' | 'cpu';
+
+/** Dev/testing override (via `?renderer=` on the page URL) that pins the
+ *  worker to one backend instead of probing. Threaded through the init msg. */
+export type ForcedBackend = 'webgpu' | 'webgl2' | 'static';
 
 /** Frames between base simulation ticks. At 60 Hz: ~3.5 s per tick. */
 export const TICK_EVERY = 175;
@@ -28,29 +34,30 @@ export type WorkerInMsg =
   // it to the GPU before the first frame, avoiding a light-flash on
   // dark-OS users when their stored preference is `system`.  Subsequent
   // theme changes flow through the `set_theme` message.
-  | { type: 'init'; canvas: OffscreenCanvas; cellPx: number; theme: ThemePalette }
+  | { type: 'init'; canvas: OffscreenCanvas; theme: ThemePalette; forceBackend?: ForcedBackend }
   // The camera offset (device px) is frame-locked: the main thread samples
   // scroll + camera on its render rAF and ships it WITH the frame, so the grid
   // renders the exact position the DOM is at this frame (no separate, lagging
-  // 'camera' message during scroll).
+  // 'camera' message during scroll). The worker throttles its render/tick
+  // rate to ~60fps only while the offset is STATIC (it detects motion by
+  // comparing offsets across messages — fly, native scroll, free-pan alike),
+  // so the canvas never falls a display-refresh behind the always-uncapped
+  // DOM while the two are visibly moving together.
   | { type: 'frame'; cameraX: number; cameraY: number }
   | { type: 'resize'; width: number; height: number }
   // 2-D camera offset (canvas/device px). Drives the grid's scroll_x/scroll_y
   // uniforms so the world pans in lockstep with the content plane.
   | { type: 'camera'; x: number; y: number }
   // Toggle a cell's alive/dead state. cx/cy are world-cell coordinates
-  // already wrapped into [0, worldCols) × [0, worldRows) by the main
-  // thread. scrollCanvasPx is the scroll offset at click time so the
-  // worker can validate/log if needed.
-  | { type: 'toggle_cell'; cx: number; cy: number; scrollCanvasPx: number }
+  // already wrapped into [0, worldCols) × [0, worldRows) by the main thread.
+  | { type: 'toggle_cell'; cx: number; cy: number }
   | { type: 'set_zones';    zones: BlankZone[] }
   | { type: 'add_zone';    zone:  BlankZone   }
   | { type: 'update_zone'; zone:  BlankZone   }
   | { type: 'remove_zone'; id:    string      }
   | { type: 'clear_zones' }
   | { type: 'set_theme'; theme: ThemePalette }
-  | { type: 'perf_snapshot' }
-  | { type: 'stop' };
+  | { type: 'perf_snapshot' };
 
 /**
  * One-shot perf signal emitted by the worker after the renderer is ready.
@@ -107,7 +114,7 @@ export interface MemoryBreakdown {
   canvasW: number;
   canvasH: number;
   surfaceBytes: number;            // canvas w×h×4 — ONE frame; swapchain is ×2–3
-  cellBytes: number;               // 3 cell-sized buffers (ping-pong pair + frozen)
+  cellBytes: number;               // 5 cell-plane-sized buffers (a/b pair + packed×2 + frozen)
   noiseBytes: number;              // paper-noise texture (256² RGBA8)
   workerHeapBytes: number | null;  // worker JS/WASM heap, if performance.memory exists
 }
