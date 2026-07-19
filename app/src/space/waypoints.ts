@@ -52,8 +52,8 @@ export function findByRoute(route: string): Waypoint | null {
 }
 
 /**
- * Stable DOM id for a panel keyed by its route — `/notebook/cut-paper` →
- * `panel-notebook-cut-paper`, `/` → `panel-home`. The route is the one key both
+ * Stable DOM id for a panel keyed by its route — `/notebook/hashdag` →
+ * `panel-notebook-hashdag`, `/` → `panel-home`. The route is the one key both
  * core waypoints and dynamic entry nodes share, so cameraSync can move focus to
  * any panel on arrival regardless of which layer it belongs to.
  */
