@@ -31,6 +31,10 @@ struct RenderU {
 @group(0) @binding(1) var          cells_cur:  texture_2d<u32>;
 @group(0) @binding(2) var          cells_prev: texture_2d<u32>;
 
+// Linear-light ambient floor added to the paper (see fs_main). Matches the DC
+// term of render.wgsl's fiber-lighting specular/ambient.
+const PAPER_AMBIENT: f32 = 0.0035;
+
 // ── Color space (OKLab ↔ linear sRGB ↔ sRGB) — same math as render.wgsl ──────
 fn oklab_to_linear(lab: vec3f) -> vec3f {
     let l_ = lab.x + 0.3963377774 * lab.y + 0.2158037573 * lab.z;
@@ -138,8 +142,13 @@ fn fs_main(@builtin(position) frag: vec4f) -> @location(0) vec4f {
     let py = frag.y * u.scale.y + u.scroll.y;
     let gp = u.cell_px;
 
-    // Paper.
-    let paper = oklab_to_linear(u.surface.xyz);
+    // Paper. The additive ambient approximates the DC (flat-normal) result of
+    // render.wgsl's fiber lighting — chiefly its specular/ambient floor (~0.002
+    // in linear light). On near-black dark paper that small add is a big
+    // relative lift, so the paper sits lighter and the grid reads as softly as
+    // the WebGPU path; on light paper it's imperceptible. Without it the
+    // fallback dark paper is too dark and the grid over-contrasts.
+    let paper = oklab_to_linear(u.surface.xyz) + vec3f(PAPER_AMBIENT);
 
     // Grid lines. Half-widths mirror PaperParams::for_pitch (minor = pitch*0.02,
     // major = pitch*0.06). Each axis is dimmed by a low-frequency value-noise

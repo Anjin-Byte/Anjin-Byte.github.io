@@ -30,6 +30,40 @@ const WORLD_CELLS = 1024;
  *  around 3–5% density; this reads as the same texture without simulating. */
 const CELL_DENSITY = 0.04;
 
+// Paper gets the same linear-light ambient floor as the WebGL2/WebGPU paths
+// (render_gles.wgsl PAPER_AMBIENT): it lifts near-black dark-theme paper so the
+// grid over it reads as softly as the GPU renderer, and is imperceptible on
+// light paper. The 2D canvas encodes oklab()/rgb() to sRGB itself, so to inject
+// a LINEAR ambient we compute the paper's final sRGB bytes ourselves.
+const PAPER_AMBIENT = 0.0035;
+
+/** OKLab → linear sRGB (same coefficients as the shaders). */
+function oklabToLinear([L, a, b]: readonly [number, number, number]): [number, number, number] {
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
+  const l = l_ ** 3, m = m_ ** 3, s = s_ ** 3;
+  return [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
+  ];
+}
+
+/** Linear channel → sRGB byte [0,255]. */
+function linToByte(c: number): number {
+  const cl = Math.min(1, Math.max(0, c));
+  const s = cl <= 0.0031308 ? cl * 12.92 : 1.055 * cl ** (1 / 2.4) - 0.055;
+  return Math.round(s * 255);
+}
+
+/** Paper fill as an `rgb()` string: surface in linear light + the ambient floor,
+ *  then sRGB-encoded — matching the GPU/WebGL2 paper exactly. */
+function paperFill(surface: readonly [number, number, number]): string {
+  const lin = oklabToLinear(surface);
+  return `rgb(${linToByte(lin[0] + PAPER_AMBIENT)} ${linToByte(lin[1] + PAPER_AMBIENT)} ${linToByte(lin[2] + PAPER_AMBIENT)})`;
+}
+
 /** Deterministic per-cell occupancy: integer hash of the WRAPPED cell coords,
  *  so the field is stable across pans (toroidal-consistent) and sessions. */
 function cellOccupied(cx: number, cy: number): boolean {
@@ -76,7 +110,8 @@ export function makeStaticRenderer(canvas: OffscreenCanvas): StaticRenderer {
     if (w === 0 || h === 0) return;
 
     // ── Paper ────────────────────────────────────────────────────────────
-    ctx.fillStyle = oklabCss(theme.surface);
+    // Ambient-lifted (see paperFill) to match the GPU/WebGL2 paper value.
+    ctx.fillStyle = paperFill(theme.surface);
     ctx.fillRect(0, 0, w, h);
 
     // ── Grid ─────────────────────────────────────────────────────────────
