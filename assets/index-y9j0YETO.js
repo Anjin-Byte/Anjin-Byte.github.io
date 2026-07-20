@@ -14273,11 +14273,11 @@ Expected #hex, #hexa, rgb(), rgba(), hsl(), hsla(), object or number`);
       links: [
         {
           kind: "demo",
-          href: "https://anjin-byte.github.io/friendly-journey/"
+          href: "https://anjin-byte.github.io/Gestalt/"
         },
         {
           kind: "source",
-          href: "https://github.com/Anjin-Byte/friendly-journey"
+          href: "https://github.com/Anjin-Byte/Gestalt"
         }
       ]
     },
