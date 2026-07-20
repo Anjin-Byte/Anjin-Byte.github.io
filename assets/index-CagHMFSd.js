@@ -14224,7 +14224,7 @@ Expected #hex, #hexa, rgb(), rgba(), hsl(), hsla(), object or number`);
     }
   ], TS = [
     {
-      title: "SM83 Emulator",
+      title: "Okra",
       featured: true,
       blurb: "An SM83 CPU disassembler and emulator \u2014 translating Game Boy binaries into readable assembly and a custom microcode format, rendered with a WebGL2 LCD-substrate shader for material-grain authenticity.",
       tech: [
