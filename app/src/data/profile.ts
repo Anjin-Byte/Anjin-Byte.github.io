@@ -84,9 +84,11 @@ export const projects: Project[] = [
     title: 'Okra',
     featured: true,
     blurb:
-      'An SM83 CPU disassembler and emulator — translating Game Boy binaries ' +
-      'into readable assembly and a custom microcode format, rendered with a ' +
-      'WebGL2 LCD-substrate shader for material-grain authenticity.',
+      'A cycle-accurate Game Boy (DMG) emulator in Rust, built out into an ' +
+      'in-browser debugger workbench: live disassembly, CPU/PPU/APU/memory ' +
+      'panels, and a WebGL2 LCD-substrate shader for authentic screen texture. ' +
+      'Passes Blargg\'s CPU accuracy suite and is growing into a light IDE for ' +
+      'DMG development.',
     tech: ['Rust', 'WASM', 'WebGL2', 'Svelte', 'TypeScript'],
     links: [
       { kind: 'demo', href: 'https://anjin-byte.github.io/okra-emu/' },
@@ -98,7 +100,7 @@ export const projects: Project[] = [
     featured: true,
     blurb:
       'A GPU voxel engine that renders by ray-marching a sparse voxel structure ' +
-      'directly — no polygons. It voxelizes meshes on the GPU, supports live ' +
+      'directly, with no polygons. It voxelizes meshes on the GPU, supports live ' +
       'sculpting, and checks every GPU path against a CPU reference.',
     tech: ['Rust', 'WASM', 'WebGPU', 'WGSL', 'Svelte 5'],
     links: [
@@ -132,7 +134,7 @@ export const projects: Project[] = [
   {
     title: 'Heightfield Filters',
     blurb:
-      'A Rust image-processing suite for terrain heightfields — hexagonal-' +
+      'A Rust image-processing suite for terrain heightfields: hexagonal-' +
       'kernel aggregation, Sobel/Prewitt edge detection, and extraction of ' +
       'structural lines (crests, thalwegs, convex/concave ridges) from raw ' +
       '.r32 elevation rasters. Parallelized with Rayon.',
@@ -144,7 +146,7 @@ export const projects: Project[] = [
   {
     title: 'Aether Sonde',
     blurb:
-      'An Ethernet network simulator modeling the MAC data-link sublayer — ' +
+      'An Ethernet network simulator modeling the MAC data-link sublayer: ' +
       'signal propagation, CSMA/CD collision detection, and bridge relay across ' +
       'half-duplex, full-duplex, and bridged topologies. Rust core with WASM ' +
       'bindings and a typed TypeScript adapter.',
@@ -186,23 +188,23 @@ export const experience: Experience[] = [
     dates: 'Nov 2025 – Present',
     highlights: [
       'Coordinate nationwide dispatch of service technicians for low-voltage networking projects, maintaining an updated schedule in a high-volume, time-sensitive environment.',
-      'Act as central coordination point between project managers, field technicians, and clients — translating job requirements into execution and closing communication gaps.',
+      'Act as central coordination point between project managers, field technicians, and clients, translating job requirements into execution and closing communication gaps.',
       'Manage full lifecycle of service tickets across multiple concurrent projects: creation, assignment, progress tracking, and closeout deliverables.',
     ],
   },
   {
-    role: 'Contract Developer — XChange Connector Engineering',
+    role: 'Contract Developer: XChange Connector Engineering',
     company: 'Pipeline Data Services',
     location: 'Remote',
     dates: 'Sep 2025 – Present',
     tech: ['C#', '.NET', 'XChange SDK', 'REST', 'Python'],
     highlights: [
       'Delivered 5 production-ready connectors on an accelerated timeline, unifying client data across workforce-management and project-planning systems via Trimble\'s App Xchange platform.',
-      'Designed an automated contract-testing framework validating API documentation, client data, and XChange Data Objects — reducing T&E cycles by 45%.',
+      'Designed an automated contract-testing framework validating API documentation, client data, and XChange Data Objects, reducing T&E cycles by 45%.',
     ],
   },
   {
-    role: 'AI Systems Developer — SBIR Phase I Prototype',
+    role: 'AI Systems Developer: SBIR Phase I Prototype',
     company: 'Brynhild Industries',
     location: 'Washington, DC · Remote',
     dates: 'Feb 2024 – Apr 2025',
@@ -219,7 +221,7 @@ export const experience: Experience[] = [
     dates: 'Jul 2023 – Jun 2024',
     tech: ['Python', 'OpenCV', 'FFmpeg', 'Detectron2', 'PyTorch'],
     highlights: [
-      'Engineered an end-to-end video-to-training pipeline — ingesting raw multi-device footage, parallelizing instance segmentation with Detectron2, and aligning outputs to CASIA-B gait dataset standards — producing model-ready training data for gait-recognition research.',
+      'Engineered an end-to-end video-to-training pipeline: ingesting raw multi-device footage, parallelizing instance segmentation with Detectron2, and aligning outputs to CASIA-B gait dataset standards to produce model-ready training data for gait-recognition research.',
     ],
   },
   {
@@ -228,7 +230,7 @@ export const experience: Experience[] = [
     location: 'Fayetteville, AR',
     dates: 'Aug 2021 – Feb 2022',
     highlights: [
-      'Built labeled datasets of thousands of taxonomically verified specimens and prototyped a detection + classification pipeline for species-level insect identification — targeting early-warning systems for agricultural pest outbreaks.',
+      'Built labeled datasets of thousands of taxonomically verified specimens and prototyped a detection + classification pipeline for species-level insect identification, targeting early-warning systems for agricultural pest outbreaks.',
     ],
   },
   {

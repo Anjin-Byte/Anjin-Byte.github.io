@@ -29,7 +29,7 @@ onUnmounted(registerElementCollider(() => markRef.value?.$el ?? null, { margin: 
     <div class="chrome__bar">
       <!-- Identity, doubling as home. Routing to "/" flies to the hero via the
            router→camera sync (cameraSync.ts), so no direct camera call needed. -->
-      <router-link ref="markRef" to="/" class="chrome__mark glass-chip" aria-label="Taylor Hale — home">
+      <router-link ref="markRef" to="/" class="chrome__mark glass-chip" aria-label="Taylor Hale, home">
         Taylor Hale
       </router-link>
 

@@ -53,7 +53,7 @@ import { experience, education } from '../../data/profile';
       >
         <header class="entry-head">
           <div class="entry-titleblock">
-            <h3 class="entry-role">{{ e.degree }} — {{ e.field }}</h3>
+            <h3 class="entry-role">{{ e.degree }}: {{ e.field }}</h3>
             <p class="entry-company">{{ e.school }}</p>
           </div>
           <div class="entry-meta">

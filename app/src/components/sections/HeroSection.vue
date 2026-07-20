@@ -18,7 +18,7 @@ const locationLink = contactLinks.find((link) => link.label === 'Location');
             target="_blank"
             rel="noopener noreferrer"
             class="hero-kicker glass-chip section-kicker"
-            :aria-label="`${profile.location} — open in maps`"
+            :aria-label="`${profile.location}, open in maps`"
           ><v-icon :icon="mdiMapMarkerOutline" class="hero-location-icon" />{{ profile.location }}</a>
           <h1 class="hero-name section-heading">{{ profile.name }}</h1>
           <p class="hero-tagline">{{ profile.tagline }}</p>
