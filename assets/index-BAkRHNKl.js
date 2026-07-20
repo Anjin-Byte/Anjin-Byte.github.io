@@ -14237,11 +14237,11 @@ Expected #hex, #hexa, rgb(), rgba(), hsl(), hsla(), object or number`);
       links: [
         {
           kind: "demo",
-          href: "https://anjin-byte.github.io/fragile-canvas/"
+          href: "https://anjin-byte.github.io/okra-emu/"
         },
         {
           kind: "source",
-          href: "https://github.com/Anjin-Byte/fragile-canvas"
+          href: "https://github.com/Anjin-Byte/okra-emu"
         }
       ]
     },
