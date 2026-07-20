@@ -89,8 +89,8 @@ export const projects: Project[] = [
       'WebGL2 LCD-substrate shader for material-grain authenticity.',
     tech: ['Rust', 'WASM', 'WebGL2', 'Svelte', 'TypeScript'],
     links: [
-      { kind: 'demo', href: 'https://anjin-byte.github.io/fragile-canvas/' },
-      { kind: 'source', href: 'https://github.com/Anjin-Byte/fragile-canvas' },
+      { kind: 'demo', href: 'https://anjin-byte.github.io/okra-emu/' },
+      { kind: 'source', href: 'https://github.com/Anjin-Byte/okra-emu' },
     ],
   },
   {
