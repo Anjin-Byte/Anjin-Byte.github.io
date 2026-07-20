@@ -133,8 +133,8 @@ export const projects: Project[] = [
       'SAT-based mesh voxelization',
     ],
     links: [
-      { kind: 'demo', href: 'https://anjin-byte.github.io/friendly-journey/' },
-      { kind: 'source', href: 'https://github.com/Anjin-Byte/friendly-journey' },
+      { kind: 'demo', href: 'https://anjin-byte.github.io/Gestalt/' },
+      { kind: 'source', href: 'https://github.com/Anjin-Byte/Gestalt' },
     ],
   },
   {
