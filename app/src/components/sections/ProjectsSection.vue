@@ -5,27 +5,23 @@ import {
   type ResolvedProjectLink,
 } from '../../utils/projectLinks';
 
-interface FeaturedProject extends Project {
+interface DisplayProject extends Project {
   visibleLinks: ResolvedProjectLink[];
 }
 
-interface ProjectIndexItem extends Project {
-  visibleLinks: ResolvedProjectLink[];
-}
+const featuredProjects: DisplayProject[] = projects
+  .filter((project) => project.featured)
+  .map((project) => ({
+    ...project,
+    visibleLinks: getProjectVisibleLinks(project, 'featured'),
+  }));
 
-const [rawFeaturedProject, ...rawProjectIndex] = projects;
-
-const featuredProject: FeaturedProject | null = rawFeaturedProject
-  ? {
-      ...rawFeaturedProject,
-      visibleLinks: getProjectVisibleLinks(rawFeaturedProject, 'featured'),
-    }
-  : null;
-
-const projectIndex: ProjectIndexItem[] = rawProjectIndex.map((project) => ({
-  ...project,
-  visibleLinks: getProjectVisibleLinks(project, 'compact'),
-}));
+const projectIndex: DisplayProject[] = projects
+  .filter((project) => !project.featured)
+  .map((project) => ({
+    ...project,
+    visibleLinks: getProjectVisibleLinks(project, 'compact'),
+  }));
 </script>
 
 <template>
@@ -42,9 +38,12 @@ const projectIndex: ProjectIndexItem[] = rawProjectIndex.map((project) => ({
         </p>
       </div>
 
-      <article v-if="featuredProject" class="project-feature glass-panel">
+      <article
+        v-for="featuredProject in featuredProjects"
+        :key="featuredProject.title"
+        class="project-feature glass-panel"
+      >
         <div class="project-feature-body">
-          <span class="project-feature-label">Featured project</span>
           <h3 class="project-feature-title">{{ featuredProject.title }}</h3>
           <p class="project-feature-blurb">{{ featuredProject.blurb }}</p>
           <div class="project-feature-tech">
@@ -64,11 +63,9 @@ const projectIndex: ProjectIndexItem[] = rawProjectIndex.map((project) => ({
             rel="noopener noreferrer"
             class="project-link paper-key"
             :class="{ 'paper-key--primary': link.kind === 'demo' }"
-            :aria-label="link.ariaLabel"
           >
             <v-icon :icon="link.icon" />
             <span>{{ link.label }}</span>
-            <v-tooltip activator="parent" location="top" :text="link.ariaLabel" />
           </a>
         </div>
       </article>
@@ -152,16 +149,6 @@ const projectIndex: ProjectIndexItem[] = rawProjectIndex.map((project) => ({
   margin-bottom: 1.4rem;
 }
 
-.project-feature-label {
-  display: inline-block;
-  margin-bottom: 0.9rem;
-  color: var(--theme-text-tertiary);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-}
-
 .project-feature-title {
   margin: 0 0 0.75rem;
   color: var(--theme-text-primary);
@@ -208,19 +195,15 @@ const projectIndex: ProjectIndexItem[] = rawProjectIndex.map((project) => ({
   gap: 1rem;
 }
 
+/* A recessed field, not a control: it stays put. Only its keys react to the
+   pointer (see .paper-key--ghost) — a container that lifted on hover read as a
+   giant button it isn't. */
 .project-item {
   display: flex;
   flex-direction: column;
   gap: 0.95rem;
   min-height: 230px;
   padding: 1.3rem;
-  transition: border-color 150ms ease, transform 150ms ease, background-color 150ms ease;
-}
-
-.project-item:hover,
-.project-item:focus-within {
-  border-color: var(--theme-grid-border);
-  transform: translateY(-1px);
 }
 
 .project-item-head {

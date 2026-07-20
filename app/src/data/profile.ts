@@ -75,11 +75,14 @@ export interface Project {
   blurb: string;
   tech: string[];
   links?: ProjectLink[];
+  /** Rendered as a full-width featured card instead of an index-grid entry. */
+  featured?: boolean;
 }
 
 export const projects: Project[] = [
   {
     title: 'SM83 Emulator',
+    featured: true,
     blurb:
       'An SM83 CPU disassembler and emulator — translating Game Boy binaries ' +
       'into readable assembly and a custom microcode format, rendered with a ' +
@@ -91,21 +94,13 @@ export const projects: Project[] = [
     ],
   },
   {
-    title: 'Anjin-Byte.github.io',
-    blurb:
-      'This site. Conway\'s Game of Life running as a WebGPU-rendered ' +
-      'engineering-paper background, with a theme system parameterized in OKLab.',
-    tech: ['Rust', 'WebGPU', 'WASM', 'Vue 3', 'TypeScript', 'WGSL'],
-    links: [
-      // Intentionally no `demo` link — you're already on it.
-      { kind: 'source', href: 'https://github.com/Anjin-Byte/Anjin-Byte.github.io' },
-    ],
-  },
-  {
     title: 'Gestalt',
+    featured: true,
     blurb:
-      'A GPU-driven voxel mesh renderer built with Rust + WASM + Svelte 5 + WebGPU.',
-    tech: ['Rust', 'WASM', 'WebGPU', 'Svelte 5'],
+      'A GPU voxel engine that renders by ray-marching a sparse voxel structure ' +
+      'directly — no polygons. It voxelizes meshes on the GPU, supports live ' +
+      'sculpting, and checks every GPU path against a CPU reference.',
+    tech: ['Rust', 'WASM', 'WebGPU', 'WGSL', 'Svelte 5'],
     links: [
       { kind: 'demo', href: 'https://anjin-byte.github.io/friendly-journey/' },
       { kind: 'source', href: 'https://github.com/Anjin-Byte/friendly-journey' },
@@ -144,6 +139,18 @@ export const projects: Project[] = [
     tech: ['Rust', 'Image Processing', 'Terrain Analysis', 'Rayon'],
     links: [
       { kind: 'source', href: 'https://github.com/Anjin-Byte/probable-eureka' },
+    ],
+  },
+  {
+    title: 'Aether Sonde',
+    blurb:
+      'An Ethernet network simulator modeling the MAC data-link sublayer — ' +
+      'signal propagation, CSMA/CD collision detection, and bridge relay across ' +
+      'half-duplex, full-duplex, and bridged topologies. Rust core with WASM ' +
+      'bindings and a typed TypeScript adapter.',
+    tech: ['Rust', 'WASM', 'TypeScript', 'Network Simulation'],
+    links: [
+      { kind: 'source', href: 'https://github.com/Anjin-Byte/aether_sonde' },
     ],
   },
   {
