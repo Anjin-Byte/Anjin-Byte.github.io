@@ -14257,7 +14257,7 @@ Expected #hex, #hexa, rgb(), rgba(), hsl(), hsla(), object or number`);
       featured: true,
       thumb: AD,
       thumbAlt: "A voxel-rendered Japanese street scene from Gestalt, lit with deferred GTAO.",
-      blurb: "A GPU-resident renderer for a sparse voxel structure, ray-marched directly with no polygon mesh. Includes GPU mesh voxelization, live sculpting, and deferred GTAO lighting, with every GPU path differential-tested against a CPU reference oracle.",
+      blurb: "A GPU-resident renderer for a sparse voxel structure, ray-marched directly with no polygon mesh. It voxelizes real 3D models (glTF, OBJ, STL) on the GPU, then lets you sculpt the result live under deferred GTAO lighting.",
       tech: [
         "Rust",
         "WASM",
