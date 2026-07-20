@@ -9,6 +9,14 @@ import {
   mdiLinkedin,
 } from '@mdi/js';
 
+// Featured-project thumbnails. Vite resolves each import to a hashed asset URL.
+// Served as WebP downscaled to 1400px wide (from source PNGs ~1.5-4.4 MB): the
+// print renders at ~460px, so 1400px covers 2x retina while cutting ~97% of the
+// bytes. Regenerate from the source PNGs with, e.g.:
+//   cwebp -q 86 -m 6 -sharp_yuv -resize 1400 0 okra_hero.png -o okra_hero.webp
+import okraThumb from '../assets/thumb/okra_hero.webp';
+import gestaltThumb from '../assets/thumb/gestalt_hero.webp';
+
 export interface ContactLink {
   label: string;
   icon: string; // MDI SVG path (from @mdi/js)
@@ -74,15 +82,23 @@ export interface Project {
   title: string;
   blurb: string;
   tech: string[];
+  /** Core algorithms / data structures, named with standard CS vocabulary rather than this repo's internal names. Experimental: not yet populated for every project. */
+  concepts?: string[];
   links?: ProjectLink[];
   /** Rendered as a full-width featured card instead of an index-grid entry. */
   featured?: boolean;
+  /** Hashed asset URL for the featured card's thumbnail print. Featured cards only. */
+  thumb?: string;
+  /** Alt text for the thumbnail. Describe what the image shows, for screen readers. */
+  thumbAlt?: string;
 }
 
 export const projects: Project[] = [
   {
     title: 'Okra',
     featured: true,
+    thumb: okraThumb,
+    thumbAlt: 'The Okra debugger workbench: disassembly, CPU and PPU registers, and a running Game Boy screen.',
     blurb:
       'A cycle-accurate Game Boy (DMG) emulator in Rust, built out into an ' +
       'in-browser debugger workbench: live disassembly, CPU/PPU/APU/memory ' +
@@ -90,6 +106,11 @@ export const projects: Project[] = [
       'Passes Blargg\'s CPU accuracy suite and is growing into a light IDE for ' +
       'DMG development.',
     tech: ['Rust', 'WASM', 'WebGL2', 'Svelte', 'TypeScript'],
+    concepts: [
+      'Finite-state machine emulation',
+      'Instruction decode/dispatch',
+      'ISA assembler/disassembler codec',
+    ],
     links: [
       { kind: 'demo', href: 'https://anjin-byte.github.io/okra-emu/' },
       { kind: 'source', href: 'https://github.com/Anjin-Byte/okra-emu' },
@@ -98,11 +119,19 @@ export const projects: Project[] = [
   {
     title: 'Gestalt',
     featured: true,
+    thumb: gestaltThumb,
+    thumbAlt: 'A voxel-rendered Japanese street scene from Gestalt, lit with deferred GTAO.',
     blurb:
-      'A GPU voxel engine that renders by ray-marching a sparse voxel structure ' +
-      'directly, with no polygons. It voxelizes meshes on the GPU, supports live ' +
-      'sculpting, and checks every GPU path against a CPU reference.',
-    tech: ['Rust', 'WASM', 'WebGPU', 'WGSL', 'Svelte 5'],
+      'A GPU-resident renderer for a sparse voxel structure, ray-marched ' +
+      'directly with no polygon mesh. Includes GPU mesh voxelization, live ' +
+      'sculpting, and deferred GTAO lighting, with every GPU path ' +
+      'differential-tested against a CPU reference oracle.',
+    tech: ['Rust', 'WASM', 'WebGPU', 'WGSL', 'TypeScript'],
+    concepts: [
+      'Sparse voxel octree traversal',
+      'Morton (Z-order) encoding',
+      'SAT-based mesh voxelization',
+    ],
     links: [
       { kind: 'demo', href: 'https://anjin-byte.github.io/friendly-journey/' },
       { kind: 'source', href: 'https://github.com/Anjin-Byte/friendly-journey' },
