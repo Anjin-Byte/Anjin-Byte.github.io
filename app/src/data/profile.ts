@@ -81,7 +81,7 @@ export interface Project {
 
 export const projects: Project[] = [
   {
-    title: 'SM83 Emulator',
+    title: 'Okra',
     featured: true,
     blurb:
       'An SM83 CPU disassembler and emulator — translating Game Boy binaries ' +
