@@ -64,9 +64,9 @@ export interface SkillGroup {
 }
 
 export const skills: SkillGroup[] = [
-  { label: 'Languages',           items: ['Python', 'Java', 'Rust', 'C/C++', 'JavaScript', 'TypeScript', 'SQL'] },
-  { label: 'Frameworks & Libraries', items: ['PyTorch', 'Pydantic', 'CUDA', 'OpenCV', 'Detectron2', 'React', 'Vue', 'OpenGL / WebGPU'] },
-  { label: 'Tools & Platforms',   items: ['Git', 'Cargo', 'wasm-pack', 'pnpm', 'Vite', 'Docker', 'FFmpeg', 'CMake', 'GitHub Actions', 'Postman'] },
+  { label: 'Languages',           items: ['Rust', 'TypeScript', 'Python', 'Java', 'C/C++', 'JavaScript', 'SQL'] },
+  { label: 'Frameworks & Libraries', items: ['WebGPU', 'WGSL', 'WebAssembly', 'Three.js', 'Svelte', 'Vue', 'React', 'Tauri', 'PyTorch', 'CUDA', 'OpenCV', 'Detectron2', 'Pydantic'] },
+  { label: 'Tools & Platforms',   items: ['Git', 'Docker', 'FFmpeg', 'Vite', 'Excel', 'Google Cloud APIs (Drive, Workspace)'] },
 ];
 
 // ── Projects / demos ────────────────────────────────────────────────────────
@@ -211,40 +211,39 @@ export interface Experience {
 
 export const experience: Experience[] = [
   {
-    role: 'Dispatcher · NW: Nationwide Service & Projects',
-    company: 'Wachter, Inc.',
-    location: 'Bentonville, AR',
-    dates: 'Nov 2025 – Present',
+    role: 'Software Engineer, Consultant',
+    company: 'Brynhild Industries',
+    location: 'Washington, DC · Remote',
+    dates: 'Feb 2024 – Present',
+    tech: ['Rust', 'Python', 'Pydantic'],
     highlights: [
-      'Coordinate nationwide dispatch of service technicians for low-voltage networking projects, maintaining an updated schedule in a high-volume, time-sensitive environment.',
-      'Act as central coordination point between project managers, field technicians, and clients, translating job requirements into execution and closing communication gaps.',
-      'Manage full lifecycle of service tickets across multiple concurrent projects: creation, assignment, progress tracking, and closeout deliverables.',
+      'Led development of the lattice-geometry generation pipeline for an SBIR program developing 3D-printable PFAS-free respirator filters for warfighter PM2.5 protection; cut peak resource usage 221×, runtime 7×, and scaled output capacity ~1,700× against prior approaches that hit scale or topology ceilings.',
+      'Built an intake-and-routing system that transformed open-ended requests into structured, hierarchical workflows, enabling automated assignment to specialists.',
     ],
   },
   {
-    role: 'Contract Developer: XChange Connector Engineering',
+    role: 'Dispatcher · NW: Nationwide Service & Projects',
+    company: 'Wachter, Inc.',
+    location: 'Bentonville, AR',
+    dates: 'Oct 2025 – Jun 2026',
+    highlights: [
+      'Coordinated nationwide dispatch of service technicians for low-voltage networking projects, maintaining an updated schedule in a high-volume, time-sensitive environment.',
+      'Managed full lifecycle of service tickets (creation, assignment, tracking, closeout) across multiple concurrent projects.',
+    ],
+  },
+  {
+    role: 'Contract Developer · XChange Connector Engineering',
     company: 'Pipeline Data Services',
     location: 'Remote',
     dates: 'Sep 2025 – Present',
-    tech: ['C#', '.NET', 'XChange SDK', 'REST', 'Python'],
+    tech: ['C#', '.NET', 'XChange SDK', 'Postman', 'REST', 'Python'],
     highlights: [
       'Delivered 5 production-ready connectors on an accelerated timeline, unifying client data across workforce-management and project-planning systems via Trimble\'s App Xchange platform.',
       'Designed an automated contract-testing framework validating API documentation, client data, and XChange Data Objects, reducing T&E cycles by 45%.',
     ],
   },
   {
-    role: 'AI Systems Developer: SBIR Phase I Prototype',
-    company: 'Brynhild Industries',
-    location: 'Washington, DC · Remote',
-    dates: 'Feb 2024 – Apr 2025',
-    tech: ['Python', 'Pydantic', 'anytree', 'OpenAI API'],
-    highlights: [
-      'Built a recursive task-decomposition engine that transformed open-ended prompts into structured task trees, enabling downstream agent assignment and process automation.',
-      'Wrote duplicate-detection and best-fit specialist-assignment logic, demonstrating schema-bound agent coordination for planning workflows.',
-    ],
-  },
-  {
-    role: 'Data Collection & Model Training',
+    role: 'Senior Capstone · Data Collection & Model Training',
     company: 'UARK Computer Vision & Image Understanding Lab',
     location: 'Fayetteville, AR',
     dates: 'Jul 2023 – Jun 2024',
@@ -254,7 +253,7 @@ export const experience: Experience[] = [
     ],
   },
   {
-    role: 'Graduate Research Assistant',
+    role: 'Undergraduate Research Assistant',
     company: 'UARK Computer Vision & Image Understanding Lab',
     location: 'Fayetteville, AR',
     dates: 'Aug 2021 – Feb 2022',
@@ -263,7 +262,7 @@ export const experience: Experience[] = [
     ],
   },
   {
-    role: 'Internship',
+    role: 'IT Internship',
     company: 'Daybright Financial',
     location: 'Brentwood, TN · Chennai, India',
     dates: 'Apr 2021 – May 2022',
