@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { mdiArrowLeft } from '@mdi/js';
 import type { NotebookNode } from '../../space/notebookNodes';
 import { useMermaid } from '../../composables/useMermaid';
 
@@ -19,7 +20,10 @@ useMermaid(proseRef, props.entry.route);
   <section class="note-page-shell">
     <article class="note-page content-surface">
       <header class="note-page-head">
-        <router-link to="/notebook" class="note-back">← Notebook</router-link>
+        <router-link to="/notebook" class="note-back">
+          <v-icon :icon="mdiArrowLeft" size="14" />
+          Notebook
+        </router-link>
         <time class="note-page-date" :datetime="entry.date">{{ formatDate(entry.date) }}</time>
         <h1 class="note-page-title section-heading">{{ entry.title }}</h1>
         <div v-if="entry.tags.length" class="note-page-tags">
@@ -29,6 +33,15 @@ useMermaid(proseRef, props.entry.route);
       <!-- entry.html is rendered from trusted local markdown (markdown-it html:false). -->
       <!-- eslint-disable-next-line vue/no-v-html -->
       <div ref="proseRef" class="note-prose" v-html="entry.html"></div>
+
+      <!-- The exit where a finished reader actually is: at the end. Mirrors the
+           header's back pill so arrival and departure use the same control. -->
+      <footer class="note-page-foot">
+        <router-link to="/notebook" class="note-back">
+          <v-icon :icon="mdiArrowLeft" size="14" />
+          Notebook
+        </router-link>
+      </footer>
     </article>
   </section>
 </template>
@@ -68,16 +81,43 @@ useMermaid(proseRef, props.entry.route);
   border-bottom: 1px solid var(--island-edge);
 }
 
+/* A nav control sitting ON an island surface, so it takes the sidebar-entry
+   grammar: a recessed pill cut into the card (well-recess + inset shadow —
+   visible on the island-fill stock by contrast, unlike a chip of the same
+   fill). In normal flow, never over prose; its twin at the note's foot covers
+   the long-note case. */
 .note-back {
   justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.9rem 0.4rem 0.7rem;
+  background: var(--well-recess);
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 1px 2px var(--shadow-1);
   color: var(--theme-text-tertiary);
   text-decoration: none;
   font-size: 0.8rem;
   letter-spacing: 0.04em;
+  line-height: 1;
   transition: color 140ms ease;
 }
 .note-back:hover {
   color: var(--theme-text-primary);
+}
+.note-back:focus-visible {
+  outline: 2px solid var(--theme-accent-ring);
+  outline-offset: 2px;
+}
+
+/* Foot: the departure twin, above a hairline mirroring the header's rule. */
+.note-page-foot {
+  max-width: var(--measure);
+  margin-inline: auto;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--island-edge);
+  display: grid;
 }
 
 .note-page-date {
