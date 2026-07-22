@@ -37,9 +37,9 @@ import {
  *    App.vue) suppresses the browser's two-finger back/forward swipe.
  *
  * The gesture resets after `ACCUM_RESET_MS` of idle, so each scroll re-decides
- * its axis. This complements the on-screen compass (CompassNav — the primary,
- * accessible, cross-browser path) and the header links; the fly snaps under
- * prefers-reduced-motion (existing panTo/fly behaviour).
+ * its axis. This complements the on-screen nav sidebar (NavSidebar — the
+ * primary, accessible, cross-browser path) and the header links; the fly
+ * snaps under prefers-reduced-motion (existing panTo/fly behaviour).
  */
 export function useLaneScroll(opts: {
   el: Ref<HTMLElement | null>;

@@ -42,9 +42,9 @@ export function findWaypoint(id: WaypointId): Waypoint {
   return BY_ID.get(id) ?? homeWaypoint;
 }
 
-// Neighbour lookup is no longer grid-based: the compass derives each island's
-// bearing/distance from the live camera (see space/compass.ts + useCompass.ts),
-// and break-away picks the nearest bearing (useLaneScroll.ts).
+// Neighbour lookup is no longer grid-based: break-away nav derives each
+// island's bearing from the live camera (see space/compass.ts) and picks the
+// nearest bearing (useLaneScroll.ts).
 
 /** Look up a waypoint by route path, or `null` if no route matches. */
 export function findByRoute(route: string): Waypoint | null {

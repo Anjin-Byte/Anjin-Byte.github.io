@@ -3,7 +3,7 @@ import { defineAsyncComponent } from 'vue';
 import AppBackground from '@/components/layout/AppBackground.vue';
 import AppChrome from '@/components/layout/AppChrome.vue';
 import WorldStage from '@/components/space/WorldStage.vue';
-import CompassNav from '@/components/space/CompassNav.vue';
+import NavSidebar from '@/components/layout/NavSidebar.vue';
 
 // DEV-only renderer backend switcher. Dynamically imported ONLY under
 // import.meta.env.DEV so the whole component (and its dynamic-import chunk) is
@@ -19,7 +19,7 @@ const RendererDebugToggle = import.meta.env.DEV
     <AppBackground />
     <AppChrome />
     <WorldStage />
-    <CompassNav />
+    <NavSidebar />
     <component :is="RendererDebugToggle" v-if="RendererDebugToggle" />
   </v-app>
 </template>
@@ -35,8 +35,7 @@ const RendererDebugToggle = import.meta.env.DEV
   --safe-area-left: env(safe-area-inset-left, 0px);
 
   /* ── Design tokens ──────────────────────────────────────────────────────
-     The scale everything derives from. The compass solver mirrors the marker
-     geometry in space/tokens.ts — keep the two in sync. */
+     The scale everything derives from. */
 
   /* Foundation */
   --zoom: 0.875;

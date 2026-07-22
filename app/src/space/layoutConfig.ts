@@ -45,35 +45,7 @@ export const HORIZONTAL_DAMPING = 0.6;
  *  below it the camera springs back to the lane on idle. */
 export const HORIZONTAL_BREAK_THRESHOLD = 300;
 
-// ── Waymarker compass (Phase 4) ──────────────────────────────────────────────
-
-// Marker radii live in space/tokens.ts now — the hybrid floor/cap/lift the
-// compass computes per frame (touch-safe + viewport-aware). See useCompass.ts.
-
-/** World-px distance below which an island is the *current* one — its marker is
- *  suppressed (you're on it). */
-export const SUPPRESS_DIST = 40;
-
-/** World-px band above `SUPPRESS_DIST` over which a marker fades 0→1, so the
- *  destination fades out on arrival and the origin fades in on departure. */
-export const FADE_BAND = 240;
-
-/** Spring acceleration toward the bearing target each frame (Verlet). Higher =
- *  snappier pull to the rim. */
-export const COMPASS_STIFFNESS = 0.14;
-
-/** Velocity retained frame-to-frame (Verlet momentum), in (0, 1). Higher =
- *  floatier glide + more jostle; lower = snappier settle. */
-export const COMPASS_FRICTION = 0.7;
-
-/** Relaxation passes per frame resolving overlaps + walls (n ≤ 5 → cheap). */
-export const COMPASS_ITERATIONS = 6;
-
-/** Box margin (CSS px) on all four edges of the compass solver box. The top
- *  formerly reserved an 84px `COMPASS_HEADER_INSET` for the app-bar; that bar
- *  dissolved into floating corner chrome (wordmark + theme/menu) that sits
- *  z-above the compass, so the top is now a normal edge like the others. */
-export const COMPASS_EDGE_MARGIN = 18;
+// ── Gesture break-away bearing (dormant, useLaneScroll.ts) ───────────────────
 
 /** Break-away angular tolerance (radians): a scroll/swipe breaks to the island
  *  whose bearing is within this of the gesture direction (~60°). */

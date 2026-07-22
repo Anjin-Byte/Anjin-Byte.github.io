@@ -29,16 +29,17 @@ const { preference } = useThemePreference();
 </template>
 
 <style scoped>
-/* A recessed track cut into the chrome; the active mode is a raised key sitting
-   in the groove (accent-tinted), inactive segments sit flush. Matches the
-   pressable-key language in App.vue. */
+/* A recessed track cut into the chrome — same idiom as NavSidebar's grooves:
+   the inset shadow alone cuts it (no border, so the depth cue isn't doubled),
+   inactive segments sit flush as quiet ghosts, and the active mode is the ONE
+   raised thing — plain stock, marked by an accent ring around its edge. */
 .theme-toggle {
   background: var(--well-recess) !important;
-  border: 1px solid var(--island-edge);
   border-radius: var(--radius-pill);
   box-shadow: inset 0 1px 2px var(--shadow-1);
   margin-inline-start: 8px;
-  padding: 2px;
+  padding: 4px;
+  gap: 2px;
 }
 
 .theme-toggle :deep(.v-btn) {
@@ -57,8 +58,8 @@ const { preference } = useThemePreference();
 
 .theme-toggle :deep(.v-btn--active) {
   color: var(--theme-text-primary) !important;
-  background: var(--key-primary-fill) !important;
-  box-shadow: var(--island-lip) !important;
+  background: var(--island-fill) !important;
+  box-shadow: var(--island-lip), 0 0 0 2px var(--theme-accent-ring) !important;
 }
 
 .theme-toggle :deep(.v-icon) {
