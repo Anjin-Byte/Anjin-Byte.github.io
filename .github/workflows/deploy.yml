@@ -59,6 +59,17 @@ jobs:
       - name: Build WASM (GPU)
         run: wasm-pack build crates/game_of_life_gpu --target bundler
 
+      # Gate the generated TypeScript boundary surface (audit Part 1 #1): the
+      # committed .d.ts must match what wasm-pack just produced. A drift means a
+      # #[wasm_bindgen] export changed without the reviewed .d.ts being updated.
+      - name: Gate WASM TS boundary (.d.ts)
+        run: |
+          rm -f crates/game_of_life_gpu/pkg/.gitignore
+          if ! git diff --exit-code -- crates/game_of_life_gpu/pkg/; then
+            echo "::error::The generated WASM .d.ts (the public TS boundary) changed but the committed copy was not updated. Run a wasm-pack build and commit crates/game_of_life_gpu/pkg/*.d.ts. See docs/interface-audit-2026-07.md Part 1 #1."
+            exit 1
+          fi
+
       - name: Install Dependencies
         working-directory: app
         run: pnpm install --frozen-lockfile

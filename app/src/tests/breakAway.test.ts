@@ -96,7 +96,7 @@ function run(): void {
   testLockedAxis();
   testTugCameraX();
   testHorizontalBreakDir();
-  // eslint-disable-next-line no-console
+   
   console.log('breakAway.test.ts passed');
 }
 

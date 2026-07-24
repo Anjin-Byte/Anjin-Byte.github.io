@@ -4,8 +4,13 @@
 # so pinning deps keeps CI reproducible — an unpinned wasm-bindgen drifted to a
 # newer glue form than local and broke the Firefox patch in CI.
 bin/
-pkg/
-crates/*/pkg/
+# wasm-pack output: ignore the generated .wasm/.js/package.json, but TRACK the
+# .d.ts — it is the public TypeScript boundary surface. Committed + gated in CI
+# (deploy.yml) so a #[wasm_bindgen] change cannot reshape the TS API silently.
+# See docs/interface-audit-2026-07.md Part 1 #1. NB: ignoring `pkg/` (the dir)
+# made the old `!*.d.ts` negation dead — git can't re-include a file whose parent
+# dir is ignored — so we ignore the CONTENTS (`pkg/*`) instead.
+crates/*/pkg/*
 !crates/*/pkg/*.d.ts
 wasm-pack.log
 app/node_modules/

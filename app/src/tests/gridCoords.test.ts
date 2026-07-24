@@ -49,7 +49,7 @@ function testOffsetSymmetry(): void {
 function run(): void {
   testRoundTripIdentity();
   testOffsetSymmetry();
-  // eslint-disable-next-line no-console
+   
   console.log('gridCoords.test.ts passed');
 }
 

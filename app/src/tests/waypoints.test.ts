@@ -32,7 +32,7 @@ function testRouteWaypointBijection(): void {
 // Boundary validators reject unknown/non-string input rather than throwing.
 function testUnknownInputs(): void {
   assertEq(parseRouteToWaypointId('/garbage'), null, 'unknown route → null');
-  assertEq(parseRouteToWaypointId(42 as unknown), null, 'non-string route → null');
+  assertEq(parseRouteToWaypointId(42), null, 'non-string route → null');
   assertEq(parseRouteToWaypointId(undefined), null, 'undefined route → null');
   assertEq(findByRoute('/nope'), null, 'unknown route → null');
   assertEq(coerceWaypointId('garbage'), homeWaypoint.id, 'unknown id → home');
@@ -42,7 +42,7 @@ function testUnknownInputs(): void {
 function run(): void {
   testRouteWaypointBijection();
   testUnknownInputs();
-  // eslint-disable-next-line no-console
+   
   console.log('waypoints.test.ts passed');
 }
 

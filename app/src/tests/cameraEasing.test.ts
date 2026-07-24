@@ -70,7 +70,7 @@ function run(): void {
   testStepFractionNoOvershoot();
   testCssTransform();
   testDeviceOffset();
-  // eslint-disable-next-line no-console
+   
   console.log('cameraEasing.test.ts passed');
 }
 

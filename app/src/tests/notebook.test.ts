@@ -59,7 +59,7 @@ function run(): void {
   testNoFrontMatter();
   testValidateOk();
   testValidateThrows();
-  // eslint-disable-next-line no-console
+   
   console.log('notebook.test.ts passed');
 }
 

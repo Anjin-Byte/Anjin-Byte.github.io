@@ -19,6 +19,15 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
+    "noImplicitReturns": true,
+    "noImplicitOverride": true,
+    // DEFERRED (interface-audit E): these two are high-value but surface real
+    // pre-existing violations that need fixing before they can be enforced:
+    //   "noUncheckedIndexedAccess": ~20 sites (staticRenderer.ts, FrameTimer.ts)
+    //   "exactOptionalPropertyTypes": ~3 sites (useBlankZones.ts, useCamera.ts)
+    // Enable + fix as the next step (noUncheckedIndexedAccess first — it catches
+    // real unchecked buffer access). NB: verify with `tsc -p` (fresh), NOT the
+    // incremental `vue-tsc` cache, which silently passed the unfixed code.
 
     "paths": {
       "@/*": ["./src/*"],

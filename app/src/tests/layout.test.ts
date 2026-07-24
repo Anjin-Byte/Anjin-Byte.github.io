@@ -82,7 +82,7 @@ function run(): void {
   testResponsiveScalesWithViewport();
   testGridAndScreenMapping();
   testFocusWeight();
-  // eslint-disable-next-line no-console
+   
   console.log('layout.test.ts passed');
 }
 

@@ -150,7 +150,7 @@ function run(): void {
   testNormalizeZonesCap();
   testStorageRoundTrip();
   testUseBlankZonesCallbacks();
-  // eslint-disable-next-line no-console
+   
   console.log('blankZones.test.ts passed');
 }
 

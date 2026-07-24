@@ -42,7 +42,7 @@ function run(): void {
   testBearingTo();
   testAngleDelta();
   testBearingNeighbor();
-  // eslint-disable-next-line no-console
+   
   console.log('compass.test.ts passed');
 }
 

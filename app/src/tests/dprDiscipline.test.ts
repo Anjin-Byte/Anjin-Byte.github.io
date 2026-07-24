@@ -61,5 +61,5 @@ function run(): void {
 }
 
 run();
-// eslint-disable-next-line no-console
+ 
 console.log('dprDiscipline.test.ts passed');

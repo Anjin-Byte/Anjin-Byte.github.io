@@ -62,7 +62,7 @@ const blankZones = useBlankZones({
 // The Grid Tools / blank-zones panel is an authoring tool, not site chrome —
 // hidden from the presented site for now. The zone wiring below stays intact,
 // so bringing the editor back is just flipping this to true.
-const showGridTools: boolean = false;
+const showGridTools = false;
 const zoneToolEnabled = ref(false);
 const zoneSnapMajor = ref(false);
 const zoneDraft = ref<BlankZoneDraft>({

@@ -31,8 +31,8 @@ function normalizeMode(value: unknown): BlankMode {
 
 function normalizeEdge(edge: unknown): ZoneEdgeBehavior {
   const source = (edge && typeof edge === 'object') ? edge as Partial<ZoneEdgeBehavior> : {};
-  const style = (typeof source.style === 'string' && VALID_EDGE_STYLES.has(source.style as EdgeStyle))
-    ? source.style as EdgeStyle
+  const style = (typeof source.style === 'string' && VALID_EDGE_STYLES.has(source.style))
+    ? source.style
     : 'none';
 
   const widthCells = clamp(asInteger(source.widthCells) ?? 1, 1, 4);

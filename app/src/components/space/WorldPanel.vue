@@ -43,7 +43,7 @@ const style = computed(() => {
     // the opposite of the documented intent. Keyboard focus is unaffected
     // (pointer-events doesn't gate tab order); cameraSync moves focus to the
     // active panel on arrival.
-    pointerEvents: (isActive.value ? 'auto' : 'none') as 'auto' | 'none',
+    pointerEvents: (isActive.value ? 'auto' : 'none'),
     // EVERY panel's box is bounded to the TRUE viewport height (the stage
     // height the camera centres on), not just the active one. Two reasons:
     //   1. The active island's scroll box must match the viewport exactly — a

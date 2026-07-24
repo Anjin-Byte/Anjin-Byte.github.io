@@ -14,7 +14,7 @@ function assert(cond: unknown, message: string): void {
 }
 
 function expectConstant(html: string, name: string, expected: string): void {
-  const m = html.match(new RegExp(`${name}\\s*=\\s*'([^']+)'`));
+  const m = new RegExp(`${name}\\s*=\\s*'([^']+)'`).exec(html);
   assert(m, `index.html: constant ${name} not found`);
   assert(
     m![1] === expected,
@@ -54,5 +54,5 @@ function run(): void {
 }
 
 run();
-// eslint-disable-next-line no-console
+ 
 console.log('themeParity.test.ts passed');

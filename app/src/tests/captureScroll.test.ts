@@ -38,7 +38,7 @@ function testScrollFoldsIntoOffset(): void {
 
 function run(): void {
   testScrollFoldsIntoOffset();
-  // eslint-disable-next-line no-console
+   
   console.log('captureScroll.test.ts passed');
 }
 

@@ -53,7 +53,7 @@ const isAnimatingRef = ref(false);
 // entry). Drives re-centering on resize; null once the user free-pans away (so a
 // resize doesn't yank them back). Generalised from a WaypointId so dynamic entry
 // islands re-centre on resize exactly like the fixed waypoints.
-type Anchor = { gx: number; gy: number; zoom?: number };
+interface Anchor { gx: number; gy: number; zoom?: number }
 const anchorRef = ref<Anchor | null>({ gx: homeWaypoint.gx, gy: homeWaypoint.gy });
 
 // Vertical scroll within the captured island (CSS px). Owned by the active

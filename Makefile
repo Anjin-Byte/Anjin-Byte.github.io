@@ -42,11 +42,13 @@ setup:
 dev:
 	$(WASM_PACK) build --dev --target bundler $(CRATE_CPU)
 	$(WASM_PACK) build --dev --target bundler $(CRATE_GPU)
+	rm -f $(CRATE_GPU)/pkg/.gitignore   # keep the committed .d.ts trackable (see .gitignore + audit #1)
 	$(PNPM) dev
 
 build:
 	$(WASM_PACK) build --release --target bundler $(CRATE_CPU)
 	$(WASM_PACK) build --release --target bundler $(CRATE_GPU)
+	rm -f $(CRATE_GPU)/pkg/.gitignore   # keep the committed .d.ts trackable (see .gitignore + audit #1)
 	$(PNPM) typecheck
 	$(PNPM) build
 

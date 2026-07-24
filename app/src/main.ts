@@ -12,4 +12,9 @@ const app = createApp(App).use(vuetify).use(router);
 // no fly from origin, and no flash during the first-frame canvas crossfade.
 installCameraRouteSync(router);
 
-router.isReady().then(() => app.mount('#app'));
+// Bootstrap is process-fatal: a router/mount failure should surface loudly, not
+// leave a silent blank page. The chain ends in .catch so the promise is handled
+// (no floating promise) and any startup error is logged.
+router.isReady()
+  .then(() => { app.mount('#app'); })
+  .catch((err: unknown) => { console.error('App failed to start:', err); });

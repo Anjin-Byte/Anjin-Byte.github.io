@@ -42,7 +42,7 @@ function testPanShiftsCellSameDirectionAsShader(): void {
 
 function run(): void {
   testPanShiftsCellSameDirectionAsShader();
-  // eslint-disable-next-line no-console
+   
   console.log('cameraSign.test.ts passed');
 }
 

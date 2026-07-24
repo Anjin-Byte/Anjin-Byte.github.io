@@ -78,7 +78,7 @@ export function useMermaid(host: Ref<HTMLElement | null>, nodeRoute: string): vo
     } catch (err) {
       // A malformed local diagram is an authoring error — surface it in dev,
       // but never let it take down the article page.
-      // eslint-disable-next-line no-console
+       
       console.error('[mermaid] diagram render failed', err);
     }
   }

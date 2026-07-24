@@ -86,7 +86,7 @@ function run(): void {
   testFirstFrameRenders();
   testStaticThrottle();
   testBurstWindow();
-  // eslint-disable-next-line no-console
+   
   console.log('frameGate.test.ts passed');
 }
 
