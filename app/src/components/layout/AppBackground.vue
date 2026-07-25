@@ -4,6 +4,7 @@ import { createLogger } from '../../logger';
 import { screenToCell, wrapCell } from '../../utils/gridCoords';
 import { cssPx } from '../../utils/units';
 import { useBlankZones } from '../../composables/useBlankZones';
+import { featureChannel } from '../../composables/featureChannel';
 import type { BlankZone, BlankZoneDraft, BlankZoneRect } from '../../types/blankZones';
 import { asZoneId } from '../../types/blankZones';
 import { useWorkerBridge } from '../../composables/useWorkerBridge';
@@ -43,22 +44,11 @@ const { activeBackend } = useRendererBackend();
 // break) is wired per-panel in WorldPanel via useLaneScroll, so the wheel
 // listener lives on the captured island it scrolls.
 
-// ── Worker serialization helpers ──────────────────────────────────────────
-function toWorkerZone(zone: BlankZone): BlankZone {
-  return { ...zone, edge: { ...zone.edge } };
-}
-function toWorkerZones(zones: BlankZone[]): BlankZone[] {
-  return zones.map(toWorkerZone);
-}
-
-// ── Feature composables (with worker sync callbacks) ────────────────────────
-const blankZones = useBlankZones({
-  onSetZones: (zones) => bridge.post({ type: 'set_zones', zones: toWorkerZones(zones) }),
-  onAddZone: (zone) => bridge.post({ type: 'add_zone', zone: toWorkerZone(zone) }),
-  onUpdateZone: (zone) => bridge.post({ type: 'update_zone', zone: toWorkerZone(zone) }),
-  onRemoveZone: (id) => bridge.post({ type: 'remove_zone', id }),
-  onClearZones: () => bridge.post({ type: 'clear_zones' }),
-});
+// ── Feature composables (wired to the worker's generic feature channel) ─────
+// `featureChannel` supplies all five sync callbacks (and the plain-object clone
+// each op needs before postMessage), so a worker-backed feature is one binding.
+const zoneChannel = featureChannel<BlankZone>(bridge.post, 'blankZones');
+const blankZones = useBlankZones(zoneChannel);
 
 // ── Tool state ──────────────────────────────────────────────────────────────
 // The Grid Tools / blank-zones panel is an authoring tool, not site chrome —
@@ -165,15 +155,21 @@ onMounted(() => {
       applyGridPitchVars(msg.gridInfo.gridPitch);
     }
     bridge.post({ type: 'set_theme', theme: currentTheme.value });
-    bridge.post({ type: 'set_zones', zones: toWorkerZones(blankZones.zones.value) });
+    // Push the composable's current zones down to the freshly-spawned worker
+    // (its state starts empty; the composable may have loaded some from storage).
+    zoneChannel.onSet(blankZones.zones.value);
     // Deliver the current camera offset now the worker accepts commands — covers
     // a deep-link landing where the camera was snapped before the worker spawned
     // and won't change again (so the grid-sync watcher wouldn't fire).
     const off = camera.worldOffsetDevicePx.value;
     bridge.post({ type: 'camera', x: off.x, y: off.y });
   });
-  bridge.on('zones_state', (msg) => blankZones.syncFromWorker(msg.zones));
-  bridge.on('zones_error', (msg) => log.error('Zone update rejected:', msg.message));
+  bridge.on('feature_state', (msg) => {
+    if (msg.feature === 'blankZones') blankZones.syncFromWorker(msg.items as BlankZone[]);
+  });
+  bridge.on('feature_error', (msg) =>
+    log.error(`Feature '${msg.feature}' update rejected:`, msg.message),
+  );
   bridge.on('first_frame_painted', () => surface.revealCanvas());
   bridge.on('error', (msg) => {
     if (msg.phase === 'gpu-init') {

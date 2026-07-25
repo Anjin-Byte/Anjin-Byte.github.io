@@ -11,6 +11,7 @@ import type { ThemePalette } from '../types/theme';
 import { LIGHT_THEME } from '../types/theme';
 import { devicePx, worldCell } from '../utils/units';
 import { BlankZoneState } from './BlankZoneState';
+import { FeatureRegistry } from './featureRegistry';
 import { makeStaticRenderer } from './staticRenderer';
 import { makeGpuRenderer } from './gpuRenderer';
 import { makeWebglRenderer } from './webglRenderer';
@@ -79,17 +80,12 @@ function post(msg: WorkerOutMsg): void {
   ws.postMessage(msg);
 }
 
-function postZonesState(): void {
-  post({ type: 'zones_state', zones: zoneState.getAll() });
-}
-
-function postZonesError(message: string): void {
-  post({ type: 'zones_error', message });
-}
-
-function applyZonesToRenderer(): void {
-  renderer?.setZones?.(zoneState.getAll());
-}
+// Collection features driven over the generic `feature` channel. Registering one
+// wires its worker state + renderer push; the `case 'feature'` handler and
+// `features.applyAll()` (renderer-swap re-apply) then cover it with no per-
+// feature message/switch/re-apply edits. Blank zones is the only one today.
+const features = new FeatureRegistry();
+features.register('blankZones', zoneState, (items) => renderer?.setZones?.(items));
 
 // ── Memory reporting (DEV) ─────────────────────────────────────────────────────
 // wgpu exposes no VRAM total, so GPU allocations are estimated from canvas + grid
@@ -122,12 +118,6 @@ function postMemoryBreakdown(): void {
       workerHeapBytes: workerHeapBytes(),
     },
   });
-}
-
-function setZonesState(next: unknown): void {
-  zoneState.setAll(next);
-  applyZonesToRenderer();
-  postZonesState();
 }
 
 // Grid info for backends with no addressable cell grid (static fallback, and
@@ -276,7 +266,9 @@ ws.onmessage = async (e: MessageEvent<unknown>) => {
           // signature until the next wasm rebuild drops the parameter.
           const gpu = await GpuGameOfLife.new_offscreen(canvas, 0, seed);
           const startupT3 = performance.now();
-          const gpuRenderer = makeGpuRenderer(gpu, postZonesError);
+          const gpuRenderer = makeGpuRenderer(gpu, (message) =>
+            post({ type: 'feature_error', feature: 'blankZones', message }),
+          );
           renderer = gpuRenderer;
           // A resize that arrived during the async init window updated
           // canvas.width/height directly, but its `gpu.resize()` call was
@@ -289,7 +281,7 @@ ws.onmessage = async (e: MessageEvent<unknown>) => {
           // Re-apply the latest offset now that the renderer is accepting commands.
           renderer.setCamera?.(pendingCameraX, pendingCameraY);
           renderer.setTransition?.(1);
-          renderer.setZones?.(zoneState.getAll());
+          features.applyAll();
           renderer.setTheme?.(currentTheme);
           log.info('GPU renderer ready');
           post({ type: 'ready', backend: 'gpu', gridInfo: gpuRenderer.gridInfo() });
@@ -471,7 +463,7 @@ ws.onmessage = async (e: MessageEvent<unknown>) => {
       // resize() rewrites the uniform buffer (scroll_x/scroll_y reset to 0); re-apply.
       renderer.setCamera?.(pendingCameraX, pendingCameraY);
       renderer.setTransition?.(1);
-      renderer.setZones?.(zoneState.getAll());
+      features.applyAll();
       renderer.setTheme?.(currentTheme);
       // Grid dimensions change on resize; notify main thread.
       if (renderer.gridInfo) {
@@ -490,19 +482,23 @@ ws.onmessage = async (e: MessageEvent<unknown>) => {
       renderer?.toggleCell?.(e.data.cx, e.data.cy);
       break;
 
-    case 'set_zones': setZonesState(e.data.zones); break;
-    case 'add_zone': {
-      const result = zoneState.add(e.data.zone);
-      if (result.error) { postZonesError(result.error); break; }
-      applyZonesToRenderer(); postZonesState(); break;
+    case 'feature': {
+      const entry = features.get(e.data.feature);
+      if (!entry) {
+        post({ type: 'feature_error', feature: e.data.feature, message: `unknown feature: ${e.data.feature}` });
+        break;
+      }
+      const error = entry.dispatch(e.data.op, e.data.payload);
+      if (error) {
+        post({ type: 'feature_error', feature: e.data.feature, message: error });
+        break;
+      }
+      // Op accepted: push the new collection to the renderer, then echo the
+      // authoritative post-op state back for the composable to reconcile.
+      entry.apply();
+      post({ type: 'feature_state', feature: e.data.feature, items: entry.snapshot() });
+      break;
     }
-    case 'update_zone': {
-      const result = zoneState.update(e.data.zone);
-      if (result.error) { postZonesError(result.error); break; }
-      applyZonesToRenderer(); postZonesState(); break;
-    }
-    case 'remove_zone': zoneState.remove(e.data.id); applyZonesToRenderer(); postZonesState(); break;
-    case 'clear_zones': zoneState.clear(); applyZonesToRenderer(); postZonesState(); break;
 
     case 'set_theme':
       currentTheme = e.data.theme;

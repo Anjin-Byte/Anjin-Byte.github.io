@@ -1,6 +1,5 @@
 // Shared message types between AppBackground (main thread) and backgroundRenderer (worker).
 
-import type { BlankZone } from '../types/blankZones';
 import type { ThemePalette } from '../types/theme';
 import type { FrameStats } from '../perf';
 import type { DevicePx, WorldCell } from '../utils/units';
@@ -12,6 +11,12 @@ export type RendererBackend = 'gpu' | 'webgl2' | 'cpu';
 /** Dev/testing override (via `?renderer=` on the page URL) that pins the
  *  worker to one backend instead of probing. Threaded through the init msg. */
 export type ForcedBackend = 'webgpu' | 'webgl2' | 'static';
+
+/** CRUD operations on a worker-backed collection feature (see the `feature`
+ *  message). `set` replaces the whole collection; `add`/`update` key on item
+ *  `id`; `remove` takes an id; `clear` empties it. Switched exhaustively in one
+ *  place (the worker's feature dispatch), so a new op is a compile error there. */
+export type FeatureOp = 'set' | 'add' | 'update' | 'remove' | 'clear';
 
 /** Frames between base simulation ticks. At 60 Hz: ~3.5 s per tick. */
 export const TICK_EVERY = 175;
@@ -52,11 +57,15 @@ export type WorkerInMsg =
   // Toggle a cell's alive/dead state. cx/cy are world-cell coordinates
   // already wrapped into [0, worldCols) × [0, worldRows) by the main thread.
   | { type: 'toggle_cell'; cx: number; cy: number }
-  | { type: 'set_zones';    zones: BlankZone[] }
-  | { type: 'add_zone';    zone:  BlankZone   }
-  | { type: 'update_zone'; zone:  BlankZone   }
-  | { type: 'remove_zone'; id:    string      }
-  | { type: 'clear_zones' }
+  // ── Feature channel ─────────────────────────────────────────────────────
+  // Generic CRUD envelope for worker-backed collection features (blank zones is
+  // the only one today). One variant + one switch case + one worker registry
+  // entry replaces the per-feature explosion of {set,add,update,remove,clear}_X
+  // messages. `payload` is `unknown` by design: it crosses the structured-clone
+  // boundary and is validated worker-side by the feature's `FeatureState`
+  // normalizers — the same boundary validation the bespoke zone messages relied
+  // on. `op` is a small closed union, switched exhaustively in ONE place.
+  | { type: 'feature'; feature: string; op: FeatureOp; payload?: unknown }
   | { type: 'set_theme'; theme: ThemePalette }
   | { type: 'perf_snapshot' };
 
@@ -124,8 +133,14 @@ export type WorkerOutMsg =
   | { type: 'ready'; backend: RendererBackend; gridInfo: GridInfo }
   // Sent after resize so the main thread can update its CoordSnapshot.
   | { type: 'grid_info'; gridInfo: GridInfo }
-  | { type: 'zones_state';  zones: BlankZone[] }
-  | { type: 'zones_error';  message: string }
+  // Feature-channel replies (see the `feature` inbound message). `feature_state`
+  // echoes the authoritative post-op collection back for the composable to
+  // reconcile; `feature_error` reports a rejected op (invalid payload / missing
+  // item). `items` is `unknown[]`: the main-thread composable re-normalizes on
+  // receipt (`createFeatureComposable.syncFromWorker`), so the wire stays untyped
+  // and the boundary owns validation.
+  | { type: 'feature_state'; feature: string; items: unknown[] }
+  | { type: 'feature_error'; feature: string; message: string }
   | { type: 'perf_snapshot'; stats: FrameStats[] }
   // DEV-only perf signals — see StartupBreakdown / GpuPassDurations.
   | { type: 'startup_breakdown'; phases: StartupBreakdown }

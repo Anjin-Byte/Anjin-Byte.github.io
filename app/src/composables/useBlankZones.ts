@@ -3,7 +3,7 @@ import type { Ref } from 'vue';
 import type { BlankZone } from '../types/blankZones';
 import { normalizeZone, normalizeZones } from '../utils/blankZoneNormalization';
 import { loadBlankZones, saveBlankZones, clearBlankZonesStorage } from '../utils/blankZoneStorage';
-import { createFeatureComposable } from './createFeatureComposable';
+import { createFeatureComposable, type FeatureCallbacks } from './createFeatureComposable';
 
 export interface UseBlankZones {
   zones: Ref<BlankZone[]>;
@@ -15,13 +15,10 @@ export interface UseBlankZones {
   syncFromWorker(zones: BlankZone[]): void;
 }
 
-export interface UseBlankZonesOptions {
-  onSetZones?: (zones: BlankZone[]) => void;
-  onAddZone?: (zone: BlankZone) => void;
-  onUpdateZone?: (zone: BlankZone) => void;
-  onRemoveZone?: (id: string) => void;
-  onClearZones?: () => void;
-}
+// The worker-sync callbacks are the generic feature-channel shape (onSet/onAdd/
+// …), supplied wholesale by `featureChannel(bridge.post, 'blankZones')` — no
+// per-feature renaming layer.
+export type UseBlankZonesOptions = FeatureCallbacks<BlankZone>;
 
 export function useBlankZones(options: UseBlankZonesOptions = {}): UseBlankZones {
   const {
@@ -30,11 +27,11 @@ export function useBlankZones(options: UseBlankZonesOptions = {}): UseBlankZones
     storage: { load: loadBlankZones, save: saveBlankZones, clear: clearBlankZonesStorage },
     normalize: normalizeZones,
     normalizeOne: normalizeZone,
-    onSet: options.onSetZones,
-    onAdd: options.onAddZone,
-    onUpdate: options.onUpdateZone,
-    onRemove: options.onRemoveZone,
-    onClear: options.onClearZones,
+    onSet: options.onSet,
+    onAdd: options.onAdd,
+    onUpdate: options.onUpdate,
+    onRemove: options.onRemove,
+    onClear: options.onClear,
   });
 
   return {

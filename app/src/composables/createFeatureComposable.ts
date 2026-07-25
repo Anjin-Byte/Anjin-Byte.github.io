@@ -18,6 +18,11 @@ export interface FeatureComposableConfig<T extends HasId> {
   onClear?: (() => void) | undefined;
 }
 
+/** The worker-sync callbacks of a feature composable, as their own type so a
+ *  transport (see `featureChannel`) can supply all five at once. */
+export type FeatureCallbacks<T extends HasId> =
+  Pick<FeatureComposableConfig<T>, 'onSet' | 'onAdd' | 'onUpdate' | 'onRemove' | 'onClear'>;
+
 export interface FeatureComposable<T extends HasId> {
   items: Ref<T[]>;
   // Function-property syntax (not methods): this-less, safe to destructure.

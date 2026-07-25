@@ -117,11 +117,11 @@ function testUseBlankZonesCallbacks(): void {
   fakeStorage.clear();
   const events: string[] = [];
   const zoneStore = useBlankZones({
-    onSetZones: () => events.push('set'),
-    onAddZone: () => events.push('add'),
-    onUpdateZone: () => events.push('update'),
-    onRemoveZone: () => events.push('remove'),
-    onClearZones: () => events.push('clear'),
+    onSet: () => events.push('set'),
+    onAdd: () => events.push('add'),
+    onUpdate: () => events.push('update'),
+    onRemove: () => events.push('remove'),
+    onClear: () => events.push('clear'),
   });
 
   const zone: BlankZone = {
