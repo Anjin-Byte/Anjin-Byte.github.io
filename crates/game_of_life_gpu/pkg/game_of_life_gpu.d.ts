@@ -52,8 +52,9 @@ export class GpuGameOfLife {
     last_present_ms(): number;
     last_render_pass_ms(): number | undefined;
     /**
-     * DEV: wall-clock ms of the most recent `auto_reseed()` (CPU) inside
-     * `tick_and_render`; `0.0` on ticks where no reseed fired.
+     * DEV: wall-clock ms of the most recent `arm_reseed()` (CPU) inside
+     * `tick_and_render`; `0.0` on ticks where no reseed fired. Expect this to
+     * be small now — it times the rejection-set build only, not the stamping.
      */
     last_reseed_ms(): number;
     last_xor_edit_ms(): number | undefined;

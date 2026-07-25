@@ -199,6 +199,24 @@ fn value_noise(p: vec2f) -> f32 {
     return mix(a, b, u.y);
 }
 
+// 1-D value noise — linear interpolation of random lattice values along one
+// axis, with the same quintic fade as `value_noise` so the smoothness character
+// matches exactly.
+//
+// Exists because the grid's printing-roller fades vary along a SINGLE axis
+// (`print_fade_x` is a function of px alone, `print_fade_y` of world_y alone).
+// Evaluating full 2-D noise for those was doing ~4x the necessary work per
+// call: 4 hash21 (~10 ops each) plus a two-component quintic, to interpolate
+// between two lattice rows whose blend weight was a compile-time constant. This
+// is 2 hash11 (~5 ops each) plus a one-component fade — roughly 18 ALU against
+// ~55, on four calls for every pixel of a dpr²-scaled surface.
+fn value_noise_1d(x: f32) -> f32 {
+    let i = floor(x);
+    let f = fract(x);
+    let u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+    return mix(hash11(i), hash11(i + 1.0), u);
+}
+
 // Fractional Brownian Motion: 4 octaves (quality/perf balance for real-time).
 fn fbm(p: vec2f) -> f32 {
     var s = 0.0; var amp = 0.5; var pp = p;
@@ -532,8 +550,14 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     // Low-frequency printing variation: ink roller/ribbon inconsistency during
     // manufacture.  Each axis fades independently — the print head's condition
     // varies per pass.  Period ≈ 200px (spans ~25 cells); range [0.80, 1.00].
-    let print_fade_x = mix(0.70, 1.0, value_noise(vec2f(px       * 0.005,  7.3)));
-    let print_fade_y = mix(0.70, 1.0, value_noise(vec2f(3.9, world_y * 0.005)));
+    // 1-D noise: each axis' fade depends only on that axis (see value_noise_1d).
+    // The per-axis constant offsets replace the distinct constant coordinates
+    // the 2-D calls used (`7.3` / `3.9`), keeping the two axes decorrelated —
+    // without them both axes would fade with the identical curve and the
+    // roller variation would read as a diagonal plaid instead of independent
+    // horizontal and vertical passes.
+    let print_fade_x = mix(0.70, 1.0, value_noise_1d(px      * 0.005));
+    let print_fade_y = mix(0.70, 1.0, value_noise_1d(world_y * 0.005 + 41.7));
 
     let minor_x = grid_line_aa(px,      pitch_minor, paper.minor_half_px + fiber_bleed) * print_fade_x;
     let minor_y = grid_line_aa(world_y, pitch_minor, paper.minor_half_px + fiber_bleed) * print_fade_y;
@@ -541,8 +565,8 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
 
     // Major lines get a separate, more aggressive fade — they're bolder so need
     // a lower floor to show the same perceptual variation as the minor lines.
-    let major_fade_x = mix(0.45, 1.0, value_noise(vec2f(px       * 0.004 + 11.7, 23.1)));
-    let major_fade_y = mix(0.45, 1.0, value_noise(vec2f(19.4, world_y * 0.004 + 11.7)));
+    let major_fade_x = mix(0.45, 1.0, value_noise_1d(px      * 0.004 + 11.7));
+    let major_fade_y = mix(0.45, 1.0, value_noise_1d(world_y * 0.004 + 79.3));
     let major_x = grid_line_aa(px,      pitch_major, paper.major_half_px + fiber_bleed) * major_fade_x;
     let major_y = grid_line_aa(world_y, pitch_major, paper.major_half_px + fiber_bleed) * major_fade_y;
     var major_cov = max(major_x, major_y) * content_mask;

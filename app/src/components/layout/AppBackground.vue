@@ -18,6 +18,7 @@ import {
   GRID_CELL_DEVICE_PX,
 } from '../../composables/useCanvasSurface';
 import { useRendererBackend } from '../../composables/useRendererBackend';
+import { publishRenderCost } from '../../composables/useRenderCost';
 import { useWorkerDiagnostics } from '../../composables/useWorkerDiagnostics';
 import { useCamera } from '../../composables/useCamera';
 import GridBlankZonePanel from './GridBlankZonePanel.vue';
@@ -170,6 +171,9 @@ onMounted(() => {
   bridge.on('feature_error', (msg) =>
     log.error(`Feature '${msg.feature}' update rejected:`, msg.message),
   );
+  // Relay live render cost to the dev perf HUD (no-op in prod: the worker only
+  // emits these under PERF_ENABLED, and the HUD isn't mounted).
+  bridge.on('render_cost', (msg) => publishRenderCost(msg.stats));
   bridge.on('first_frame_painted', () => surface.revealCanvas());
   bridge.on('error', (msg) => {
     if (msg.phase === 'gpu-init') {

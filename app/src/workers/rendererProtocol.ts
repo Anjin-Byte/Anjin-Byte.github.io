@@ -129,8 +129,33 @@ export interface MemoryBreakdown {
   workerHeapBytes: number | null;  // worker JS/WASM heap, if performance.memory exists
 }
 
+/**
+ * Live worker-side render cost, emitted on a low fixed cadence (a few Hz) for
+ * the dev perf HUD. Distinct from `perf_snapshot`, which is a pull-based dump
+ * of the whole FrameTimer table: this is a small push used to drive a live
+ * readout while you scroll, which is when the numbers actually matter.
+ *
+ * `rendered` vs `received` is the load-shedding signal — the gap is frames the
+ * gate declined because the device could not sustain them (see frameGate.ts).
+ */
+export interface RenderCostStats {
+  /** EMA the frame gate uses for its sustainable-rate decision (ms). */
+  sustainedMs: number;
+  /** Tail cost over the recent window (ms). */
+  p95Ms: number;
+  worstMs: number;
+  /** 'frame' messages received vs actually rendered since the last emit. */
+  received: number;
+  rendered: number;
+  /** Whether the camera was moving for the majority of the window — the
+   *  expensive, uncapped case worth judging smoothness on. */
+  moving: boolean;
+}
+
 export type WorkerOutMsg =
   | { type: 'ready'; backend: RendererBackend; gridInfo: GridInfo }
+  // DEV-only: live render cost for the perf HUD (see RenderCostStats).
+  | { type: 'render_cost'; stats: RenderCostStats }
   // Sent after resize so the main thread can update its CoordSnapshot.
   | { type: 'grid_info'; gridInfo: GridInfo }
   // Feature-channel replies (see the `feature` inbound message). `feature_state`

@@ -91,6 +91,21 @@ fn value_noise(p: vec2f) -> f32 {
     return mix(a, b, u.y);
 }
 
+// 1-D noise for the single-axis roller fades — mirrors render.wgsl (see the
+// rationale there). This tier needs the win more than WebGPU does, not less:
+// it is the fallback for weaker machines.
+fn hash11(p: f32) -> f32 {
+    let x = fract(p * 0.1031);
+    let y = x * (x + 33.33);
+    return fract(y * (y + y));
+}
+fn value_noise_1d(x: f32) -> f32 {
+    let i = floor(x);
+    let f = fract(x);
+    let u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+    return mix(hash11(i), hash11(i + 1.0), u);
+}
+
 // ── AA + grid + cell fill — ported from render.wgsl ──────────────────────────
 fn aastep(threshold: f32, value: f32) -> f32 {
     let w = fwidth(value);
@@ -157,14 +172,14 @@ fn fs_main(@builtin(position) frag: vec4f) -> @location(0) vec4f {
     let pitch_major = gp * 5.0;
     let minor_half = gp * 0.02;
     let major_half = gp * 0.06;
-    let print_fade_x = mix(0.70, 1.0, value_noise(vec2f(px * 0.005,  7.3)));
-    let print_fade_y = mix(0.70, 1.0, value_noise(vec2f(3.9, py * 0.005)));
+    let print_fade_x = mix(0.70, 1.0, value_noise_1d(px * 0.005));
+    let print_fade_y = mix(0.70, 1.0, value_noise_1d(py * 0.005 + 41.7));
     let minor_cov = max(
         grid_line_aa(px, gp, minor_half) * print_fade_x,
         grid_line_aa(py, gp, minor_half) * print_fade_y,
     );
-    let major_fade_x = mix(0.45, 1.0, value_noise(vec2f(px * 0.004 + 11.7, 23.1)));
-    let major_fade_y = mix(0.45, 1.0, value_noise(vec2f(19.4, py * 0.004 + 11.7)));
+    let major_fade_x = mix(0.45, 1.0, value_noise_1d(px * 0.004 + 11.7));
+    let major_fade_y = mix(0.45, 1.0, value_noise_1d(py * 0.004 + 79.3));
     let major_cov = max(
         grid_line_aa(px, pitch_major, major_half) * major_fade_x,
         grid_line_aa(py, pitch_major, major_half) * major_fade_y,

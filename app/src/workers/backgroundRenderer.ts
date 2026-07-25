@@ -58,6 +58,72 @@ let lastRenderedCameraY = Number.NaN;
 // applies to the identical stale-buffer ghosting during pans and scrolls.
 const THEME_PRESENT_BURST_MS = 300;
 let forceRenderUntil = 0;
+// Smoothed cost of a rendered frame on THIS device, feeding the gate's
+// sustainable-rate check while the camera moves (rationale in frameGate.ts).
+// Always-on, NOT PERF_ENABLED-gated: the adaptation has to work in production,
+// where the stutter it addresses is worst. Cost is two performance.now() reads
+// per rendered frame.
+//
+// The EMA is deliberately slow to rise and slow to fall (alpha 0.1, ~20 frames
+// to converge) so one expensive frame — notably the periodic base tick, which
+// stamps a reseed batch and costs far more than a render_only frame — cannot
+// latch the gate into shedding. It tracks the sustained cost, not the spikes.
+const RENDER_COST_EMA_ALPHA = 0.1;
+let sustainedRenderMs = 0;
+
+// ── Live render-cost reporting (DEV) ──────────────────────────────────────
+// Pushed to the perf HUD a few times a second. Emitting per frame would post
+// 120 messages/sec into the very main thread whose smoothness we are trying to
+// measure, so we aggregate here and emit on a fixed wall-clock cadence.
+const RENDER_COST_EMIT_MS = 250;
+let costWindowStart = 0;
+let costWindowReceived = 0;
+let costWindowRendered = 0;
+let costWindowMoved = 0;
+let costWindowWorst = 0;
+const costWindowSamples: number[] = [];
+
+function recordFrameCost(costMs: number): void {
+  sustainedRenderMs = sustainedRenderMs === 0
+    ? costMs
+    : sustainedRenderMs + RENDER_COST_EMA_ALPHA * (costMs - sustainedRenderMs);
+  if (!PERF_ENABLED) return;
+  costWindowRendered++;
+  costWindowWorst = Math.max(costWindowWorst, costMs);
+  costWindowSamples.push(costMs);
+}
+
+/** Emit the aggregated window if the cadence elapsed. Called once per received
+ *  'frame' message (including shed ones — the shed count is the point). */
+function maybeEmitRenderCost(nowMs: number, moved: boolean): void {
+  if (!PERF_ENABLED) return;
+  costWindowReceived++;
+  if (moved) costWindowMoved++;
+  if (costWindowStart === 0) { costWindowStart = nowMs; return; }
+  if (nowMs - costWindowStart < RENDER_COST_EMIT_MS) return;
+
+  const sorted = costWindowSamples.slice().sort((a, b) => a - b);
+  const p95 = sorted.length > 0
+    ? sorted[Math.min(Math.floor(sorted.length * 0.95), sorted.length - 1)] ?? 0
+    : 0;
+  post({
+    type: 'render_cost',
+    stats: {
+      sustainedMs: sustainedRenderMs,
+      p95Ms: p95,
+      worstMs: costWindowWorst,
+      received: costWindowReceived,
+      rendered: costWindowRendered,
+      moving: costWindowMoved * 2 > costWindowReceived,
+    },
+  });
+  costWindowStart = nowMs;
+  costWindowReceived = 0;
+  costWindowRendered = 0;
+  costWindowMoved = 0;
+  costWindowWorst = 0;
+  costWindowSamples.length = 0;
+}
 const zoneState  = new BlankZoneState();
 // Cached so the current theme survives renderer hand-offs (GPU→CPU fallback,
 // resize, etc). Defaults to light until the main thread sends `set_theme`.
@@ -366,12 +432,18 @@ ws.onmessage = async (e: MessageEvent<unknown>) => {
       // fresh; only the expensive tick/render + its bookkeeping (frameCount,
       // and hence TICK_EVERY's cadence) are skipped.
       const nowMs = performance.now();
+      const cameraMoving =
+        pendingCameraX !== lastRenderedCameraX || pendingCameraY !== lastRenderedCameraY;
       const render = shouldRenderFrame(nowMs, pendingCameraX, pendingCameraY, {
         lastRenderTime,
         lastCameraX: lastRenderedCameraX,
         lastCameraY: lastRenderedCameraY,
         forceRenderUntil,
+        sustainedRenderMs,
       });
+      // Counted for EVERY received message, rendered or shed — the received-vs-
+      // rendered gap is exactly the load-shedding signal the HUD reports.
+      maybeEmitRenderCost(nowMs, cameraMoving);
       if (!render) break;
       lastRenderTime = nowMs;
       lastRenderedCameraX = pendingCameraX;
@@ -422,6 +494,13 @@ ws.onmessage = async (e: MessageEvent<unknown>) => {
         }
       }
       perf?.endFrame();
+
+      // Feed the gate's sustainable-rate check. Measured here, around the work
+      // actually performed above, so it reflects this device's real cost right
+      // now (dev vs release wasm, low-power clock throttling, surface size).
+      // NB: this is CPU-side submission time, not GPU completion — enough to
+      // detect "the worker cannot keep up", which is the failure being guarded.
+      recordFrameCost(performance.now() - nowMs);
 
       // First-paint signal: emitted exactly once after the first
       // successful render (either backend) so the main thread can

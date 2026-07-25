@@ -19,7 +19,7 @@ CRATE_CPU := crates/game_of_life
 # We pass --target $(HOST_TRIPLE) to run the pure-core tests on the host.
 HOST_TRIPLE := $(shell rustc -vV | sed -n 's/^host: //p')
 
-.PHONY: setup dev build typecheck check test-wasm fmt clean
+.PHONY: setup dev build typecheck check check-shaders test-wasm fmt clean
 
 # =============================================================================
 # Targets:
@@ -59,7 +59,25 @@ build:
 typecheck:
 	$(PNPM) typecheck
 
-check:
+# WGSL is compiled by the BROWSER at runtime, so neither `cargo build` nor
+# `wasm-pack build` catches a shader error — the crate only `include_str!`s
+# these files. Without this gate a typo in a shader is discovered by loading the
+# page and seeing a blank canvas, which is the slowest possible feedback loop
+# and gets slower as the shaders grow. `naga` is wgpu's own front end, so it
+# validates the same WGSL the runtime will.
+#
+# Hard-fails when naga is missing rather than skipping: an advisory gate that
+# quietly passes is worse than no gate (see the .d.ts gate in the audit).
+# Install with: cargo install naga-cli
+check-shaders:
+	@command -v naga >/dev/null 2>&1 || { \
+	  echo "naga not found — install it with: cargo install naga-cli"; exit 1; }
+	@for f in $(CRATE_GPU)/wgsl/*.wgsl; do \
+	  naga "$$f" >/dev/null || { echo "WGSL validation FAILED: $$f"; exit 1; }; \
+	  echo "  ok $$f"; \
+	done
+
+check: check-shaders
 	cargo clippy --all-targets -- -D warnings
 	cargo test -p game-of-life-core --target $(HOST_TRIPLE)
 

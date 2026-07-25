@@ -3,13 +3,33 @@ members = ["crates/game_of_life", "crates/game_of_life_core", "crates/game_of_li
 resolver = "2"
 
 [profile.release]
-# Optimize all workspace crates for small WASM binary size.
+# Default for the workspace: DEPENDENCIES (wgpu, naga, …) and the dormant
+# game_of_life crate build size-first. This is deliberately NOT opt-level=3 at
+# the workspace level — wgpu/naga make up the bulk of the wasm binary, and
+# pushing their codegen to speed-first is a much bigger, unmeasured size trade
+# than the two per-package overrides below, which WERE measured (see there).
 opt-level = "s"
 # Size wins with no runtime cost: lto + codegen-units=1 give the optimizer more
 # to work with (typically neutral-to-faster), while strip + panic=abort just
-# drop dead weight (symbol names, unwind tables). opt-level and wasm-opt stay
-# speed-first, so the wgpu wasm's runtime is never traded for bytes.
+# drop dead weight (symbol names, unwind tables).
 lto = true
 codegen-units = 1
 panic = "abort"
 strip = true
+
+# Our own CPU-side hot path — reseed stamp-picking (RNG + spatial rejection),
+# buffer packing, tick orchestration — builds speed-first. Does NOT affect WGSL
+# shader execution speed: shaders are compiled by the browser's GPU driver at
+# runtime, entirely outside the Cargo/wasm-opt pipeline; this only speeds up
+# the Rust code that ORCHESTRATES those GPU calls.
+#
+# Measured cost of scoping this to just these two crates (2026-07-25, wasm-pack
+# --release --target bundler): +4.5KB gzip on the ~803KB download (+0.6%) — the
+# bulk of the binary is wgpu/naga, untouched by this override and still
+# opt-level="s" above. wasm-opt's own -O pass (game_of_life_gpu/Cargo.toml)
+# runs over the whole binary regardless, which is why the two starting points
+# converge this close.
+[profile.release.package.game-of-life-gpu]
+opt-level = 3
+[profile.release.package.game-of-life-core]
+opt-level = 3

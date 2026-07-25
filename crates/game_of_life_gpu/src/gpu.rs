@@ -52,6 +52,18 @@ const RESEED_INTERVAL_TICKS: u32 = 1;
 /// saturated.  Dial down for "named-pattern visibility" aesthetic.
 const RESEED_BATCH_SIZE: u32 = 50;
 
+/// Stamps placed per frame while draining a reseed cycle (see `pump_reseed`).
+///
+/// At 1/frame the batch finishes in `RESEED_BATCH_SIZE` frames — 50 of the ~175
+/// in a tick interval, so a cycle always completes with a wide margin before
+/// the next one arms. Each stamp measured ~1.7ms in the burst that motivated
+/// this (84ms / 50), which as a per-frame slice is comfortably inside even a
+/// 120Hz budget, whereas the burst was 10x a whole frame.
+///
+/// Raising this shortens the drain but thickens the slice; the margin against
+/// `TICK_EVERY` is the thing to preserve if it ever changes.
+const RESEED_STAMPS_PER_FRAME: u32 = 1;
+
 /// Bound on remembered recent stamp positions used as the rejection
 /// set for `pick_random_stamp_spaced`.  Old stamps' chaos clouds
 /// outgrow `MIN_PATTERN_DISTANCE` well before falling out of this
@@ -114,6 +126,16 @@ pub struct GpuGameOfLife {
     /// pile up on each other and immediately collide before
     /// reaching their named-pattern recognizable phase.
     recent_stamps: VecDeque<(u32, u32)>,
+    /// Stamps still owed for the current reseed cycle.  The batch is placed a
+    /// few at a time across the frames following a base tick rather than all at
+    /// once — see `pump_reseed`.
+    reseed_remaining: u32,
+    /// Rejection set for the in-flight reseed cycle, built ONCE when the cycle
+    /// is armed and carried across the frames that drain it.  Rebuilding it per
+    /// frame would re-insert every remembered stamp (`RECENT_STAMP_MEMORY`)
+    /// dozens of times and cost far more in total than the burst it replaced;
+    /// `SpatialGrid` has no removal, so it cannot be kept permanently either.
+    reseed_grid: Option<SpatialGrid>,
     /// Per-pass GPU timing collector.  Disabled (no-op) on browsers
     /// that didn't grant `TIMESTAMP_QUERY`.
     timestamp_panel: TimestampPanel,
@@ -122,10 +144,12 @@ pub struct GpuGameOfLife {
     /// `startup_breakdown` message; not used at runtime.
     init_phases: InitPhases,
     /// DEV split-timing of the most recent `tick_and_render`: ms (Date::now
-    /// resolution) spent in `auto_reseed()` (CPU) and in the present/submit
+    /// resolution) spent ARMING the reseed (CPU) and in the present/submit
     /// block (GPU/compositor back-pressure).  Lets the worker attribute the
     /// periodic tick spike to CPU reseed vs GPU present.  `0.0` when a tick
-    /// didn't reseed.
+    /// didn't reseed.  Since stamp placement moved to `pump_reseed`, the reseed
+    /// half now covers only the rejection-set build — the placement cost is
+    /// spread across later frames and shows up in ordinary frame cost instead.
     last_reseed_ms: f64,
     last_present_ms: f64,
 }
@@ -233,6 +257,8 @@ async fn from_surface(
         rng,
         tick_count: 0,
         recent_stamps: VecDeque::with_capacity(RECENT_STAMP_MEMORY),
+        reseed_remaining: 0,
+        reseed_grid: None,
         timestamp_panel,
         init_phases,
         last_reseed_ms: 0.0,
@@ -289,6 +315,12 @@ impl GpuGameOfLife {
     /// Call this on render frames that fall between simulation ticks so the
     /// display stays at vsync rate while the simulation runs at a lower rate.
     pub fn render_only(&mut self) {
+        // Drain a slice of any armed reseed cycle. This is the frame type the
+        // amortisation rides on: `render_only` runs on ~174 of every 175 frames,
+        // so there is ample room to place the batch a stamp at a time. Queued
+        // cells are not flushed here (only `tick_and_render` flushes), so they
+        // still land on screen at the next base tick exactly as before.
+        self.pump_reseed(RESEED_STAMPS_PER_FRAME);
         self.present();
     }
 
@@ -346,7 +378,11 @@ impl GpuGameOfLife {
         self.last_reseed_ms = 0.0;
         if self.tick_count.is_multiple_of(RESEED_INTERVAL_TICKS) {
             let reseed_t0 = js_sys::Date::now();
-            self.auto_reseed();
+            // Arm only — the stamps themselves are placed a slice at a time by
+            // `pump_reseed` on the following frames. Deliberately no pump here:
+            // the tick frame already carries the compute dispatch and present,
+            // so it is the worst frame to add work to.
+            self.arm_reseed();
             self.last_reseed_ms = js_sys::Date::now() - reseed_t0;
         }
         // Present + (optionally) resolve query set into the present's
@@ -490,8 +526,9 @@ impl GpuGameOfLife {
         self.timestamp_panel.latest().and_then(|d| d.render_pass_ms())
     }
 
-    /// DEV: wall-clock ms of the most recent `auto_reseed()` (CPU) inside
-    /// `tick_and_render`; `0.0` on ticks where no reseed fired.
+    /// DEV: wall-clock ms of the most recent `arm_reseed()` (CPU) inside
+    /// `tick_and_render`; `0.0` on ticks where no reseed fired. Expect this to
+    /// be small now — it times the rejection-set build only, not the stamping.
     pub fn last_reseed_ms(&self) -> f64 { self.last_reseed_ms }
     /// DEV: wall-clock ms of the most recent present/submit block (render +
     /// `get_current_texture` + present) — i.e. GPU/compositor back-pressure.
@@ -554,21 +591,59 @@ impl GpuGameOfLife {
     /// rejection budget past saturation, `pick_random_stamp_spaced`
     /// falls back to unconstrained random — better one collision than
     /// a missing stamp.
-    fn auto_reseed(&mut self) {
+    /// Arm a reseed cycle: build the rejection set and record how many stamps
+    /// are owed.  Placement itself happens in `pump_reseed` over the following
+    /// frames.
+    ///
+    /// Splitting arm from place is what removes the periodic hitch. Stamping
+    /// the whole batch inside the tick blocked the worker for 55–160ms every
+    /// `TICK_EVERY` frames (~2.9s), which showed up as a single ~84ms outlier
+    /// in main-thread frame deltas — the last visible jank source once render
+    /// cost was down to fractions of a millisecond.
+    ///
+    /// This is behaviour-preserving VISUALLY, which is the reason it is safe:
+    /// `render_only` does not flush the edit queue (only `tick_and_render`
+    /// does, at the top), so stamps queued at any point during the interval
+    /// become visible at exactly the same moment they always did — the next
+    /// base tick. Same stamps, same arrival frame, cost spread instead of
+    /// spiked.
+    fn arm_reseed(&mut self) {
+        // A cycle still draining means the previous batch never finished
+        // within one tick interval. Placing the remainder now would reintroduce
+        // the burst, so drop it: skipping a few stamps is invisible (they are
+        // scattered world-wide, mostly off-screen), a frame hitch is not.
         let cols = self.world.cols();
         let rows = self.world.rows();
-
-        // Build the rejection set as a SpatialGrid: cross-tick recent
-        // stamps go in first, then we insert each new placement as we
-        // make it.  O(1) per check (versus the previous O(N) Vec scan)
-        // means batch size isn't bounded by `RECENT_STAMP_MEMORY` for
+        // Cross-tick recent stamps seed the set; each new placement inserts
+        // itself as it is made. O(1) per check (versus the previous O(N) Vec
+        // scan) means batch size isn't bounded by `RECENT_STAMP_MEMORY` for
         // performance reasons any more — only by aesthetic choice.
         let mut grid = SpatialGrid::new(cols, rows, SPATIAL_BUCKET_SIZE);
         for &(ox, oy) in &self.recent_stamps {
             grid.insert(ox, oy);
         }
+        self.reseed_grid = Some(grid);
+        self.reseed_remaining = RESEED_BATCH_SIZE;
+    }
 
-        for _ in 0..RESEED_BATCH_SIZE {
+    /// Place at most `max_stamps` of the owed batch. Called every frame,
+    /// including `render_only` frames, so the cost lands as a thin slice per
+    /// frame instead of one blocking burst.
+    fn pump_reseed(&mut self, max_stamps: u32) {
+        if self.reseed_remaining == 0 {
+            return;
+        }
+        // Take the grid out so `self` is not borrowed while stamping; it goes
+        // back below unless the cycle finished.
+        let Some(mut grid) = self.reseed_grid.take() else {
+            self.reseed_remaining = 0;
+            return;
+        };
+        let cols = self.world.cols();
+        let rows = self.world.rows();
+
+        let n = max_stamps.min(self.reseed_remaining);
+        for _ in 0..n {
             let d = pick_random_stamp_spaced(
                 &mut self.rng,
                 cols,
@@ -590,6 +665,11 @@ impl GpuGameOfLife {
                 self.recent_stamps.pop_front();
             }
             self.recent_stamps.push_back((d.ox, d.oy));
+        }
+
+        self.reseed_remaining -= n;
+        if self.reseed_remaining > 0 {
+            self.reseed_grid = Some(grid);
         }
     }
 

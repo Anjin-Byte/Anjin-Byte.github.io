@@ -12,6 +12,12 @@ import NavSidebar from '@/components/layout/NavSidebar.vue';
 const RendererDebugToggle = import.meta.env.DEV
   ? defineAsyncComponent(() => import('@/components/layout/RendererDebugToggle.vue'))
   : null;
+
+// DEV-only live frame-budget HUD (toggle with `\`, or `?perf=1` to start open).
+// Same dynamic-import-under-DEV treatment as above, for the same reason.
+const PerfHud = import.meta.env.DEV
+  ? defineAsyncComponent(() => import('@/components/layout/PerfHud.vue'))
+  : null;
 </script>
 
 <template>
@@ -21,6 +27,7 @@ const RendererDebugToggle = import.meta.env.DEV
     <WorldStage />
     <NavSidebar />
     <component :is="RendererDebugToggle" v-if="RendererDebugToggle" />
+    <component :is="PerfHud" v-if="PerfHud" />
   </v-app>
 </template>
 
