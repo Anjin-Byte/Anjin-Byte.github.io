@@ -53,8 +53,9 @@ jobs:
         run: |
           cargo test -p game-of-life-core --target "$(rustc -vV | sed -n 's/^host: //p')"
 
-      - name: Build WASM (CPU)
-        run: wasm-pack build crates/game_of_life --target bundler
+      # `game_of_life` (CPU Universe) is dormant, no longer built here: nothing
+      # in app/ consumes it (the static-fallback renderer superseded it).
+      # See Makefile CRATE_CPU comment + docs/interface-audit-2026-07.md Part 1 #2.
 
       - name: Build WASM (GPU)
         run: wasm-pack build crates/game_of_life_gpu --target bundler

@@ -150,17 +150,28 @@ export function systemPreferredTheme(): ThemePalette {
     : LIGHT_THEME;
 }
 
-/** Serialize the shader-bound subset into JSON for the WASM renderer. */
-export function serializeTheme(theme: ThemePalette): string {
-  return JSON.stringify({
+/** The shader-bound subset, as the plain object the WASM renderer deserializes
+ *  (serde-wasm-bindgen — interface-audit #3). `border_t` is omitted: the page
+ *  border was removed from the shader and the Rust side ignores it. */
+export interface ThemeWire {
+  surface: OkLab;
+  ink: OkLab;
+  minor_t: number;
+  major_t: number;
+  ink_opacity: number;
+  grain_intensity: number;
+}
+
+/** Project a palette onto the shader-bound wire object passed to `set_theme`. */
+export function serializeTheme(theme: ThemePalette): ThemeWire {
+  return {
     surface: theme.surface,
     ink: theme.ink,
     minor_t: theme.minor_t,
     major_t: theme.major_t,
-    border_t: theme.border_t,
     ink_opacity: theme.ink_opacity,
     grain_intensity: theme.grain_intensity,
-  });
+  };
 }
 
 // ── OKLab utilities ─────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
-use js_sys::{Array, Reflect};
-use wasm_bindgen::JsValue;
+use serde::Deserialize;
+use wasm_bindgen::{JsError, JsValue};
 
 use crate::grid::Grid;
 
@@ -34,93 +34,86 @@ pub struct ZoneEntryGpu {
     pub edge: [f32; 4],
 }
 
-pub fn parse_zone_entries_json(
-    zones_json: &str,
-    grid: &Grid,
-) -> Result<Vec<ZoneEntryGpu>, JsValue> {
-    let parsed = js_sys::JSON::parse(zones_json)
-        .map_err(|_| JsValue::from_str("Invalid zones JSON payload"))?;
-    if !Array::is_array(&parsed) {
-        return Err(JsValue::from_str("Zones JSON must be an array"));
-    }
-
-    let arr = Array::from(&parsed);
-    let mut out = Vec::with_capacity(arr.length().min(MAX_BLANK_ZONES as u32) as usize);
-    for idx in 0..arr.length() {
-        if out.len() >= MAX_BLANK_ZONES {
-            break;
-        }
-        if let Some(entry) = parse_zone_entry(&arr.get(idx), grid) {
-            out.push(entry);
-        }
-    }
-    Ok(out)
+/// Typed wire form of a `BlankZone` (mirrors app/src/types/blankZones.ts). Only
+/// the fields the renderer consumes are declared; unknown fields (id,
+/// timestamps) are ignored. serde replaces the old hand-rolled Reflect walking
+/// (interface-audit #3).
+#[derive(Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BlankZoneInput {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    pub x1: f64,
+    pub y1: f64,
+    pub x2: f64,
+    pub y2: f64,
+    #[serde(default)]
+    pub mode: Option<String>,
+    #[serde(default)]
+    pub edge: Option<EdgeInput>,
 }
 
-fn parse_zone_entry(zone: &JsValue, grid: &Grid) -> Option<ZoneEntryGpu> {
-    if !zone.is_object() {
+#[derive(Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct EdgeInput {
+    #[serde(default)]
+    pub style: Option<String>,
+    #[serde(default)]
+    pub width_cells: Option<f64>,
+    #[serde(default)]
+    pub opacity: Option<f64>,
+    #[serde(default)]
+    pub fade_strength: Option<f64>,
+    #[serde(default)]
+    pub note_pitch_cells: Option<f64>,
+    #[serde(default)]
+    pub hide_interior_border: Option<bool>,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+/// Deserialize the zones payload (a JS array of BlankZone) into typed inputs,
+/// capped at `MAX_BLANK_ZONES`. The caller caches these and re-derives GPU
+/// entries against the live grid via [`zone_entries_from_inputs`] — rects are
+/// grid-relative, so a resize must recompute them.
+pub fn deserialize_zone_inputs(zones: JsValue) -> Result<Vec<BlankZoneInput>, JsError> {
+    let mut all: Vec<BlankZoneInput> =
+        serde_wasm_bindgen::from_value(zones).map_err(|e| JsError::new(&e.to_string()))?;
+    all.truncate(MAX_BLANK_ZONES);
+    Ok(all)
+}
+
+/// Convert cached typed inputs to packed GPU entries against the current grid.
+/// Disabled zones are dropped; coordinate/mode/edge normalization is unchanged.
+pub fn zone_entries_from_inputs(inputs: &[BlankZoneInput], grid: &Grid) -> Vec<ZoneEntryGpu> {
+    inputs
+        .iter()
+        .filter_map(|z| zone_entry_from_input(z, grid))
+        .collect()
+}
+
+fn zone_entry_from_input(z: &BlankZoneInput, grid: &Grid) -> Option<ZoneEntryGpu> {
+    if !z.enabled {
         return None;
     }
-
-    if !get_bool(zone, "enabled").unwrap_or(true) {
-        return None;
-    }
-
-    let x1 = get_number(zone, "x1")?;
-    let y1 = get_number(zone, "y1")?;
-    let x2 = get_number(zone, "x2")?;
-    let y2 = get_number(zone, "y2")?;
-
-    let rect = normalize_rect_coords(x1 as i64, y1 as i64, x2 as i64, y2 as i64, grid);
-    let mode = normalize_mode(get_string(zone, "mode").as_deref());
-
-    let edge = get_object(zone, "edge");
-    let edge_style = normalize_edge_style(
-        edge.as_ref()
-            .and_then(|e| get_string(e, "style"))
-            .as_deref(),
-    );
-    let hide_interior = edge
-        .as_ref()
-        .and_then(|e| get_bool(e, "hideInteriorBorder"))
-        .unwrap_or(false);
+    let rect = normalize_rect_coords(z.x1 as i64, z.y1 as i64, z.x2 as i64, z.y2 as i64, grid);
+    let mode = normalize_mode(z.mode.as_deref());
+    let edge = z.edge.as_ref();
+    let edge_style = normalize_edge_style(edge.and_then(|e| e.style.as_deref()));
+    let hide_interior = edge.and_then(|e| e.hide_interior_border).unwrap_or(false);
     let edge_data = normalize_edge_data(
-        edge.as_ref().and_then(|e| get_number(e, "widthCells")),
-        edge.as_ref().and_then(|e| get_number(e, "opacity")),
-        edge.as_ref().and_then(|e| get_number(e, "fadeStrength")),
-        edge.as_ref().and_then(|e| get_number(e, "notePitchCells")),
+        edge.and_then(|e| e.width_cells),
+        edge.and_then(|e| e.opacity),
+        edge.and_then(|e| e.fade_strength),
+        edge.and_then(|e| e.note_pitch_cells),
     );
-
     Some(ZoneEntryGpu {
         rect,
         style: [mode, edge_style, u32::from(hide_interior), 0],
         edge: edge_data,
     })
-}
-
-fn get_object(value: &JsValue, key: &str) -> Option<JsValue> {
-    let v = get_prop(value, key)?;
-    if v.is_object() {
-        Some(v)
-    } else {
-        None
-    }
-}
-
-fn get_string(value: &JsValue, key: &str) -> Option<String> {
-    get_prop(value, key)?.as_string()
-}
-
-fn get_bool(value: &JsValue, key: &str) -> Option<bool> {
-    get_prop(value, key)?.as_bool()
-}
-
-fn get_number(value: &JsValue, key: &str) -> Option<f64> {
-    get_prop(value, key)?.as_f64()
-}
-
-fn get_prop(value: &JsValue, key: &str) -> Option<JsValue> {
-    Reflect::get(value, &JsValue::from_str(key)).ok()
 }
 
 fn normalize_mode(mode: Option<&str>) -> u32 {

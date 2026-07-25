@@ -592,35 +592,16 @@ impl WebglGameOfLife {
     /// Apply a theme. Accepts the same JSON the WebGPU path parses; only the
     /// fields this simpler shader uses are read (surface, ink, minor/major
     /// lerps, ink opacity).
-    pub fn set_theme_json(&mut self, theme_json: &str) -> Result<(), JsValue> {
-        let parsed = js_sys::JSON::parse(theme_json)
-            .map_err(|_| JsValue::from_str("Invalid theme JSON payload"))?;
-        let read_lab = |key: &str| -> [f32; 4] {
-            let v = js_sys::Reflect::get(&parsed, &JsValue::from_str(key)).unwrap_or(JsValue::NULL);
-            if js_sys::Array::is_array(&v) {
-                let a = js_sys::Array::from(&v);
-                [
-                    a.get(0).as_f64().unwrap_or(0.0) as f32,
-                    a.get(1).as_f64().unwrap_or(0.0) as f32,
-                    a.get(2).as_f64().unwrap_or(0.0) as f32,
-                    0.0,
-                ]
-            } else {
-                [0.0, 0.0, 0.0, 0.0]
-            }
-        };
-        let read_f32 = |key: &str, default: f32| -> f32 {
-            js_sys::Reflect::get(&parsed, &JsValue::from_str(key))
-                .ok()
-                .and_then(|v| v.as_f64())
-                .map(|n| n as f32)
-                .unwrap_or(default)
-        };
-        self.uniforms.surface = read_lab("surface");
-        self.uniforms.ink = read_lab("ink");
-        self.uniforms.minor_t = read_f32("minor_t", 0.08);
-        self.uniforms.major_t = read_f32("major_t", 0.14);
-        self.uniforms.ink_opacity = read_f32("ink_opacity", 0.10);
+    pub fn set_theme(&mut self, theme: JsValue) -> Result<(), JsError> {
+        // Shares the serde wire struct with the WebGPU path (interface-audit #3);
+        // maps it onto this tier's uniforms rather than ThemeParams.
+        let t: crate::gpu::ThemeInput =
+            serde_wasm_bindgen::from_value(theme).map_err(|e| JsError::new(&e.to_string()))?;
+        self.uniforms.surface = [t.surface[0], t.surface[1], t.surface[2], 0.0];
+        self.uniforms.ink = [t.ink[0], t.ink[1], t.ink[2], 0.0];
+        self.uniforms.minor_t = t.minor_t;
+        self.uniforms.major_t = t.major_t;
+        self.uniforms.ink_opacity = t.ink_opacity;
         self.upload_uniforms();
         Ok(())
     }

@@ -215,7 +215,7 @@ async function initWebgl2Renderer(): Promise<boolean> {
       toggleCell: (cx, cy) => gl.toggle_cell(cx, cy),
       setTheme: (theme) => {
         try {
-          gl.set_theme_json(serializeTheme(theme));
+          gl.set_theme(serializeTheme(theme));
         } catch (err) {
           log.error('WebGL2 theme update failed:', errorMessage(err));
         }
@@ -249,7 +249,27 @@ async function initWebgl2Renderer(): Promise<boolean> {
 
 // ── Message handler ───────────────────────────────────────────────────────────
 
-ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
+/** Structural guard for the inbound-message boundary (interface-audit C). This
+ *  channel is same-origin — only our own `WorkerBridge` posts here — so we
+ *  validate SHAPE (a non-null object carrying a string discriminant) rather than
+ *  deep-parsing every variant. It replaces the previous blind
+ *  `MessageEvent<WorkerInMsg>` type-assertion with a real runtime check, so a
+ *  malformed message is rejected at the boundary instead of trusted. The switch
+ *  below stays exhaustive over the union (compile-time, finding D); an unknown
+ *  `type` string that passes this guard simply matches no case and is ignored. */
+function isWorkerInMsg(data: unknown): data is WorkerInMsg {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    typeof (data as { type?: unknown }).type === 'string'
+  );
+}
+
+ws.onmessage = async (e: MessageEvent<unknown>) => {
+  if (!isWorkerInMsg(e.data)) {
+    log.warn('worker: ignored malformed inbound message', e.data);
+    return;
+  }
   switch (e.data.type) {
 
     case 'init': {
@@ -316,24 +336,25 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
           // signature until the next wasm rebuild drops the parameter.
           const gpu = await GpuGameOfLife.new_offscreen(canvas, 0, seed);
           const startupT3 = performance.now();
-          // Verify set_zones_json is present at init time so a future rename/removal
+          // Verify set_zones is present at init time so a future rename/removal
           // produces a visible warning rather than silently failing on every zone update.
+          // Zones/theme now cross as JS objects (serde-wasm-bindgen), not JSON strings.
           const gpuExt = gpu as unknown as {
-            set_zones_json?: (zonesJson: string) => void;
-            set_theme_json?: (themeJson: string) => void;
+            set_zones?: (zones: unknown) => void;
+            set_theme?: (theme: unknown) => void;
           };
           const setZonesOnGpu = (zones: BlankZone[]): void => {
-            if (typeof gpuExt.set_zones_json !== 'function') return;
+            if (typeof gpuExt.set_zones !== 'function') return;
             try {
-              gpuExt.set_zones_json(JSON.stringify(zones));
+              gpuExt.set_zones(zones);
             } catch (err) {
               postZonesError(`GPU zone update failed: ${errorMessage(err)}`);
             }
           };
           const setThemeOnGpu = (theme: ThemePalette): void => {
-            if (typeof gpuExt.set_theme_json !== 'function') return;
+            if (typeof gpuExt.set_theme !== 'function') return;
             try {
-              gpuExt.set_theme_json(serializeTheme(theme));
+              gpuExt.set_theme(serializeTheme(theme));
             } catch (err) {
               log.error('GPU theme update failed:', errorMessage(err));
             }

@@ -14,7 +14,7 @@ use crate::perf::{self, TimestampPanel};
 use crate::renderer::GpuRenderer;
 use crate::renderer::types::ThemeParams;
 use crate::simulation::Simulation;
-use crate::zones::parse_zone_entries_json;
+use crate::zones::{deserialize_zone_inputs, zone_entries_from_inputs, BlankZoneInput};
 
 /// World dimensions in cells.  Fixed at startup; never resize-derived.
 /// 1024×1024 cells = ~1M cells; 256 KB ping-pong total.  See
@@ -100,7 +100,9 @@ pub struct GpuGameOfLife {
     world: World,
     simulation: Simulation,
     renderers: Vec<GpuRenderer>,
-    zones_json: String,
+    // Cached deserialized zone inputs. Grid-relative rects are re-derived from
+    // these on resize (below), so the parsed inputs are cached, not GPU entries.
+    zones_input: Vec<BlankZoneInput>,
     /// RNG for auto-reseed pattern/position/orientation selection.
     /// Seeded from a u32 supplied by the JS caller at construction.
     rng: Xoshiro256StarStar,
@@ -227,7 +229,7 @@ async fn from_surface(
         world,
         simulation,
         renderers: vec![renderer],
-        zones_json: String::new(),
+        zones_input: Vec::new(),
         rng,
         tick_count: 0,
         recent_stamps: VecDeque::with_capacity(RECENT_STAMP_MEMORY),
@@ -416,9 +418,10 @@ impl GpuGameOfLife {
         // Zones reference world cells, not canvas pixels — re-parse if the
         // user-set zones list is non-empty so the renderer's bounds are
         // updated against current grid dims.
-        if self.zones_json.is_empty() {
+        if self.zones_input.is_empty() {
             self.renderers[0].clear_zones(&self.ctx.queue);
-        } else if let Ok(entries) = parse_zone_entries_json(&self.zones_json, &self.grid) {
+        } else {
+            let entries = zone_entries_from_inputs(&self.zones_input, &self.grid);
             self.renderers[0].set_zones(&self.ctx.queue, &entries);
         }
     }
@@ -504,25 +507,23 @@ impl GpuGameOfLife {
     pub fn init_simulation_ms(&self) -> f64      { self.init_phases.simulation_init_ms }
     pub fn init_renderer_ms(&self) -> f64        { self.init_phases.renderer_init_ms }
 
-    /// Accepts a JSON array of blank-zone records and caches it for the next
-    /// renderer integration step (GPU mask upload in Phase 1 task 5).
-    ///
-    /// We validate that the payload is valid JSON now so malformed messages fail
-    /// early at the Rust boundary.
-    pub fn set_zones_json(&mut self, zones_json: &str) -> Result<(), JsValue> {
-        let entries = parse_zone_entries_json(zones_json, &self.grid)?;
-        self.zones_json.clear();
-        self.zones_json.push_str(zones_json);
+    /// Accepts a JS array of blank-zone records (deserialized via serde), caches
+    /// the typed inputs, and uploads the derived GPU entries. Malformed payloads
+    /// fail at the boundary with a typed `JsError`.
+    pub fn set_zones(&mut self, zones: JsValue) -> Result<(), JsError> {
+        let inputs = deserialize_zone_inputs(zones)?;
+        let entries = zone_entries_from_inputs(&inputs, &self.grid);
+        self.zones_input = inputs;
         self.renderers[0].set_zones(&self.ctx.queue, &entries);
         Ok(())
     }
 
-    /// Apply a theme palette. Accepts a JSON object with OKLab endpoints and
-    /// grid lerp positions; all color relationships are derived from these.
-    /// Schema: `{ surface: [L,a,b], ink: [L,a,b], minor_t, major_t, border_t, ink_opacity }`.
-    pub fn set_theme_json(&mut self, theme_json: &str) -> Result<(), JsValue> {
-        let theme = parse_theme_json(theme_json)?;
-        self.renderers[0].set_theme(&self.ctx.queue, &theme);
+    /// Apply a theme palette (a JS object, deserialized via serde). OKLab
+    /// endpoints + grid lerp positions; all color relationships derive from these.
+    /// Schema: `{ surface: [L,a,b], ink: [L,a,b], minor_t, major_t, ink_opacity, grain_intensity }`.
+    pub fn set_theme(&mut self, theme: JsValue) -> Result<(), JsError> {
+        let params = theme_params_from_value(theme)?;
+        self.renderers[0].set_theme(&self.ctx.queue, &params);
         Ok(())
     }
 }
@@ -611,47 +612,44 @@ impl GpuGameOfLife {
     }
 }
 
-fn parse_theme_json(theme_json: &str) -> Result<ThemeParams, JsValue> {
-    use js_sys::{Array, Reflect};
+/// Typed wire form of the theme palette (matches app/src/types/theme.ts
+/// `serializeTheme`). serde replaces the hand-rolled Reflect walking
+/// (interface-audit #3). `border_t` is intentionally absent — the page border
+/// was removed from the shader; any such field in the payload is ignored.
+#[derive(serde::Deserialize)]
+pub(crate) struct ThemeInput {
+    pub(crate) surface: [f32; 3],
+    pub(crate) ink: [f32; 3],
+    #[serde(default = "default_minor_t")]
+    pub(crate) minor_t: f32,
+    #[serde(default = "default_major_t")]
+    pub(crate) major_t: f32,
+    #[serde(default = "default_ink_opacity")]
+    pub(crate) ink_opacity: f32,
+    #[serde(default)]
+    pub(crate) grain_intensity: f32,
+}
 
-    let parsed = js_sys::JSON::parse(theme_json)
-        .map_err(|_| JsValue::from_str("Invalid theme JSON payload"))?;
-    if !parsed.is_object() {
-        return Err(JsValue::from_str("Theme JSON must be an object"));
-    }
+fn default_minor_t() -> f32 {
+    0.08
+}
+fn default_major_t() -> f32 {
+    0.14
+}
+fn default_ink_opacity() -> f32 {
+    0.88
+}
 
-    let read_lab = |key: &str| -> Result<[f32; 4], JsValue> {
-        let v = Reflect::get(&parsed, &JsValue::from_str(key))
-            .map_err(|_| JsValue::from_str(&format!("theme.{key} missing")))?;
-        if !Array::is_array(&v) {
-            return Err(JsValue::from_str(&format!("theme.{key} must be [L,a,b]")));
-        }
-        let arr = Array::from(&v);
-        if arr.length() < 3 {
-            return Err(JsValue::from_str(&format!("theme.{key} needs [L,a,b]")));
-        }
-        let l = arr.get(0).as_f64().unwrap_or(0.0) as f32;
-        let a = arr.get(1).as_f64().unwrap_or(0.0) as f32;
-        let b = arr.get(2).as_f64().unwrap_or(0.0) as f32;
-        Ok([l, a, b, 0.0])
-    };
-    let read_f32 = |key: &str, default: f32| -> f32 {
-        Reflect::get(&parsed, &JsValue::from_str(key))
-            .ok()
-            .and_then(|v| v.as_f64())
-            .map(|n| n as f32)
-            .unwrap_or(default)
-    };
-
-    // `border_t` may still appear in the JSON payload (the JS serializer is
-    // unchanged) but has no consumer: the page border was removed from the
-    // shader, so the value is simply ignored here.
+fn theme_params_from_value(theme: JsValue) -> Result<ThemeParams, JsError> {
+    let t: ThemeInput =
+        serde_wasm_bindgen::from_value(theme).map_err(|e| JsError::new(&e.to_string()))?;
+    // OKLab endpoints are padded to [L, a, b, 0.0] for the 16-byte-aligned uniform.
     Ok(ThemeParams::from_endpoints(
-        read_lab("surface")?,
-        read_lab("ink")?,
-        read_f32("minor_t", 0.08),
-        read_f32("major_t", 0.14),
-        read_f32("ink_opacity", 0.88),
-        read_f32("grain_intensity", 0.0),
+        [t.surface[0], t.surface[1], t.surface[2], 0.0],
+        [t.ink[0], t.ink[1], t.ink[2], 0.0],
+        t.minor_t,
+        t.major_t,
+        t.ink_opacity,
+        t.grain_intensity,
     ))
 }

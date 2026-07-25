@@ -104,20 +104,18 @@ export class GpuGameOfLife {
      */
     set_scroll(scroll_y: number): void;
     /**
-     * Apply a theme palette. Accepts a JSON object with OKLab endpoints and
-     * grid lerp positions; all color relationships are derived from these.
-     * Schema: `{ surface: [L,a,b], ink: [L,a,b], minor_t, major_t, border_t, ink_opacity }`.
+     * Apply a theme palette (a JS object, deserialized via serde). OKLab
+     * endpoints + grid lerp positions; all color relationships derive from these.
+     * Schema: `{ surface: [L,a,b], ink: [L,a,b], minor_t, major_t, ink_opacity, grain_intensity }`.
      */
-    set_theme_json(theme_json: string): void;
+    set_theme(theme: any): void;
     set_transition(t: number): void;
     /**
-     * Accepts a JSON array of blank-zone records and caches it for the next
-     * renderer integration step (GPU mask upload in Phase 1 task 5).
-     *
-     * We validate that the payload is valid JSON now so malformed messages fail
-     * early at the Rust boundary.
+     * Accepts a JS array of blank-zone records (deserialized via serde), caches
+     * the typed inputs, and uploads the derived GPU entries. Malformed payloads
+     * fail at the boundary with a typed `JsError`.
      */
-    set_zones_json(zones_json: string): void;
+    set_zones(zones: any): void;
     /**
      * Advances one GoL generation and presents.
      *
@@ -183,7 +181,7 @@ export class WebglGameOfLife {
      * fields this simpler shader uses are read (surface, ink, minor/major
      * lerps, ink opacity).
      */
-    set_theme_json(theme_json: string): void;
+    set_theme(theme: any): void;
     set_transition(t: number): void;
     /**
      * Advance one generation and present.

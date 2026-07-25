@@ -4,8 +4,14 @@ APP_DIR  := app
 PNPM     := pnpm --dir $(APP_DIR)
 WASM_PACK := wasm-pack
 
-CRATE_CPU := crates/game_of_life
 CRATE_GPU := crates/game_of_life_gpu
+# `game_of_life` (CPU Universe) is DORMANT: kept as source/reference (its own
+# Cargo.toml workspace membership + `make test-wasm` still cover it) but no
+# longer wasm-pack built by `dev`/`build`/CI. Nothing in app/ has consumed it
+# since the static-fallback renderer replaced CPU GoL — every deploy was
+# compiling and packaging a WASM artifact with zero consumers (interface-audit
+# Part 1 #2). Re-add its build line here if it ever grows a real consumer.
+CRATE_CPU := crates/game_of_life
 
 # Host triple, e.g. aarch64-apple-darwin.  .cargo/config.toml pins the default
 # target to wasm32 (for rust-analyzer + clippy on the wasm-only GPU crate), so
@@ -40,13 +46,11 @@ setup:
 	$(PNPM) install
 
 dev:
-	$(WASM_PACK) build --dev --target bundler $(CRATE_CPU)
 	$(WASM_PACK) build --dev --target bundler $(CRATE_GPU)
 	rm -f $(CRATE_GPU)/pkg/.gitignore   # keep the committed .d.ts trackable (see .gitignore + audit #1)
 	$(PNPM) dev
 
 build:
-	$(WASM_PACK) build --release --target bundler $(CRATE_CPU)
 	$(WASM_PACK) build --release --target bundler $(CRATE_GPU)
 	rm -f $(CRATE_GPU)/pkg/.gitignore   # keep the committed .d.ts trackable (see .gitignore + audit #1)
 	$(PNPM) typecheck
