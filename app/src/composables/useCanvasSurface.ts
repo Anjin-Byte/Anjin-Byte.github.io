@@ -210,7 +210,7 @@ export function useCanvasSurface(post: (msg: WorkerInMsg) => void): CanvasSurfac
   function initialize(
     shell: HTMLElement,
     canvas: HTMLCanvasElement,
-  ): { offscreen: OffscreenCanvas; gridPitch: number } {
+  ): { offscreen: OffscreenCanvas } {
     canvasEl = canvas;
 
     // Detect Chrome/Firefox effective-zoom asymmetry once (refreshed on DPR
@@ -242,7 +242,7 @@ export function useCanvasSurface(post: (msg: WorkerInMsg) => void): CanvasSurfac
     // as any plausible viewport (handled by `pickCanvasHeight`). Width changes
     // are coalesced to one publish per frame to avoid swapchain-rebuild storms.
     resizeObserver = new ResizeObserver(([entry]) => {
-      if (!canvasEl) return;
+      if (!canvasEl || !entry) return;
       const w = readWidthDevicePx(entry);
       if (w <= 0 || w === canvasW) return;
       pendingWidth = w;

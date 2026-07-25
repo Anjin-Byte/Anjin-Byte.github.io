@@ -8,7 +8,7 @@ import {
 interface DisplayProject extends Project {
   visibleLinks: ResolvedProjectLink[];
   /** Where the thumbnail print links: the live demo, or the first link if none. */
-  thumbLink?: ResolvedProjectLink;
+  thumbLink?: ResolvedProjectLink | undefined;
   /** Action-row links with the print's own target removed, so the demo isn't
    *  offered twice (once as the clickable print, once as a button). */
   actionLinks: ResolvedProjectLink[];

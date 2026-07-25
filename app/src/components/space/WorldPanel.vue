@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, type CSSProperties } from 'vue';
 import { useRoute } from 'vue-router';
 import { panelDomId, type WaypointId } from '../../space/waypoints';
 import type { PanelNode } from '../../types/space';
@@ -30,7 +30,7 @@ const focus = computed(() => {
   return focusWeight(world.value, camera.value, viewport.value, { radius, floor: FOCUS_FLOOR });
 });
 
-const style = computed(() => {
+const style = computed<CSSProperties>(() => {
   const scale = FOCUS_SCALE_MIN + (1 - FOCUS_SCALE_MIN) * focus.value;
   return {
     transform: `translate(${world.value.x}px, ${world.value.y}px) translate(-50%, -50%) scale(${scale})`,

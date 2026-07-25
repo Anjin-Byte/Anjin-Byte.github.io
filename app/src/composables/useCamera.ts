@@ -53,7 +53,7 @@ const isAnimatingRef = ref(false);
 // entry). Drives re-centering on resize; null once the user free-pans away (so a
 // resize doesn't yank them back). Generalised from a WaypointId so dynamic entry
 // islands re-centre on resize exactly like the fixed waypoints.
-interface Anchor { gx: number; gy: number; zoom?: number }
+interface Anchor { gx: number; gy: number; zoom?: number | undefined }
 const anchorRef = ref<Anchor | null>({ gx: homeWaypoint.gx, gy: homeWaypoint.gy });
 
 // Vertical scroll within the captured island (CSS px). Owned by the active
@@ -111,7 +111,7 @@ function snapTo(x: number, y: number, zoom?: number): void {
   targetRef.value = { x, y, zoom: z };
 }
 
-function panTo(x: number, y: number, opts: { zoom?: number; snap?: boolean } = {}): void {
+function panTo(x: number, y: number, opts: { zoom?: number | undefined; snap?: boolean | undefined } = {}): void {
   const z = opts.zoom ?? targetRef.value.zoom;
   targetRef.value = { x, y, zoom: z };
   if (opts.snap || reducedMotionRef.value) {
@@ -186,9 +186,9 @@ export interface CameraController {
   spacing: ComputedRef<Spacing>;
   cameraStyle: ComputedRef<{ transform: string }>;
   worldOffsetDevicePx: ComputedRef<{ x: number; y: number }>;
-  panTo(x: number, y: number, opts?: { zoom?: number; snap?: boolean }): void;
+  panTo(x: number, y: number, opts?: { zoom?: number | undefined; snap?: boolean | undefined }): void;
   panToWaypoint(id: WaypointId, opts?: { snap?: boolean }): void;
-  panToNode(node: { gx: number; gy: number; zoom?: number }, opts?: { snap?: boolean }): void;
+  panToNode(node: { gx: number; gy: number; zoom?: number | undefined }, opts?: { snap?: boolean }): void;
   snapTo(x: number, y: number, zoom?: number): void;
   releaseAnchor(): void;
   setViewport(w: number, h: number): void;

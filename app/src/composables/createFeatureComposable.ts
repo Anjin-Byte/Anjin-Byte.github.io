@@ -9,11 +9,13 @@ export interface FeatureComposableConfig<T extends HasId> {
   storage: FeatureStorage<T>;
   normalize: (raw: unknown) => T[];
   normalizeOne: (raw: unknown) => T | null;
-  onAdd?: (item: T) => void;
-  onUpdate?: (item: T) => void;
-  onRemove?: (id: string) => void;
-  onSet?: (items: T[]) => void;
-  onClear?: () => void;
+  // `| undefined` so callers may pass an explicitly-undefined hook (absent ===
+  // no hook) under exactOptionalPropertyTypes.
+  onAdd?: ((item: T) => void) | undefined;
+  onUpdate?: ((item: T) => void) | undefined;
+  onRemove?: ((id: string) => void) | undefined;
+  onSet?: ((items: T[]) => void) | undefined;
+  onClear?: (() => void) | undefined;
 }
 
 export interface FeatureComposable<T extends HasId> {

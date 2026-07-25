@@ -52,22 +52,25 @@ export class FrameTimer {
     const n = this.count;
     const sorted = new Float64Array(n);
     const start = this.count < SAMPLE_BUFFER_SIZE ? 0 : this.head;
+    // `?? 0` satisfies noUncheckedIndexedAccess; the ring buffer is fully
+    // populated for every index read here (guarded by count === 0 above and the
+    // masked indices), so the fallback branch is never taken.
     for (let i = 0; i < n; i++) {
-      sorted[i] = this.buf[(start + i) & (SAMPLE_BUFFER_SIZE - 1)];
+      sorted[i] = this.buf[(start + i) & (SAMPLE_BUFFER_SIZE - 1)] ?? 0;
     }
     sorted.sort();
 
     let sum = 0;
-    for (let i = 0; i < n; i++) sum += sorted[i];
+    for (let i = 0; i < n; i++) sum += sorted[i] ?? 0;
 
     return {
       label: this.label,
       samples: n,
       avg: sum / n,
-      min: sorted[0],
-      max: sorted[n - 1],
-      p95: sorted[Math.min(Math.floor(n * 0.95), n - 1)],
-      p99: sorted[Math.min(Math.floor(n * 0.99), n - 1)],
+      min: sorted[0] ?? 0,
+      max: sorted[n - 1] ?? 0,
+      p95: sorted[Math.min(Math.floor(n * 0.95), n - 1)] ?? 0,
+      p99: sorted[Math.min(Math.floor(n * 0.99), n - 1)] ?? 0,
     };
   }
 

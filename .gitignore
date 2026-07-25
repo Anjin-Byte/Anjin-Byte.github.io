@@ -5,13 +5,16 @@
 # newer glue form than local and broke the Firefox patch in CI.
 bin/
 # wasm-pack output: ignore the generated .wasm/.js/package.json, but TRACK the
-# .d.ts — it is the public TypeScript boundary surface. Committed + gated in CI
-# (deploy.yml) so a #[wasm_bindgen] change cannot reshape the TS API silently.
-# See docs/interface-audit-2026-07.md Part 1 #1. NB: ignoring `pkg/` (the dir)
-# made the old `!*.d.ts` negation dead — git can't re-include a file whose parent
-# dir is ignored — so we ignore the CONTENTS (`pkg/*`) instead.
+# high-level `game_of_life_gpu.d.ts` — the public TypeScript API surface — so a
+# #[wasm_bindgen] change shows up in the commit diff (audit Part 1 #1). NB:
+# ignoring `pkg/` (the dir) made the old `!*.d.ts` negation dead (git can't
+# re-include a file under an ignored dir), so we ignore the CONTENTS (`pkg/*`).
+# The `*_bg.wasm.d.ts` glue typings are RE-ignored: they carry version-specific
+# mangled wasm-bindgen symbol names that churn on every toolchain bump and are
+# not a real API surface.
 crates/*/pkg/*
 !crates/*/pkg/*.d.ts
+crates/*/pkg/*_bg.wasm.d.ts
 wasm-pack.log
 app/node_modules/
 app/dist/

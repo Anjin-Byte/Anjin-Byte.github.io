@@ -34,7 +34,7 @@ export type WorkerInMsg =
   // it to the GPU before the first frame, avoiding a light-flash on
   // dark-OS users when their stored preference is `system`.  Subsequent
   // theme changes flow through the `set_theme` message.
-  | { type: 'init'; canvas: OffscreenCanvas; theme: ThemePalette; forceBackend?: ForcedBackend }
+  | { type: 'init'; canvas: OffscreenCanvas; theme: ThemePalette; forceBackend?: ForcedBackend | undefined }
   // The camera offset (device px) is frame-locked: the main thread samples
   // scroll + camera on its render rAF and ships it WITH the frame, so the grid
   // renders the exact position the DOM is at this frame (no separate, lagging

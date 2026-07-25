@@ -5,9 +5,11 @@ export interface ZoneEdgeBehavior {
   style: EdgeStyle;
   widthCells: number;      // range: 1..4
   opacity: number;         // range: 0..1
-  fadeStrength?: number;   // range: 0..1 (style='fade')
-  notePitchCells?: number; // >= 1 (style='noted')
-  hideInteriorBorder?: boolean; // suppress border where this zone is adjacent to another zone (style='bold-major'|'noted')
+  // `| undefined` (exactOptionalPropertyTypes): these are set only for the
+  // relevant style and passed as explicit `undefined` otherwise; absent === n/a.
+  fadeStrength?: number | undefined;   // range: 0..1 (style='fade')
+  notePitchCells?: number | undefined; // >= 1 (style='noted')
+  hideInteriorBorder?: boolean | undefined; // suppress border where this zone is adjacent to another zone (style='bold-major'|'noted')
 }
 
 export interface BlankZone {

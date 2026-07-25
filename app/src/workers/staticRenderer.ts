@@ -87,8 +87,12 @@ export interface StaticRenderer {
 }
 
 export function makeStaticRenderer(canvas: OffscreenCanvas): StaticRenderer {
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('2D context unavailable');
+  const rawCtx = canvas.getContext('2d');
+  if (!rawCtx) throw new Error('2D context unavailable');
+  // Re-bind to a non-null const so the `draw` closure below sees a non-null
+  // type: control-flow narrowing from the guard above does not propagate into
+  // nested function declarations, so `rawCtx` would re-widen to `| null` there.
+  const ctx = rawCtx;
 
   let theme: ThemePalette = LIGHT_THEME;
   let camX = 0;

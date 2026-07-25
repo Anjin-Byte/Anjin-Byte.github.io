@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc --noEmit && vite build",
-    "typecheck": "vue-tsc --noEmit",
+    "build": "vue-tsc -b && vite build",
+    "typecheck": "vue-tsc -b",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test:zones": "tsc -p tsconfig.tests.json && node ./.tests-dist/tests/blankZones.test.js",
@@ -32,6 +32,7 @@
     "@types/node": "^26.1.1",
     "@vitejs/plugin-vue": "^5.2.1",
     "@vue/eslint-config-typescript": "^14",
+    "@webgpu/types": "^0.1.71",
     "eslint": "^9",
     "eslint-plugin-vue": "^9",
     "gh-pages": "^6.2.0",

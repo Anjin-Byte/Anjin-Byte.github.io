@@ -4,7 +4,7 @@ import type { BlankZone, BlankMode, EdgeStyle, BlankZoneDraft, BlankZoneRect } f
 
 const props = defineProps<{
   zones: BlankZone[];
-  previewRect?: BlankZoneRect | null;
+  previewRect?: BlankZoneRect | null | undefined;
 }>();
 
 const emit = defineEmits<{
