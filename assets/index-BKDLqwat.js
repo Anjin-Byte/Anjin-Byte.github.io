@@ -3753,7 +3753,7 @@ Promise.all([
       if (m) for (const _ of m) _(u);
     }
     function o(u, m, _) {
-      const f = new Worker(new URL("/assets/backgroundRenderer-Dpavsk42.js", import.meta.url), {
+      const f = new Worker(new URL("/assets/backgroundRenderer-kLpuYqBC.js", import.meta.url), {
         type: "module"
       });
       f.onmessage = (h) => i(h.data), f.onerror = (h) => {

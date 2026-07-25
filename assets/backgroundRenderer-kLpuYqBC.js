@@ -57,13 +57,13 @@
     const v = (e)=>e, k = (e)=>e, q = (e)=>e, le = 128;
     function de(e, r, t, n) {
         if (!Array.isArray(e)) return [];
-        const i = n ?? Date.now(), a = [];
+        const s = n ?? Date.now(), o = [];
         for (const c of e){
-            if (a.length >= t) break;
-            const o = r(c, i);
-            o && a.push(o);
+            if (o.length >= t) break;
+            const a = r(c, s);
+            a && o.push(a);
         }
-        return a;
+        return o;
     }
     const fe = new Set([
         "minor",
@@ -88,14 +88,14 @@
         return typeof e == "string" && fe.has(e) ? e : "both";
     }
     function pe(e) {
-        const r = e && typeof e == "object" ? e : {}, t = typeof r.style == "string" && ue.has(r.style) ? r.style : "none", n = z(C(r.widthCells) ?? 1, 1, 4), i = typeof r.opacity == "number" ? r.opacity : 1, a = z(i, 0, 1), c = {
+        const r = e && typeof e == "object" ? e : {}, t = typeof r.style == "string" && ue.has(r.style) ? r.style : "none", n = z(C(r.widthCells) ?? 1, 1, 4), s = typeof r.opacity == "number" ? r.opacity : 1, o = z(s, 0, 1), c = {
             style: t,
             widthCells: n,
-            opacity: a
+            opacity: o
         };
         if (t === "fade") {
-            const o = typeof r.fadeStrength == "number" ? r.fadeStrength : .6;
-            c.fadeStrength = z(o, 0, 1);
+            const a = typeof r.fadeStrength == "number" ? r.fadeStrength : .6;
+            c.fadeStrength = z(a, 0, 1);
         }
         return t === "noted" && (c.notePitchCells = Math.max(1, C(r.notePitchCells) ?? 2)), (t === "bold-major" || t === "noted") && (c.hideInteriorBorder = typeof r.hideInteriorBorder == "boolean" ? r.hideInteriorBorder : !1), c;
     }
@@ -107,12 +107,12 @@
     }
     function oe(e, r = Date.now()) {
         if (!e || typeof e != "object") return null;
-        const t = e, n = C(t.x1), i = C(t.y1), a = C(t.x2), c = C(t.y2);
-        if (n === null || i === null || a === null || c === null) return null;
-        const o = Math.min(n, a), l = Math.max(n, a), f = Math.min(i, c), d = Math.max(i, c);
+        const t = e, n = C(t.x1), s = C(t.y1), o = C(t.x2), c = C(t.y2);
+        if (n === null || s === null || o === null || c === null) return null;
+        const a = Math.min(n, o), l = Math.max(n, o), f = Math.min(s, c), d = Math.max(s, c);
         return {
             id: typeof t.id == "string" && t.id.length > 0 ? t.id : me(),
-            x1: k(o),
+            x1: k(a),
             y1: k(f),
             x2: k(l),
             y2: k(d),
@@ -142,7 +142,7 @@
             if (!t) return {
                 error: "Invalid payload"
             };
-            const n = this.items.filter((i)=>i.id !== t.id);
+            const n = this.items.filter((s)=>s.id !== t.id);
             return this.items = this.normalizeAll([
                 ...n,
                 t
@@ -153,12 +153,12 @@
             if (!t) return {
                 error: "Invalid payload"
             };
-            const n = this.items.findIndex((a)=>a.id === t.id);
+            const n = this.items.findIndex((o)=>o.id === t.id);
             if (n < 0) return {
                 error: `Item ${t.id} not found`
             };
-            const i = this.items.slice();
-            return i[n] = t, this.items = this.normalizeAll(i), {};
+            const s = this.items.slice();
+            return s[n] = t, this.items = this.normalizeAll(s), {};
         }
         remove(r) {
             return this.items = this.items.filter((t)=>t.id !== r), this.items;
@@ -176,7 +176,7 @@
         entries = new Map;
         register(r, t, n) {
             this.entries.set(r, {
-                dispatch: (i, a)=>ke(t, i, a),
+                dispatch: (s, o)=>ke(t, s, o),
                 apply: ()=>n(t.getAll()),
                 snapshot: ()=>t.getAll()
             });
@@ -210,11 +210,11 @@
     }
     const m = 32, E = 5, x = 1024, Me = .04, S = .0035;
     function Re([e, r, t]) {
-        const n = e + .3963377774 * r + .2158037573 * t, i = e - .1055613458 * r - .0638541728 * t, a = e - .0894841775 * r - 1.291485548 * t, c = n ** 3, o = i ** 3, l = a ** 3;
+        const n = e + .3963377774 * r + .2158037573 * t, s = e - .1055613458 * r - .0638541728 * t, o = e - .0894841775 * r - 1.291485548 * t, c = n ** 3, a = s ** 3, l = o ** 3;
         return [
-            4.0767416621 * c - 3.3077115913 * o + .2309699292 * l,
-            -1.2684380046 * c + 2.6097574011 * o - .3413193965 * l,
-            -.0041960863 * c - .7034186147 * o + 1.707614701 * l
+            4.0767416621 * c - 3.3077115913 * a + .2309699292 * l,
+            -1.2684380046 * c + 2.6097574011 * a - .3413193965 * l,
+            -.0041960863 * c - .7034186147 * a + 1.707614701 * l
         ];
     }
     function F(e) {
@@ -227,34 +227,34 @@
     }
     function Ee(e, r) {
         const t = (e % x + x) % x, n = (r % x + x) % x;
-        let i = t * 73856093 ^ n * 19349663;
-        return i = Math.imul(i ^ i >>> 13, 1540483477), i ^= i >>> 15, (i >>> 0) / 4294967295 < Me;
+        let s = t * 73856093 ^ n * 19349663;
+        return s = Math.imul(s ^ s >>> 13, 1540483477), s ^= s >>> 15, (s >>> 0) / 4294967295 < Me;
     }
     function xe(e) {
         const r = e.getContext("2d");
         if (!r) throw new Error("2D context unavailable");
         const t = r;
-        let n = re, i = 0, a = 0, c = 0, o = !0;
+        let n = re, s = 0, o = 0, c = 0, a = !0;
         function l() {
-            if (!o) return;
-            o = !1;
+            if (!a) return;
+            a = !1;
             const f = e.width, d = e.height;
             if (f === 0 || d === 0) return;
             t.fillStyle = Te(n.surface), t.fillRect(0, 0, f, d);
-            const _ = Math.floor(i / m), U = Math.ceil((i + f) / m), j = Math.floor(a / m), Y = Math.ceil((a + d) / m), ie = P(V(n.surface, n.ink, n.minor_t)), se = P(V(n.surface, n.ink, n.major_t));
+            const _ = Math.floor(s / m), U = Math.ceil((s + f) / m), j = Math.floor(o / m), Y = Math.ceil((o + d) / m), se = P(V(n.surface, n.ink, n.minor_t)), ie = P(V(n.surface, n.ink, n.major_t));
             for (const R of [
                 !1,
                 !0
             ]){
-                t.strokeStyle = R ? se : ie, t.lineWidth = m * (R ? .12 : .04), t.globalAlpha = R ? .72 : .85, t.beginPath();
+                t.strokeStyle = R ? ie : se, t.lineWidth = m * (R ? .12 : .04), t.globalAlpha = R ? .72 : .85, t.beginPath();
                 for(let u = _; u <= U; u++){
                     if ((u % E + E) % E === 0 !== R) continue;
-                    const y = u * m - i;
+                    const y = u * m - s;
                     t.moveTo(y, 0), t.lineTo(y, d);
                 }
                 for(let u = j; u <= Y; u++){
                     if ((u % E + E) % E === 0 !== R) continue;
-                    const y = u * m - a;
+                    const y = u * m - o;
                     t.moveTo(0, y), t.lineTo(f, y);
                 }
                 t.stroke();
@@ -266,7 +266,7 @@
                 const R = m * .08;
                 for(let u = j; u <= Y; u++)for(let y = _; y <= U; y++){
                     if (!Ee(y, u)) continue;
-                    const B = y * m - i, W = u * m - a;
+                    const B = y * m - s, W = u * m - o;
                     typeof t.roundRect == "function" ? (t.beginPath(), t.roundRect(B, W, m, m, R), t.fill()) : t.fillRect(B, W, m, m);
                 }
                 t.globalAlpha = 1;
@@ -276,17 +276,17 @@
             tick: l,
             renderOnly: l,
             resize (f, d) {
-                o = !0, l();
+                a = !0, l();
             },
             setCamera (f, d) {
-                f === i && d === a || (i = f, a = d, o = !0);
+                f === s && d === o || (s = f, o = d, a = !0);
             },
             setInitFade (f) {
                 const d = Math.min(1, Math.max(0, f));
-                d !== c && (c = d, o = !0);
+                d !== c && (c = d, a = !0);
             },
             setTheme (f) {
-                n = f, o = !0, l();
+                n = f, a = !0, l();
             },
             free () {}
         };
@@ -303,15 +303,15 @@
     }
     const Ie = $("Renderer");
     function Pe(e, r) {
-        const t = e, n = (o)=>{
+        const t = e, n = (a)=>{
             if (typeof t.set_zones == "function") try {
-                t.set_zones(o);
+                t.set_zones(a);
             } catch (l) {
                 r(`GPU zone update failed: ${M(l)}`);
             }
-        }, i = (o)=>{
+        }, s = (a)=>{
             if (typeof t.set_theme == "function") try {
-                t.set_theme(ne(o));
+                t.set_theme(ne(a));
             } catch (l) {
                 Ie.error("GPU theme update failed:", M(l));
             }
@@ -319,15 +319,15 @@
         return {
             tick: ()=>e.tick_and_render(),
             renderOnly: ()=>e.render_only(),
-            resize: (o, l)=>e.resize(o, l),
-            setCamera: (o, l)=>e.set_camera(o, l),
-            setTransition: (o)=>e.set_transition(o),
-            setInitFade: (o)=>e.set_init_fade(o),
-            toggleCell: (o, l)=>{
-                e.toggle_cell(o, l), e.flush_and_render();
+            resize: (a, l)=>e.resize(a, l),
+            setCamera: (a, l)=>e.set_camera(a, l),
+            setTransition: (a)=>e.set_transition(a),
+            setInitFade: (a)=>e.set_init_fade(a),
+            toggleCell: (a, l)=>{
+                e.toggle_cell(a, l), e.flush_and_render();
             },
-            setZones: (o)=>n(o),
-            setTheme: (o)=>i(o),
+            setZones: (a)=>n(a),
+            setTheme: (a)=>s(a),
             gridInfo: ()=>({
                     worldCols: k(e.world_cols()),
                     worldRows: k(e.world_rows()),
@@ -337,8 +337,8 @@
                 }),
             pullGpuPassDurations: ()=>{
                 if (!e.timestamp_query_supported()) return null;
-                const o = e.last_compute_tick_ms(), l = e.last_xor_edit_ms(), f = e.last_or_edit_ms(), d = e.last_render_pass_ms(), _ = {
-                    computeTickMs: o ?? null,
+                const a = e.last_compute_tick_ms(), l = e.last_xor_edit_ms(), f = e.last_or_edit_ms(), d = e.last_render_pass_ms(), _ = {
+                    computeTickMs: a ?? null,
                     xorEditMs: l ?? null,
                     orEditMs: f ?? null,
                     renderPassMs: d ?? null
@@ -376,19 +376,19 @@
     function Ge(e, r, t, n) {
         return r !== n.lastCameraX || t !== n.lastCameraY || e < n.forceRenderUntil ? !0 : e - n.lastRenderTime >= Fe - Oe;
     }
-    const p = $("Renderer"), ae = self;
-    let s = null, b = null, w = 0, g = 0, A = null, O = 0, G = 0, K = Number.NaN, J = Number.NaN;
+    const h = $("Renderer"), ae = self;
+    let i = null, b = null, w = 0, g = 0, A = null, O = 0, G = 0, K = Number.NaN, J = Number.NaN;
     const Ne = 300;
     let Q = 0;
     const De = new ge;
     let T = re, ee = !1;
     const Le = 1e3;
     let N = 0, D = 0;
-    function h(e) {
+    function p(e) {
         ae.postMessage(e);
     }
     const I = new be;
-    I.register("blankZones", De, (e)=>s?.setZones?.(e));
+    I.register("blankZones", De, (e)=>i?.setZones?.(e));
     const $e = {
         worldCols: k(0),
         worldRows: k(0),
@@ -410,7 +410,7 @@
                 await m.__tla;
                 return m;
             }), r = Math.floor(Math.random() * 4294967296), t = await e.new_offscreen(b, r);
-            return s = Se(t), s.setCamera?.(w, g), s.setTheme?.(T), p.info("WebGL2 fallback renderer ready"), h({
+            return i = Se(t), i.setCamera?.(w, g), i.setTheme?.(T), h.info("WebGL2 fallback renderer ready"), p({
                 type: "ready",
                 backend: "webgl2",
                 gridInfo: {
@@ -422,7 +422,7 @@
                 }
             }), !0;
         } catch (e) {
-            return p.error("WebGL2 init failed:", M(e)), h({
+            return h.error("WebGL2 init failed:", M(e)), p({
                 type: "error",
                 phase: "gpu-init",
                 message: M(e)
@@ -434,13 +434,13 @@
     }
     ae.onmessage = async (e)=>{
         if (!Ue(e.data)) {
-            p.warn("worker: ignored malformed inbound message", e.data);
+            h.warn("worker: ignored malformed inbound message", e.data);
             return;
         }
         switch(e.data.type){
             case "init":
                 {
-                    b = e.data.canvas, T = e.data.theme, p.debug("Init received — canvas", b.width, "x", b.height);
+                    b = e.data.canvas, T = e.data.theme, h.debug("Init received — canvas", b.width, "x", b.height);
                     const r = performance.now(), t = e.data.forceBackend;
                     if (t === "webgl2") {
                         await te();
@@ -449,35 +449,35 @@
                     let n = !1;
                     if (t !== "static") try {
                         if (!(await navigator.gpu?.requestAdapter() ?? null)) throw new Error("No WebGPU adapter");
-                        n = !0, p.debug("GPU: probe passed — adapter found");
-                    } catch (a) {
-                        p.info("GPU: probe failed, will use CPU renderer:", M(a)), h({
+                        n = !0, h.debug("GPU: probe passed — adapter found");
+                    } catch (o) {
+                        h.info("GPU: probe failed, will use CPU renderer:", M(o)), p({
                             type: "error",
                             phase: "gpu-probe",
-                            message: M(a)
+                            message: M(o)
                         });
                     }
-                    const i = performance.now();
+                    const s = performance.now();
                     if (n) try {
-                        const { GpuGameOfLife: a } = await import("./game_of_life_gpu-CLrhJ3vV.js").then(async (m)=>{
+                        const { GpuGameOfLife: o } = await import("./game_of_life_gpu-CLrhJ3vV.js").then(async (m)=>{
                             await m.__tla;
                             return m;
                         }), c = performance.now();
-                        p.debug("GPU: module loaded, initialising surface...");
-                        const o = Math.floor(Math.random() * 4294967296), l = await a.new_offscreen(b, 0, o), f = performance.now(), d = Pe(l, (_)=>h({
+                        h.debug("GPU: module loaded, initialising surface...");
+                        const a = Math.floor(Math.random() * 4294967296), l = await o.new_offscreen(b, 0, a), f = performance.now(), d = Pe(l, (_)=>p({
                                 type: "feature_error",
                                 feature: "blankZones",
                                 message: _
                             }));
-                        s = d, A && (s.resize(A.width, A.height), A = null), s.setCamera?.(w, g), s.setTransition?.(1), I.applyAll(), s.setTheme?.(T), p.info("GPU renderer ready"), h({
+                        i = d, A && (i.resize(A.width, A.height), A = null), i.setCamera?.(w, g), i.setTransition?.(1), I.applyAll(), i.setTheme?.(T), h.info("GPU renderer ready"), p({
                             type: "ready",
                             backend: "gpu",
                             gridInfo: d.gridInfo()
                         });
                         break;
-                    } catch (a) {
-                        const c = M(a);
-                        p.error("GPU init failed after probe passed (canvas may be locked):", c), h({
+                    } catch (o) {
+                        const c = M(o);
+                        h.error("GPU init failed after probe passed (canvas may be locked):", c), p({
                             type: "error",
                             phase: "gpu-init",
                             message: c
@@ -486,14 +486,14 @@
                     }
                     if (t !== "static" && ve() && await te()) break;
                     try {
-                        s = xe(b), s.setCamera?.(w, g), s.setTheme?.(T), p.info("Static fallback renderer ready"), h({
+                        i = xe(b), i.setCamera?.(w, g), i.setTheme?.(T), h.info("Static fallback renderer ready"), p({
                             type: "ready",
                             backend: "cpu",
                             gridInfo: $e
                         });
-                    } catch (a) {
-                        const c = M(a);
-                        p.error("Static fallback init failed:", c), h({
+                    } catch (o) {
+                        const c = M(o);
+                        h.error("Static fallback init failed:", c), p({
                             type: "error",
                             phase: "cpu-init",
                             message: c
@@ -503,9 +503,9 @@
                 }
             case "frame":
                 {
-                    if (!s) break;
-                    const r = s;
-                    w = e.data.cameraX, g = e.data.cameraY, s.setCamera?.(w, g);
+                    if (!i) break;
+                    const r = i;
+                    w = e.data.cameraX, g = e.data.cameraY, i.setCamera?.(w, g);
                     const t = performance.now();
                     if (!Ge(t, w, g, {
                         lastRenderTime: G,
@@ -514,52 +514,59 @@
                         forceRenderUntil: Q
                     })) break;
                     if (G = t, K = w, J = g, O++, D < 1) {
-                        const a = performance.now();
-                        N === 0 && (N = a), D = Math.min(1, (a - N) / Le), s.setInitFade?.(D);
+                        const o = performance.now();
+                        N === 0 && (N = o), D = Math.min(1, (o - N) / Le), i.setInitFade?.(D);
                     }
-                    switch(Ae(O)){
+                    const s = Ae(O);
+                    switch(s){
                         case "base_tick":
-                            s.setTransition?.(0), r.tick();
+                            i.setTransition?.(0), r.tick();
                             break;
                         case "render_only":
-                            if (s.setTransition?.(Ce(O % L / L)), r.renderOnly) {
-                                const a = r.renderOnly;
-                                a();
+                            if (i.setTransition?.(Ce(O % L / L)), r.renderOnly) {
+                                const o = r.renderOnly;
+                                o();
                             }
                             break;
+                        default:
+                            {
+                                const o = s;
+                                h.warn("worker: unhandled frame action", o);
+                                break;
+                            }
                     }
-                    ee || (ee = !0, h({
+                    ee || (ee = !0, p({
                         type: "first_frame_painted"
                     }));
                     break;
                 }
             case "resize":
                 {
-                    if (p.debug("Resize →", e.data.width, "x", e.data.height), !b) break;
-                    if (b.width = e.data.width, b.height = e.data.height, !s) {
+                    if (h.debug("Resize →", e.data.width, "x", e.data.height), !b) break;
+                    if (b.width = e.data.width, b.height = e.data.height, !i) {
                         A = {
                             width: e.data.width,
                             height: e.data.height
                         };
                         break;
                     }
-                    s.resize(e.data.width, e.data.height), s.setCamera?.(w, g), s.setTransition?.(1), I.applyAll(), s.setTheme?.(T), s.gridInfo && h({
+                    i.resize(e.data.width, e.data.height), i.setCamera?.(w, g), i.setTransition?.(1), I.applyAll(), i.setTheme?.(T), i.gridInfo && p({
                         type: "grid_info",
-                        gridInfo: s.gridInfo()
+                        gridInfo: i.gridInfo()
                     });
                     break;
                 }
             case "camera":
-                w = e.data.x, g = e.data.y, s?.setCamera?.(w, g);
+                w = e.data.x, g = e.data.y, i?.setCamera?.(w, g);
                 break;
             case "toggle_cell":
-                s?.toggleCell?.(e.data.cx, e.data.cy);
+                i?.toggleCell?.(e.data.cx, e.data.cy);
                 break;
             case "feature":
                 {
                     const r = I.get(e.data.feature);
                     if (!r) {
-                        h({
+                        p({
                             type: "feature_error",
                             feature: e.data.feature,
                             message: `unknown feature: ${e.data.feature}`
@@ -568,14 +575,14 @@
                     }
                     const t = r.dispatch(e.data.op, e.data.payload);
                     if (t) {
-                        h({
+                        p({
                             type: "feature_error",
                             feature: e.data.feature,
                             message: t
                         });
                         break;
                     }
-                    r.apply(), h({
+                    r.apply(), p({
                         type: "feature_state",
                         feature: e.data.feature,
                         items: r.snapshot()
@@ -583,8 +590,16 @@
                     break;
                 }
             case "set_theme":
-                T = e.data.theme, s?.setTheme?.(T), Q = performance.now() + Ne, G = 0;
+                T = e.data.theme, i?.setTheme?.(T), Q = performance.now() + Ne, G = 0;
                 break;
+            case "perf_snapshot":
+                break;
+            default:
+                {
+                    const r = e.data;
+                    h.warn("worker: ignored unhandled message type", r.type);
+                    break;
+                }
         }
     };
 })();
