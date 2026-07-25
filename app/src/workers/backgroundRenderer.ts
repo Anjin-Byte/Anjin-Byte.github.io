@@ -412,6 +412,14 @@ ws.onmessage = async (e: MessageEvent<unknown>) => {
             else { renderOnly(); }
           }
           break;
+        default: {
+          // Unreachable at runtime (`action` comes from `resolveFrameAction`,
+          // not the wire) — this exists so a new `FrameAction` member is a
+          // compile error here rather than a frame that silently does nothing.
+          const unhandled: never = action;
+          log.warn('worker: unhandled frame action', unhandled);
+          break;
+        }
       }
       perf?.endFrame();
 
@@ -524,5 +532,21 @@ ws.onmessage = async (e: MessageEvent<unknown>) => {
     // (No 'stop' message: WorkerBridge.terminate() kills the thread
     // synchronously, so a farewell message could never be processed — the
     // browser reclaims the GPU device with the worker.)
+
+    default: {
+      // Finding D, compile-time half: a new `WorkerInMsg` variant with no case
+      // above makes this assignment fail (nothing is assignable to `never`), so
+      // the union cannot silently outgrow the switch. This backs up the
+      // `switch-exhaustiveness-check` lint rule at the TYPE level, so the
+      // protection survives a typecheck-only run.
+      //
+      // Runtime half: this is genuinely reachable. `isWorkerInMsg` admits ANY
+      // string discriminant (it validates shape, not membership), so a stale or
+      // bogus `type` lands here — warn and ignore rather than throw, since a
+      // malformed message must never take down the render loop.
+      const unhandled: never = e.data;
+      log.warn('worker: ignored unhandled message type', (unhandled as { type?: unknown }).type);
+      break;
+    }
   }
 };
