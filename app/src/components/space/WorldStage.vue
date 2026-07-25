@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref, type Component } from 'vue';
 import { useCamera } from '../../composables/useCamera';
 import WorldPanel from './WorldPanel.vue';
 import HeroSection from '../sections/HeroSection.vue';
@@ -8,7 +8,7 @@ import ResumeSection from '../sections/ResumeSection.vue';
 import ContactSection from '../sections/ContactSection.vue';
 import NotebookSection from '../sections/NotebookSection.vue';
 import NotebookPage from '../sections/NotebookPage.vue';
-import { findWaypoint } from '../../space/waypoints';
+import { findWaypoint, type WaypointId } from '../../space/waypoints';
 import { notebookNodes } from '../../space/notebookNodes';
 
 // WorldStage hosts the transformed world plane. All panels coexist on the
@@ -17,14 +17,20 @@ import { notebookNodes } from '../../space/notebookNodes';
 // in generated entry-coordinate panels (one per markdown note).
 const { cameraStyle, setViewport, isAnimating } = useCamera();
 
-// Static waypoint coordinates for the core section panels, resolved once.
-const coreNodes = {
-  hero: findWaypoint('hero'),
-  projects: findWaypoint('projects'),
-  resume: findWaypoint('resume'),
-  contact: findWaypoint('contact'),
-  notebook: findWaypoint('notebook'),
-};
+// The core-section registry: one entry per waypoint-anchored panel. `id` is
+// typed `WaypointId`, so an entry naming a non-existent waypoint (or a stale one
+// after a WAYPOINTS edit) is a COMPILE error — the panel list can't silently
+// drift from the constellation. Adding a core section = one row here (+ its
+// WAYPOINTS row, which routing needs anyway); the template renders it via v-for,
+// exactly like the data-driven notebook layer below. (interface-audit S1.)
+const CORE_SECTIONS: readonly { id: WaypointId; component: Component }[] = [
+  { id: 'hero',     component: HeroSection },
+  { id: 'projects', component: ProjectsSection },
+  { id: 'resume',   component: ResumeSection },
+  { id: 'contact',  component: ContactSection },
+  { id: 'notebook', component: NotebookSection },
+];
+const coreSections = CORE_SECTIONS.map((s) => ({ ...s, node: findWaypoint(s.id) }));
 
 const stageRef = ref<HTMLDivElement | null>(null);
 let resizeObserver: ResizeObserver | null = null;
@@ -67,11 +73,9 @@ onUnmounted(() => {
 <template>
   <div ref="stageRef" class="world-stage">
     <div class="world-plane" :class="{ 'world-plane--animating': isAnimating }" :style="cameraStyle">
-      <WorldPanel :node="coreNodes.hero" waypoint-id="hero"><HeroSection /></WorldPanel>
-      <WorldPanel :node="coreNodes.projects" waypoint-id="projects"><ProjectsSection /></WorldPanel>
-      <WorldPanel :node="coreNodes.resume" waypoint-id="resume"><ResumeSection /></WorldPanel>
-      <WorldPanel :node="coreNodes.contact" waypoint-id="contact"><ContactSection /></WorldPanel>
-      <WorldPanel :node="coreNodes.notebook" waypoint-id="notebook"><NotebookSection /></WorldPanel>
+      <WorldPanel v-for="s in coreSections" :key="s.id" :node="s.node" :waypoint-id="s.id">
+        <component :is="s.component" />
+      </WorldPanel>
       <WorldPanel v-for="entry in notebookNodes" :key="entry.slug" :node="entry">
         <NotebookPage :entry="entry" />
       </WorldPanel>
