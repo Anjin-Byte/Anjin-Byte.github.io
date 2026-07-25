@@ -10018,7 +10018,7 @@ Expected #hex, #hexa, rgb(), rgba(), hsl(), hsla(), object or number`);
   }), EI = Hr(bI, [
     [
       "__scopeId",
-      "data-v-799cc403"
+      "data-v-6f059739"
     ]
   ]), SI = kt({
     id: String,
@@ -11443,7 +11443,7 @@ Expected #hex, #hexa, rgb(), rgba(), hsl(), hsla(), object or number`);
   }), Do = Hr(Lw, [
     [
       "__scopeId",
-      "data-v-ed55a872"
+      "data-v-5404b17f"
     ]
   ]), Pw = "/assets/okra_hero-OwtZ_t5d.webp", Fw = "/assets/gestalt_hero-DKNpkSMW.webp", ea = {
     name: "Taylor Hale",
@@ -114978,5 +114978,9 @@ l0,-` + (n + 144) + `c-2,-159.3,-10,-310.7,-24,-454c-53.3,-528,-210,-949.7,
     routes: Mz
   }), kz = pA(wz).use(h3).use(ah);
   Dz(ah);
-  ah.isReady().then(() => kz.mount("#app"));
+  ah.isReady().then(() => {
+    kz.mount("#app");
+  }).catch((e) => {
+    console.error("App failed to start:", e);
+  });
 });
