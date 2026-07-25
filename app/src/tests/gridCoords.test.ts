@@ -1,4 +1,5 @@
 import { screenToCell, cellToScreen, wrapCell, type CoordSnapshot } from '../utils/gridCoords';
+import { cssPx, devicePx, dpr, worldCell } from '../utils/units';
 
 function assertEq<T>(actual: T, expected: T, message: string): void {
   const a = JSON.stringify(actual);
@@ -7,12 +8,12 @@ function assertEq<T>(actual: T, expected: T, message: string): void {
 }
 
 const SNAP: CoordSnapshot = {
-  gridPitch: 12.5,
-  offsetX: 137,
-  offsetY: -89,
-  dpr: 2,
-  worldCols: 1024,
-  worldRows: 1024,
+  gridPitch: devicePx(12.5),
+  offsetX: devicePx(137),
+  offsetY: devicePx(-89),
+  dpr: dpr(2),
+  worldCols: worldCell(1024),
+  worldRows: worldCell(1024),
 };
 
 // Sharp oracle: cell → screen → cell is a TRUE identity (modulo toroidal wrap).
@@ -22,7 +23,7 @@ const SNAP: CoordSnapshot = {
 function testRoundTripIdentity(): void {
   for (const cx of [0, 1, 17, 512, 1023]) {
     for (const cy of [0, 5, 200, 1023]) {
-      const screen = cellToScreen(cx, cy, SNAP);
+      const screen = cellToScreen(worldCell(cx), worldCell(cy), SNAP);
       const back = wrapCell(screenToCell(screen.cssX, screen.cssY, SNAP), SNAP);
       assertEq(back.cx, cx, `cx round-trip @(${cx},${cy})`);
       assertEq(back.cy, cy, `cy round-trip @(${cx},${cy})`);
@@ -34,12 +35,12 @@ function testRoundTripIdentity(): void {
 // pointer by the same amount with zero offset — proving offsetX enters the math
 // symmetrically with the pre-existing offsetY.
 function testOffsetSymmetry(): void {
-  const zero: CoordSnapshot = { ...SNAP, offsetX: 0, offsetY: 0 };
+  const zero: CoordSnapshot = { ...SNAP, offsetX: devicePx(0), offsetY: devicePx(0) };
   const px = 321;
   const py = 210;
-  const withOffset = wrapCell(screenToCell(px, py, SNAP), SNAP);
+  const withOffset = wrapCell(screenToCell(cssPx(px), cssPx(py), SNAP), SNAP);
   const shifted = wrapCell(
-    screenToCell(px + SNAP.offsetX / SNAP.dpr, py + SNAP.offsetY / SNAP.dpr, zero),
+    screenToCell(cssPx(px + SNAP.offsetX / SNAP.dpr), cssPx(py + SNAP.offsetY / SNAP.dpr), zero),
     zero,
   );
   assertEq(withOffset.cx, shifted.cx, 'x offset symmetry');

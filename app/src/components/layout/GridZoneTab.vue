@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import type { BlankZone, BlankMode, EdgeStyle, BlankZoneDraft, BlankZoneRect } from '../../types/blankZones';
+import type { BlankZone, BlankMode, EdgeStyle, BlankZoneDraft, BlankZoneRect, ZoneId } from '../../types/blankZones';
+import { asZoneId } from '../../types/blankZones';
+import { worldCell } from '../../utils/units';
 
 const props = defineProps<{
   zones: BlankZone[];
@@ -78,21 +80,21 @@ const edgeItems = [
   { title: 'Noted', value: 'noted' },
 ];
 
-function zoneId(): string {
+function zoneId(): ZoneId {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
+    return asZoneId(crypto.randomUUID());
   }
-  return `zone-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  return asZoneId(`zone-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
 }
 
 function submitZone(): void {
   const now = Date.now();
   emit('add-zone', {
     id: zoneId(),
-    x1: Math.min(Math.trunc(x1.value), Math.trunc(x2.value)),
-    y1: Math.min(Math.trunc(y1.value), Math.trunc(y2.value)),
-    x2: Math.max(Math.trunc(x1.value), Math.trunc(x2.value)),
-    y2: Math.max(Math.trunc(y1.value), Math.trunc(y2.value)),
+    x1: worldCell(Math.min(Math.trunc(x1.value), Math.trunc(x2.value))),
+    y1: worldCell(Math.min(Math.trunc(y1.value), Math.trunc(y2.value))),
+    x2: worldCell(Math.max(Math.trunc(x1.value), Math.trunc(x2.value))),
+    y2: worldCell(Math.max(Math.trunc(y1.value), Math.trunc(y2.value))),
     mode: mode.value,
     edge: edgeFromInputs(),
     enabled: true,

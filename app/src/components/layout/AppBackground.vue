@@ -2,8 +2,10 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { createLogger } from '../../logger';
 import { screenToCell, wrapCell } from '../../utils/gridCoords';
+import { cssPx } from '../../utils/units';
 import { useBlankZones } from '../../composables/useBlankZones';
 import type { BlankZone, BlankZoneDraft, BlankZoneRect } from '../../types/blankZones';
+import { asZoneId } from '../../types/blankZones';
 import { useWorkerBridge } from '../../composables/useWorkerBridge';
 import { useCoordinateMapper } from '../../composables/useCoordinateMapper';
 import { useAnimationLoop } from '../../composables/useAnimationLoop';
@@ -84,7 +86,7 @@ function makeZoneFromRect(rect: BlankZoneRect): BlankZone {
   const now = Date.now();
   const draft = zoneDraft.value;
   return {
-    id: crypto.randomUUID(),
+    id: asZoneId(crypto.randomUUID()),
     x1: rect.x1, y1: rect.y1, x2: rect.x2, y2: rect.y2,
     mode: draft.mode,
     edge: { ...draft.edge },
@@ -120,7 +122,7 @@ function onDocumentClick(event: MouseEvent): void {
   if (drag.anyToolEnabled() || coords.isInteractiveTarget(event.target)) return;
   const snap = coords.makeSnapshot();
   if (!snap) return;
-  const cell = screenToCell(event.clientX, event.clientY, snap);
+  const cell = screenToCell(cssPx(event.clientX), cssPx(event.clientY), snap);
   const wrapped = wrapCell(cell, snap);
   log.debug('Click →', event.clientX, event.clientY, '→ cell', wrapped.cx, wrapped.cy);
   bridge.post({ type: 'toggle_cell', cx: wrapped.cx, cy: wrapped.cy });

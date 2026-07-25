@@ -24,6 +24,8 @@ const ALLOWED: Record<string, number> = {
   'composables/useCanvasSurface.ts': 4,
   // Doc comment describing the coordinate spaces.
   'utils/gridCoords.ts': 1,
+  // Doc comment on the `Dpr` branded type (always effectiveDpr(), never raw).
+  'utils/units.ts': 1,
 };
 
 function assert(cond: unknown, message: string): void {

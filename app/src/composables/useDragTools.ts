@@ -2,6 +2,7 @@ import { ref, type Ref } from 'vue';
 import type { CoordinateMapper } from './useCoordinateMapper';
 import type { CellCoord, CoordSnapshot } from '../utils/gridCoords';
 import type { BlankZoneRect } from '../types/blankZones';
+import { worldCell } from '../utils/units';
 
 export interface DragToolHandlers {
   isEnabled(): boolean;
@@ -56,8 +57,8 @@ export function useDragTools(coords: CoordinateMapper): DragTools {
       return;
     }
     const pos = coords.cellToScreen(rect.x1, rect.y1, snap);
-    const width = coords.cellSpanToCssPx(rect.x2 - rect.x1 + 1, snap);
-    const height = coords.cellSpanToCssPx(rect.y2 - rect.y1 + 1, snap);
+    const width = coords.cellSpanToCssPx(worldCell(rect.x2 - rect.x1 + 1), snap);
+    const height = coords.cellSpanToCssPx(worldCell(rect.y2 - rect.y1 + 1), snap);
     previewStyle.value = {
       left: `${pos.cssX}px`,
       top: `${pos.cssY}px`,
@@ -118,10 +119,10 @@ export function useDragTools(coords: CoordinateMapper): DragTools {
     if (!next || !snap) return;
 
     if (handler.dragMode === 'paint' && paintBounds) {
-      paintBounds.x1 = Math.min(paintBounds.x1, next.cx);
-      paintBounds.y1 = Math.min(paintBounds.y1, next.cy);
-      paintBounds.x2 = Math.max(paintBounds.x2, next.cx);
-      paintBounds.y2 = Math.max(paintBounds.y2, next.cy);
+      paintBounds.x1 = worldCell(Math.min(paintBounds.x1, next.cx));
+      paintBounds.y1 = worldCell(Math.min(paintBounds.y1, next.cy));
+      paintBounds.x2 = worldCell(Math.max(paintBounds.x2, next.cx));
+      paintBounds.y2 = worldCell(Math.max(paintBounds.y2, next.cy));
       previewRect.value = { ...paintBounds };
     } else {
       const rawRect = coords.normalizeRect(dragAnchor, next);
@@ -145,10 +146,10 @@ export function useDragTools(coords: CoordinateMapper): DragTools {
     let rect: BlankZoneRect;
     if (handler.dragMode === 'paint' && paintBounds) {
       if (next) {
-        paintBounds.x1 = Math.min(paintBounds.x1, next.cx);
-        paintBounds.y1 = Math.min(paintBounds.y1, next.cy);
-        paintBounds.x2 = Math.max(paintBounds.x2, next.cx);
-        paintBounds.y2 = Math.max(paintBounds.y2, next.cy);
+        paintBounds.x1 = worldCell(Math.min(paintBounds.x1, next.cx));
+        paintBounds.y1 = worldCell(Math.min(paintBounds.y1, next.cy));
+        paintBounds.x2 = worldCell(Math.max(paintBounds.x2, next.cx));
+        paintBounds.y2 = worldCell(Math.max(paintBounds.y2, next.cy));
       }
       rect = paintBounds;
     } else if (next) {

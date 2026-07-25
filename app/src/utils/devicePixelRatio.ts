@@ -11,9 +11,11 @@
 // joining), and its cost scales with dpr² pixels. 3x → 2x cuts that fragment
 // count from 9x to 4x baseline, with no perceptible sharpness loss for this
 // content (soft ink/paper aesthetic, not fine text or line art).
+import { dpr, type Dpr } from './units';
+
 const MAX_EFFECTIVE_DPR = 2;
 
-export function effectiveDpr(): number {
+export function effectiveDpr(): Dpr {
   const raw = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
-  return Math.min(raw, MAX_EFFECTIVE_DPR);
+  return dpr(Math.min(raw, MAX_EFFECTIVE_DPR));
 }

@@ -1,4 +1,5 @@
-import { MAX_BLANK_ZONES, type BlankZone } from '../types/blankZones';
+import { asZoneId, MAX_BLANK_ZONES, type BlankZone } from '../types/blankZones';
+import { worldCell } from '../utils/units';
 import { normalizeZone, normalizeZones } from '../utils/blankZoneNormalization';
 import {
   clearBlankZonesStorage,
@@ -47,7 +48,7 @@ function assertEq<T>(actual: T, expected: T, message: string): void {
 function testNormalizeZone(): void {
   const now = 1000;
   const zone = normalizeZone({
-    id: 'z-1',
+    id: asZoneId('z-1'),
     x1: 10,
     y1: 7,
     x2: 2,
@@ -92,11 +93,11 @@ function testNormalizeZonesCap(): void {
 function testStorageRoundTrip(): void {
   fakeStorage.clear();
   const zones: BlankZone[] = [{
-    id: 'z-storage',
-    x1: 0,
-    y1: 0,
-    x2: 1,
-    y2: 1,
+    id: asZoneId('z-storage'),
+    x1: worldCell(0),
+    y1: worldCell(0),
+    x2: worldCell(1),
+    y2: worldCell(1),
     mode: 'both',
     edge: { style: 'none', widthCells: 1, opacity: 1 },
     enabled: true,
@@ -124,11 +125,11 @@ function testUseBlankZonesCallbacks(): void {
   });
 
   const zone: BlankZone = {
-    id: 'z-store',
-    x1: 1,
-    y1: 2,
-    x2: 3,
-    y2: 4,
+    id: asZoneId('z-store'),
+    x1: worldCell(1),
+    y1: worldCell(2),
+    x2: worldCell(3),
+    y2: worldCell(4),
     mode: 'minor',
     edge: { style: 'bold-major', widthCells: 2, opacity: 0.8 },
     enabled: true,

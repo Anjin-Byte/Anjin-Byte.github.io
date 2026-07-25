@@ -22,26 +22,28 @@
  * Captured atomically at click time to prevent races between scroll
  * updates, resize events, and DPR changes.
  */
+import { cssPx, worldCell, type CssPx, type DevicePx, type Dpr, type WorldCell } from './units';
+
 export interface CoordSnapshot {
-  /** Float grid pitch in canvas pixels — must match PaperParams.grid_pitch_px. */
-  gridPitch: number;
-  /** Horizontal camera offset in canvas pixels (matches shader `scroll_x`). */
-  offsetX: number;
-  /** Vertical camera offset in canvas pixels (matches shader `scroll_y`). */
-  offsetY: number;
+  /** Float grid pitch in device pixels — must match PaperParams.grid_pitch_px. */
+  gridPitch: DevicePx;
+  /** Horizontal camera offset in device pixels (matches shader `scroll_x`). */
+  offsetX: DevicePx;
+  /** Vertical camera offset in device pixels (matches shader `scroll_y`). */
+  offsetY: DevicePx;
   /** Device pixel ratio at the moment of the click. */
-  dpr: number;
+  dpr: Dpr;
   /** World cell columns; toroidal-wrap modulus for `cx`. Currently 1024. */
-  worldCols: number;
+  worldCols: WorldCell;
   /** World cell rows; toroidal-wrap modulus for `cy`. Currently 1024. */
-  worldRows: number;
+  worldRows: WorldCell;
 }
 
 export interface CellCoord {
   /** Column index in the simulation grid. */
-  cx: number;
+  cx: WorldCell;
   /** Row index in the simulation grid. */
-  cy: number;
+  cy: WorldCell;
 }
 
 /**
@@ -51,11 +53,11 @@ export interface CellCoord {
  * scroll offset, DPR, and grid pitch are self-consistent.
  */
 export function screenToCell(
-  clientX: number,
-  clientY: number,
+  clientX: CssPx,
+  clientY: CssPx,
   snap: CoordSnapshot,
 ): CellCoord {
-  // CSS pixels → canvas pixels
+  // CSS pixels → device pixels
   const canvasPx = clientX * snap.dpr;
   const canvasPy = clientY * snap.dpr;
 
@@ -64,10 +66,10 @@ export function screenToCell(
   const worldY = canvasPy + snap.offsetY;
 
   // Reverse the shader's floor division
-  const cx = Math.floor(worldX / snap.gridPitch);
-  const cy = Math.floor(worldY / snap.gridPitch);
-
-  return { cx, cy };
+  return {
+    cx: worldCell(Math.floor(worldX / snap.gridPitch)),
+    cy: worldCell(Math.floor(worldY / snap.gridPitch)),
+  };
 }
 
 /**
@@ -80,9 +82,10 @@ export function screenToCell(
 export function wrapCell(coord: CellCoord, snap: CoordSnapshot): CellCoord {
   // JS % can return negative for negative operands; this shouldn't happen
   // for click coordinates, but guard defensively.
-  const cx = ((coord.cx % snap.worldCols) + snap.worldCols) % snap.worldCols;
-  const cy = ((coord.cy % snap.worldRows) + snap.worldRows) % snap.worldRows;
-  return { cx, cy };
+  return {
+    cx: worldCell(((coord.cx % snap.worldCols) + snap.worldCols) % snap.worldCols),
+    cy: worldCell(((coord.cy % snap.worldRows) + snap.worldRows) % snap.worldRows),
+  };
 }
 
 /**
@@ -90,17 +93,17 @@ export function wrapCell(coord: CellCoord, snap: CoordSnapshot): CellCoord {
  * Exact inverse of screenToCell().
  */
 export function cellToScreen(
-  cx: number,
-  cy: number,
+  cx: WorldCell,
+  cy: WorldCell,
   snap: CoordSnapshot,
-): { cssX: number; cssY: number } {
+): { cssX: CssPx; cssY: CssPx } {
   return {
-    cssX: (cx * snap.gridPitch - snap.offsetX) / snap.dpr,
-    cssY: (cy * snap.gridPitch - snap.offsetY) / snap.dpr,
+    cssX: cssPx((cx * snap.gridPitch - snap.offsetX) / snap.dpr),
+    cssY: cssPx((cy * snap.gridPitch - snap.offsetY) / snap.dpr),
   };
 }
 
 /** Convert a cell-count span to CSS pixels. */
-export function cellSpanToCssPx(cellCount: number, snap: CoordSnapshot): number {
-  return cellCount * snap.gridPitch / snap.dpr;
+export function cellSpanToCssPx(cellCount: WorldCell, snap: CoordSnapshot): CssPx {
+  return cssPx(cellCount * snap.gridPitch / snap.dpr);
 }

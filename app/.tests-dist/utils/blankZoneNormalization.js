@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.normalizeZone = normalizeZone;
 exports.normalizeZones = normalizeZones;
 const blankZones_1 = require("../types/blankZones");
+const units_1 = require("./units");
 const normalizeArray_1 = require("./normalizeArray");
 const VALID_MODES = new Set(['minor', 'major', 'both']);
 const VALID_EDGE_STYLES = new Set(['none', 'bold-major', 'fade', 'noted']);
@@ -17,9 +18,9 @@ function asInteger(value) {
 }
 function fallbackZoneId() {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-        return crypto.randomUUID();
+        return (0, blankZones_1.asZoneId)(crypto.randomUUID());
     }
-    return `zone-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    return (0, blankZones_1.asZoneId)(`zone-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
 }
 function normalizeMode(value) {
     return typeof value === 'string' && VALID_MODES.has(value)
@@ -73,10 +74,10 @@ function normalizeZone(zone, now = Date.now()) {
     const normY2 = Math.max(y1, y2);
     return {
         id: typeof source.id === 'string' && source.id.length > 0 ? source.id : fallbackZoneId(),
-        x1: normX1,
-        y1: normY1,
-        x2: normX2,
-        y2: normY2,
+        x1: (0, units_1.worldCell)(normX1),
+        y1: (0, units_1.worldCell)(normY1),
+        x2: (0, units_1.worldCell)(normX2),
+        y2: (0, units_1.worldCell)(normY2),
         mode: normalizeMode(source.mode),
         edge: normalizeEdge(source.edge),
         enabled: normalizeEnabled(source.enabled),

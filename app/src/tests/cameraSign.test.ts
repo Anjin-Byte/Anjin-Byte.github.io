@@ -1,5 +1,6 @@
 import { useCamera } from '../composables/useCamera';
 import { screenToCell, type CoordSnapshot } from '../utils/gridCoords';
+import { cssPx, devicePx, worldCell, dpr as toDpr } from '../utils/units';
 
 function assertEq<T>(actual: T, expected: T, message: string): void {
   const a = JSON.stringify(actual);
@@ -22,15 +23,15 @@ function testPanShiftsCellSameDirectionAsShader(): void {
 
   const snapAt = (): CoordSnapshot => {
     const off = camera.worldOffsetDevicePx.value;
-    return { gridPitch: pitch, offsetX: off.x, offsetY: off.y, dpr, worldCols: 1024, worldRows: 1024 };
+    return { gridPitch: devicePx(pitch), offsetX: off.x, offsetY: off.y, dpr: toDpr(dpr), worldCols: worldCell(1024), worldRows: worldCell(1024) };
   };
 
   camera.snapTo(0, 0, 1);
-  const before = screenToCell(px, py, snapAt());
+  const before = screenToCell(cssPx(px), cssPx(py), snapAt());
 
   const G = 250; // multiple of pitch → integer cell shift
   camera.snapTo(G, 0, 1);
-  const after = screenToCell(px, py, snapAt());
+  const after = screenToCell(cssPx(px), cssPx(py), snapAt());
 
   const expectedShift = Math.round((G * dpr) / pitch); // 250 / 12.5 = 20
   assertEq(after.cx - before.cx, expectedShift, '+X pan shifts cell by +G·dpr/pitch');

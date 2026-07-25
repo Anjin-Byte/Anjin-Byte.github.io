@@ -3,6 +3,7 @@
 import type { BlankZone } from '../types/blankZones';
 import type { ThemePalette } from '../types/theme';
 import type { FrameStats } from '../perf';
+import type { DevicePx, WorldCell } from '../utils/units';
 
 // 'gpu' = WebGPU (compute); 'webgl2' = WebGL2 GPGPU ping-pong fallback;
 // 'cpu' = the static (no-simulation) fallback of last resort.
@@ -22,11 +23,11 @@ export const TICK_EVERY = 175;
  * `wordsPerRow` describe the bitpacked buffer layout.
  */
 export interface GridInfo {
-  worldCols:   number;
-  worldRows:   number;
-  paddedRows:  number;
-  wordsPerRow: number;
-  gridPitch:   number;  // float, matches PaperParams.grid_pitch_px
+  worldCols:   WorldCell;
+  worldRows:   WorldCell;
+  paddedRows:  number;      // bitpacked buffer layout, not a coordinate space
+  wordsPerRow: number;      // bitpacked buffer layout, not a coordinate space
+  gridPitch:   DevicePx;    // float cell pitch; matches PaperParams.grid_pitch_px
 }
 
 export type WorkerInMsg =

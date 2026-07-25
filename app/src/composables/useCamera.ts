@@ -1,6 +1,7 @@
 import { ref, computed, watch, type ComputedRef, type Ref } from 'vue';
 import type { Camera } from '../types/space';
 import { effectiveDpr } from '../utils/devicePixelRatio';
+import { devicePx, type DevicePx } from '../utils/units';
 import { findWaypoint, homeWaypoint, type WaypointId } from '../space/waypoints';
 import {
   responsiveSpacing,
@@ -167,8 +168,8 @@ const cameraStyle = computed(() => ({
 // Grid + click-mapping offset. Vertical includes the captured island's scroll
 // so the grid pans with native scrolling (the plane transform above does not —
 // the panel frame stays pinned while its content scrolls inside it).
-const worldOffsetDevicePx = computed(() =>
-  cameraToDeviceOffset(
+const worldOffsetDevicePx = computed(() => {
+  const off = cameraToDeviceOffset(
     {
       x: cameraRef.value.x,
       y: cameraRef.value.y + captureScrollRef.value,
@@ -176,8 +177,9 @@ const worldOffsetDevicePx = computed(() =>
     },
     effectiveDpr(),
     GRID_FOLLOW_RATE,
-  ),
-);
+  );
+  return { x: devicePx(off.x), y: devicePx(off.y) };
+});
 
 export interface CameraController {
   camera: Readonly<Ref<Camera>>;
@@ -185,7 +187,7 @@ export interface CameraController {
   viewport: Readonly<Ref<Viewport>>;
   spacing: ComputedRef<Spacing>;
   cameraStyle: ComputedRef<{ transform: string }>;
-  worldOffsetDevicePx: ComputedRef<{ x: number; y: number }>;
+  worldOffsetDevicePx: ComputedRef<{ x: DevicePx; y: DevicePx }>;
   // Function-property syntax (not methods): this-less, safe to destructure.
   panTo: (x: number, y: number, opts?: { zoom?: number | undefined; snap?: boolean | undefined }) => void;
   panToWaypoint: (id: WaypointId, opts?: { snap?: boolean }) => void;

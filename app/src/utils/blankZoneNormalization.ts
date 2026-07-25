@@ -1,5 +1,6 @@
-import type { BlankMode, BlankZone, EdgeStyle, ZoneEdgeBehavior } from '../types/blankZones';
-import { MAX_BLANK_ZONES } from '../types/blankZones';
+import type { BlankMode, BlankZone, EdgeStyle, ZoneEdgeBehavior, ZoneId } from '../types/blankZones';
+import { asZoneId, MAX_BLANK_ZONES } from '../types/blankZones';
+import { worldCell } from './units';
 import { normalizeArray } from './normalizeArray';
 
 const VALID_MODES = new Set<BlankMode>(['minor', 'major', 'both']);
@@ -16,11 +17,11 @@ function asInteger(value: unknown): number | null {
   return Math.trunc(value);
 }
 
-function fallbackZoneId(): string {
+function fallbackZoneId(): ZoneId {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
+    return asZoneId(crypto.randomUUID());
   }
-  return `zone-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return asZoneId(`zone-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
 }
 
 function normalizeMode(value: unknown): BlankMode {
@@ -88,10 +89,10 @@ export function normalizeZone(zone: unknown, now = Date.now()): BlankZone | null
 
   return {
     id: typeof source.id === 'string' && source.id.length > 0 ? source.id : fallbackZoneId(),
-    x1: normX1,
-    y1: normY1,
-    x2: normX2,
-    y2: normY2,
+    x1: worldCell(normX1),
+    y1: worldCell(normY1),
+    x2: worldCell(normX2),
+    y2: worldCell(normY2),
     mode: normalizeMode(source.mode),
     edge: normalizeEdge(source.edge),
     enabled: normalizeEnabled(source.enabled),

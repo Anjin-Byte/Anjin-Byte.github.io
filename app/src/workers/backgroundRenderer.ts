@@ -10,6 +10,7 @@ import type { WorkerInMsg, WorkerOutMsg, GridInfo } from './rendererProtocol';
 import type { BlankZone } from '../types/blankZones';
 import type { ThemePalette } from '../types/theme';
 import { LIGHT_THEME, serializeTheme } from '../types/theme';
+import { devicePx, worldCell } from '../utils/units';
 import { BlankZoneState } from './BlankZoneState';
 import { makeStaticRenderer } from './staticRenderer';
 import { shouldRenderFrame } from './frameGate';
@@ -177,7 +178,7 @@ function setZonesState(next: unknown): void {
 // Grid info for backends with no addressable cell grid (static fallback, and
 // the WebGL2 renderer until its sim lands). gridPitch 0 makes the main
 // thread's coordinate snapshot null, so click-to-toggle cleanly no-ops.
-const ZERO_GRID_INFO: GridInfo = { worldCols: 0, worldRows: 0, paddedRows: 0, wordsPerRow: 0, gridPitch: 0 };
+const ZERO_GRID_INFO: GridInfo = { worldCols: worldCell(0), worldRows: worldCell(0), paddedRows: 0, wordsPerRow: 0, gridPitch: devicePx(0) };
 
 /**
  * Probe WebGL2 availability WITHOUT touching the presentation canvas — a
@@ -232,11 +233,11 @@ async function initWebgl2Renderer(): Promise<boolean> {
       type: 'ready',
       backend: 'webgl2',
       gridInfo: {
-        worldCols: gl.world_cols(),
-        worldRows: gl.world_rows(),
+        worldCols: worldCell(gl.world_cols()),
+        worldRows: worldCell(gl.world_rows()),
         paddedRows: 0,
         wordsPerRow: 0,
-        gridPitch: gl.grid_pitch(),
+        gridPitch: devicePx(gl.grid_pitch()),
       },
     });
     return true;
@@ -360,11 +361,11 @@ ws.onmessage = async (e: MessageEvent<unknown>) => {
             }
           };
           const getGridInfo = (): GridInfo => ({
-            worldCols:   gpu.world_cols(),
-            worldRows:   gpu.world_rows(),
+            worldCols:   worldCell(gpu.world_cols()),
+            worldRows:   worldCell(gpu.world_rows()),
             paddedRows:  gpu.padded_rows(),
             wordsPerRow: gpu.words_per_row(),
-            gridPitch:   gpu.grid_pitch(),
+            gridPitch:   devicePx(gpu.grid_pitch()),
           });
 
           // Track if we've logged the timestamp-query availability hint

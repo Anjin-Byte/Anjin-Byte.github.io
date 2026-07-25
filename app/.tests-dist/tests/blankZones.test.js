@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const blankZones_1 = require("../types/blankZones");
+const units_1 = require("../utils/units");
 const blankZoneNormalization_1 = require("../utils/blankZoneNormalization");
 const blankZoneStorage_1 = require("../utils/blankZoneStorage");
 const useBlankZones_1 = require("../composables/useBlankZones");
@@ -43,7 +44,7 @@ function assertEq(actual, expected, message) {
 function testNormalizeZone() {
     const now = 1000;
     const zone = (0, blankZoneNormalization_1.normalizeZone)({
-        id: 'z-1',
+        id: (0, blankZones_1.asZoneId)('z-1'),
         x1: 10,
         y1: 7,
         x2: 2,
@@ -85,11 +86,11 @@ function testNormalizeZonesCap() {
 function testStorageRoundTrip() {
     fakeStorage.clear();
     const zones = [{
-            id: 'z-storage',
-            x1: 0,
-            y1: 0,
-            x2: 1,
-            y2: 1,
+            id: (0, blankZones_1.asZoneId)('z-storage'),
+            x1: (0, units_1.worldCell)(0),
+            y1: (0, units_1.worldCell)(0),
+            x2: (0, units_1.worldCell)(1),
+            y2: (0, units_1.worldCell)(1),
             mode: 'both',
             edge: { style: 'none', widthCells: 1, opacity: 1 },
             enabled: true,
@@ -113,11 +114,11 @@ function testUseBlankZonesCallbacks() {
         onClearZones: () => events.push('clear'),
     });
     const zone = {
-        id: 'z-store',
-        x1: 1,
-        y1: 2,
-        x2: 3,
-        y2: 4,
+        id: (0, blankZones_1.asZoneId)('z-store'),
+        x1: (0, units_1.worldCell)(1),
+        y1: (0, units_1.worldCell)(2),
+        x2: (0, units_1.worldCell)(3),
+        y2: (0, units_1.worldCell)(4),
         mode: 'minor',
         edge: { style: 'bold-major', widthCells: 2, opacity: 0.8 },
         enabled: true,
