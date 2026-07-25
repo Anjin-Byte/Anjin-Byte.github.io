@@ -9,8 +9,7 @@ defineProps<{
 }>();
 
 defineEmits<{
-  (e: 'add-zone', zone: BlankZone): void;
-  (e: 'update-zone', zone: BlankZone): void;
+  (e: 'add-zone' | 'update-zone', zone: BlankZone): void;
   (e: 'remove-zone', id: string): void;
   (e: 'clear-zones'): void;
   (e: 'tool-change', payload: { enabled: boolean; snapMajor: boolean }): void;

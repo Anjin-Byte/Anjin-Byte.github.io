@@ -6,14 +6,15 @@ import type { ThemePalette } from '../types/theme';
 const log = createLogger('WorkerBridge');
 
 type OutMsgType = WorkerOutMsg['type'];
-type HandlerFn = (data: any) => void;
+type HandlerFn = (data: unknown) => void;
 
 export interface WorkerBridge {
   gridInfo: Ref<GridInfo | null>;
-  post(msg: WorkerInMsg, transfer?: Transferable[]): void;
-  on<T extends OutMsgType>(type: T, handler: (data: Extract<WorkerOutMsg, { type: T }>) => void): () => void;
-  init(canvas: OffscreenCanvas, theme: ThemePalette, forceBackend?: ForcedBackend): void;
-  terminate(): void;
+  // Function-property syntax (not methods): this-less, safe to detach/pass.
+  post: (msg: WorkerInMsg, transfer?: Transferable[]) => void;
+  on: <T extends OutMsgType>(type: T, handler: (data: Extract<WorkerOutMsg, { type: T }>) => void) => () => void;
+  init: (canvas: OffscreenCanvas, theme: ThemePalette, forceBackend?: ForcedBackend) => void;
+  terminate: () => void;
 }
 
 export function useWorkerBridge(): WorkerBridge {
@@ -35,8 +36,9 @@ export function useWorkerBridge(): WorkerBridge {
   }
 
   function on<T extends OutMsgType>(type: T, handler: (data: Extract<WorkerOutMsg, { type: T }>) => void): () => void {
-    if (!handlers.has(type)) handlers.set(type, new Set());
-    handlers.get(type)!.add(handler as HandlerFn);
+    let set = handlers.get(type);
+    if (!set) { set = new Set(); handlers.set(type, set); }
+    set.add(handler as HandlerFn);
     return () => handlers.get(type)?.delete(handler as HandlerFn);
   }
 

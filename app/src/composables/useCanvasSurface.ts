@@ -226,7 +226,7 @@ export function useCanvasSurface(post: (msg: WorkerInMsg) => void): CanvasSurfac
     applyCanvasBox(canvas, canvasW, canvasH);
     log.debug(
       'Canvas initialised', canvasW, 'x', canvasH,
-      'dpr', devicePixelRatio, '(effective', effectiveDpr() + ')',
+      'dpr', devicePixelRatio, `(effective ${effectiveDpr()})`,
       'effectiveZoom', effectiveZoomActive,
     );
 

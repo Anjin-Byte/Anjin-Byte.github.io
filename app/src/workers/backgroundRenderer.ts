@@ -20,31 +20,33 @@ const perf: PerfSampler | null = PERF_ENABLED ? new PerfSampler(log) : null;
 
 // ── Renderer interface ────────────────────────────────────────────────────────
 
+// Function-property syntax (not methods): this-less, so callers may detach them
+// (e.g. capturing an optional method into a const to satisfy the compiler).
 interface Renderer {
-  tick(): void;
-  renderOnly?(): void;
-  resize(w: number, h: number): void;
-  setCamera?(x: number, y: number): void;
-  setTransition?(transitionT: number): void;
+  tick: () => void;
+  renderOnly?: () => void;
+  resize: (w: number, h: number) => void;
+  setCamera?: (x: number, y: number) => void;
+  setTransition?: (transitionT: number) => void;
   /** First-paint cell-ink fade: ramps 0 → 1 to gradually reveal cells.
    *  Optional — CPU fallback doesn't implement it. */
-  setInitFade?(t: number): void;
-  toggleCell?(cx: number, cy: number): void;
-  setZones?(zones: BlankZone[]): void;
-  setTheme?(theme: ThemePalette): void;
-  gridInfo?(): GridInfo;
+  setInitFade?: (t: number) => void;
+  toggleCell?: (cx: number, cy: number) => void;
+  setZones?: (zones: BlankZone[]) => void;
+  setTheme?: (theme: ThemePalette) => void;
+  gridInfo?: () => GridInfo;
   /** DEV-only: pull most recent per-pass GPU durations.  `null` when the
    *  renderer doesn't support timestamp queries (CPU fallback, or
    *  WebGPU adapter without `TIMESTAMP_QUERY` granted). */
-  pullGpuPassDurations?(): {
+  pullGpuPassDurations?: () => {
     computeTickMs: number | null;
     xorEditMs:     number | null;
     orEditMs:      number | null;
     renderPassMs:  number | null;
   } | null;
   /** DEV-only: CPU-reseed vs GPU-present split (ms) of the last tick_and_render. */
-  pullTickBreakdown?(): { reseedMs: number; presentMs: number } | null;
-  free(): void;
+  pullTickBreakdown?: () => { reseedMs: number; presentMs: number } | null;
+  free: () => void;
 }
 
 let renderer: Renderer | null = null;
@@ -483,6 +485,10 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
 
     case 'frame': {
       if (!renderer) break;
+      // Narrowed non-null renderer, captured so the perf-timing closures below
+      // don't re-widen it (control-flow narrowing doesn't hold across closures
+      // on a reassignable `let`).
+      const r = renderer;
       // Apply the frame-locked camera offset before rendering, so the grid pans
       // in sync with this exact render. Also cache it so resize re-applies it.
       pendingCameraX = e.data.cameraX;
@@ -523,8 +529,8 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
       switch (action) {
         case 'base_tick':
           renderer.setTransition?.(0);
-          if (perf) { perf.time('tick', () => renderer!.tick()); }
-          else { renderer.tick(); }
+          if (perf) { perf.time('tick', () => r.tick()); }
+          else { r.tick(); }
           // Post the CPU-reseed vs GPU-present split for this tick so the spike
           // can be attributed. Ticks are rare (~every 175 frames), so low volume.
           if (PERF_ENABLED) {
@@ -534,9 +540,10 @@ ws.onmessage = async (e: MessageEvent<WorkerInMsg>) => {
           break;
         case 'render_only':
           renderer.setTransition?.(easeTransition((frameCount % TICK_EVERY) / TICK_EVERY));
-          if (renderer.renderOnly) {
-            if (perf) { perf.time('render', () => renderer!.renderOnly!()); }
-            else { renderer.renderOnly(); }
+          if (r.renderOnly) {
+            const renderOnly = r.renderOnly;
+            if (perf) { perf.time('render', () => renderOnly()); }
+            else { renderOnly(); }
           }
           break;
       }

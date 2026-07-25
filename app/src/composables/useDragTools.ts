@@ -10,6 +10,10 @@ export interface DragToolHandlers {
   /** 'paint' expands bounding box continuously; 'rect' uses anchor+current corner. */
   dragMode?: 'rect' | 'paint';
   /** Called on pointer up. Return false to suppress clearing drag state (e.g., for text input). */
+  // `boolean | void` is intentional: a handler may return `false` to suppress
+  // clearing, OR be a plain void-returning function. `void` (not `undefined`) is
+  // required so void-returning implementations stay assignable.
+  // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
   onCommit(rect: BlankZoneRect, snap: CoordSnapshot | null): boolean | void;
   /** Called when the tool is disabled while a drag is active. */
   onCancel?(): void;

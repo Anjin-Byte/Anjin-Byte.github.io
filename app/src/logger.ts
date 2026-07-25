@@ -6,7 +6,7 @@
 
 const IS_DEV: boolean = import.meta.env.DEV;
 
-const noop = (): void => {};
+const noop = (): void => { /* intentional no-op — prod-stripped debug/info */ };
 
 export interface Logger {
   debug(...args: unknown[]): void;

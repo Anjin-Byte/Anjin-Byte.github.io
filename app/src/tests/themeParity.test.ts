@@ -9,7 +9,7 @@ import { LIGHT_THEME, DARK_THEME, lerpOkLab, oklabCss } from '../types/theme';
 // nicely; this test makes drift a build failure. If it fails after a palette
 // change, update the SURFACE_*/MINOR_*/MAJOR_* constants in index.html.
 
-function assert(cond: unknown, message: string): void {
+function assert(cond: unknown, message: string): asserts cond {
   if (!cond) throw new Error(message);
 }
 
@@ -17,8 +17,8 @@ function expectConstant(html: string, name: string, expected: string): void {
   const m = new RegExp(`${name}\\s*=\\s*'([^']+)'`).exec(html);
   assert(m, `index.html: constant ${name} not found`);
   assert(
-    m![1] === expected,
-    `index.html ${name} = '${m![1]}' but theme.ts derives '${expected}' — update index.html`,
+    m[1] === expected,
+    `index.html ${name} = '${m[1]}' but theme.ts derives '${expected}' — update index.html`,
   );
 }
 

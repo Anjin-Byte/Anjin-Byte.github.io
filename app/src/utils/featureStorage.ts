@@ -6,10 +6,12 @@ export interface FeatureStorageConfig<T> {
   migrate?: (raw: Record<string, unknown>) => Record<string, unknown>;
 }
 
+// Function-property syntax (not methods): these are plain, this-less functions,
+// so consumers may destructure / detach them freely (no unbound-method hazard).
 export interface FeatureStorage<T> {
-  load(): T[];
-  save(items: T[]): void;
-  clear(): void;
+  load: () => T[];
+  save: (items: T[]) => void;
+  clear: () => void;
 }
 
 function storageAvailable(): boolean {

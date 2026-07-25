@@ -20,12 +20,13 @@ export interface FeatureComposableConfig<T extends HasId> {
 
 export interface FeatureComposable<T extends HasId> {
   items: Ref<T[]>;
-  setItems(items: T[]): void;
-  addItem(item: T): void;
-  updateItem(item: T): void;
-  removeItem(id: string): void;
-  clearItems(): void;
-  syncFromWorker(items: T[]): void;
+  // Function-property syntax (not methods): this-less, safe to destructure.
+  setItems: (items: T[]) => void;
+  addItem: (item: T) => void;
+  updateItem: (item: T) => void;
+  removeItem: (id: string) => void;
+  clearItems: () => void;
+  syncFromWorker: (items: T[]) => void;
 }
 
 export function createFeatureComposable<T extends HasId>(

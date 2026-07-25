@@ -186,13 +186,14 @@ export interface CameraController {
   spacing: ComputedRef<Spacing>;
   cameraStyle: ComputedRef<{ transform: string }>;
   worldOffsetDevicePx: ComputedRef<{ x: number; y: number }>;
-  panTo(x: number, y: number, opts?: { zoom?: number | undefined; snap?: boolean | undefined }): void;
-  panToWaypoint(id: WaypointId, opts?: { snap?: boolean }): void;
-  panToNode(node: { gx: number; gy: number; zoom?: number | undefined }, opts?: { snap?: boolean }): void;
-  snapTo(x: number, y: number, zoom?: number): void;
-  releaseAnchor(): void;
-  setViewport(w: number, h: number): void;
-  setCaptureScroll(px: number): void;
+  // Function-property syntax (not methods): this-less, safe to destructure.
+  panTo: (x: number, y: number, opts?: { zoom?: number | undefined; snap?: boolean | undefined }) => void;
+  panToWaypoint: (id: WaypointId, opts?: { snap?: boolean }) => void;
+  panToNode: (node: { gx: number; gy: number; zoom?: number | undefined }, opts?: { snap?: boolean }) => void;
+  snapTo: (x: number, y: number, zoom?: number) => void;
+  releaseAnchor: () => void;
+  setViewport: (w: number, h: number) => void;
+  setCaptureScroll: (px: number) => void;
 }
 
 export function useCamera(): CameraController {

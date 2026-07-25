@@ -14,7 +14,7 @@ class FakeStorage {
         });
     }
     getItem(key) {
-        return this.map.has(key) ? this.map.get(key) : null;
+        return this.map.get(key) ?? null;
     }
     setItem(key, value) {
         this.map.set(key, value);

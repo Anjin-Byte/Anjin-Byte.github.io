@@ -56,27 +56,28 @@ export default defineConfigWithVueTs(
         { ignoreArrowShorthand: true },
       ],
 
-      // Incremental adoption (interface-audit A): the safety rules above are
-      // ERRORS and enforced now. These strict/stylistic-type-checked rules have
-      // legacy violations from a 9k-line codebase that was never linted — WARN
-      // now so `pnpm lint` is green on errors and can gate CI, then burn the
-      // backlog down and promote each to 'error'. Counts at adoption (2026-07):
       // `_` is the codebase's intentional throwaway (unused params/vars/catches);
-      // ignore it (correct regardless of severity), warn on genuine unused.
-      '@typescript-eslint/no-unused-vars': ['warn', {
+      // ignore it, error on genuine unused.
+      '@typescript-eslint/no-unused-vars': ['error', {
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_',
         caughtErrorsIgnorePattern: '^_',
       }],
-      '@typescript-eslint/no-unnecessary-condition': 'warn',  // ~14 (defensive boundary code trips this)
-      '@typescript-eslint/no-empty-function': 'warn',         // ~9 (intentional no-op adapter stubs)
-      '@typescript-eslint/no-non-null-assertion': 'warn',     // ~7
-      '@typescript-eslint/unbound-method': 'warn',            // ~12 (functional-style object methods; no `this`)
-      '@typescript-eslint/unified-signatures': 'warn',        // 2
-      '@typescript-eslint/restrict-plus-operands': 'warn',    // 2
-      '@typescript-eslint/prefer-nullish-coalescing': 'warn', // 1
-      '@typescript-eslint/no-invalid-void-type': 'warn',      // 1
-      '@typescript-eslint/no-explicit-any': 'warn',           // 1
+
+      // Incremental adoption (interface-audit A): burning down the legacy-violation
+      // backlog rule-by-rule and promoting each to 'error' as it clears. Remaining
+      // (2026-07) — still WARN until reviewed and fixed:
+      // Kept at WARN, not error, deliberately. Reviewed 2026-07: all ~15
+      // instances are legitimate load-bearing code that this rule mislabels,
+      // NOT removable dead code — (1) browser-API guards where the lib type
+      // over-claims non-nullability (`navigator.gpu?.` absent off WebGPU,
+      // `devicePixelContentBoxSize?.` absent on Safari), (2) SSR / old-browser
+      // guards (`window.matchMedia`, `document?.`, `localStorage?.`), (3) runtime
+      // validation of untrusted persisted data (GridZoneTab `safeZones`), and
+      // (4) the `GESTURE_NAV_ENABLED` feature flag. Removing any would introduce
+      // real crashes; promoting to error would pressure exactly that. WARN so a
+      // genuinely-new unnecessary condition still surfaces for review.
+      '@typescript-eslint/no-unnecessary-condition': 'warn',
     },
   },
 );
