@@ -1,6 +1,6 @@
 let P, D;
 let __tla = (async ()=>{
-    var N = "/assets/game_of_life_gpu_bg-DLtjeguq.wasm", $ = async (e = {}, _)=>{
+    var N = "/assets/game_of_life_gpu_bg-BJWCiMlv.wasm", $ = async (e = {}, _)=>{
         let t;
         if (_.startsWith("data:")) {
             const n = _.replace(/^data:.*?base64,/, "");
@@ -26,11 +26,11 @@ let __tla = (async ()=>{
         static __wrap(_) {
             _ = _ >>> 0;
             const t = Object.create(P.prototype);
-            return t.__wbg_ptr = _, z.register(t, t.__wbg_ptr, t), t;
+            return t.__wbg_ptr = _, q.register(t, t.__wbg_ptr, t), t;
         }
         __destroy_into_raw() {
             const _ = this.__wbg_ptr;
-            return this.__wbg_ptr = 0, z.unregister(this), _;
+            return this.__wbg_ptr = 0, q.unregister(this), _;
         }
         free() {
             const _ = this.__destroy_into_raw();
@@ -338,10 +338,10 @@ let __tla = (async ()=>{
     function Ue(e, _, t, n, r, a, c, o, i, d, p) {
         e.blitFramebuffer(_, t, n, r, a, c, o, i, d >>> 0, p >>> 0);
     }
-    function qe(e, _, t, n) {
+    function ze(e, _, t, n) {
         e.bufferData(_ >>> 0, t, n >>> 0);
     }
-    function ze(e, _, t, n) {
+    function qe(e, _, t, n) {
         e.bufferData(_ >>> 0, t, n >>> 0);
     }
     function Je(e, _, t, n) {
@@ -511,10 +511,10 @@ let __tla = (async ()=>{
         const _ = e.createQuery();
         return u(_) ? 0 : g(_);
     }
-    function q_(e, _) {
+    function z_(e, _) {
         return e.createRenderBundleEncoder(_);
     }
-    function z_(e, _) {
+    function q_(e, _) {
         return e.createRenderPipeline(_);
     }
     function J_(e) {
@@ -683,10 +683,10 @@ let __tla = (async ()=>{
     function Ut(e, _, t, n) {
         e.drawArrays(_ >>> 0, t, n);
     }
-    function qt(e, _, t, n) {
+    function zt(e, _, t, n) {
         e.drawArrays(_ >>> 0, t, n);
     }
-    function zt(e, _) {
+    function qt(e, _) {
         e.drawBuffersWEBGL(_);
     }
     function Jt(e, _) {
@@ -870,12 +870,12 @@ let __tla = (async ()=>{
         const _ = e.getPreferredCanvasFormat();
         return ($f.indexOf(_) + 1 || 96) - 1;
     }
-    function qn(e, _, t) {
+    function zn(e, _, t) {
         const n = _.getProgramInfoLog(t);
         var r = u(n) ? 0 : y(n, b.__wbindgen_malloc, b.__wbindgen_realloc), a = x;
         w().setInt32(e + 4, a, !0), w().setInt32(e + 0, r, !0);
     }
-    function zn(e, _, t) {
+    function qn(e, _, t) {
         const n = _.getProgramInfoLog(t);
         var r = u(n) ? 0 : y(n, b.__wbindgen_malloc, b.__wbindgen_realloc), a = x;
         w().setInt32(e + 4, a, !0), w().setInt32(e + 0, r, !0);
@@ -1116,10 +1116,10 @@ let __tla = (async ()=>{
     function Ur(e) {
         return e.maxBindGroups;
     }
-    function qr(e) {
+    function zr(e) {
         return e.maxBindingsPerBindGroup;
     }
-    function zr(e) {
+    function qr(e) {
         return e.maxBufferSize;
     }
     function Jr(e) {
@@ -1299,10 +1299,10 @@ let __tla = (async ()=>{
     function Ua(e, _, t) {
         Uint8Array.prototype.set.call(U(e, _), t);
     }
-    function qa(e, _) {
+    function za(e, _) {
         e.pushErrorScope(Nf[_]);
     }
-    function za(e, _) {
+    function qa(e, _) {
         return e.push(_);
     }
     function Ja() {
@@ -1475,11 +1475,11 @@ let __tla = (async ()=>{
     function Ub(e) {
         return e.size;
     }
-    function qb(e, _) {
+    function zb(e, _) {
         const t = _.stack, n = y(t, b.__wbindgen_malloc, b.__wbindgen_realloc), r = x;
         w().setInt32(e + 4, r, !0), w().setInt32(e + 0, n, !0);
     }
-    function zb() {
+    function qb() {
         const e = typeof global > "u" ? null : global;
         return u(e) ? 0 : g(e);
     }
@@ -1671,10 +1671,10 @@ let __tla = (async ()=>{
     function Uc(e, _, t, n, r, a) {
         e.uniform4f(_, t, n, r, a);
     }
-    function qc(e, _, t, n) {
+    function zc(e, _, t, n) {
         e.uniform4fv(_, l(t, n));
     }
-    function zc(e, _, t, n) {
+    function qc(e, _, t, n) {
         e.uniform4fv(_, l(t, n));
     }
     function Jc(e, _, t, n) {
@@ -1789,13 +1789,13 @@ let __tla = (async ()=>{
         e.writeTexture(_, t, n, r);
     }
     function Df(e, _) {
-        return q(e, _, b.wasm_bindgen_a358d65700bcadbc___closure__destroy___dyn_core_9b3796e30d99ddb7___ops__function__FnMut__wasm_bindgen_a358d65700bcadbc___JsValue____Output___core_9b3796e30d99ddb7___result__Result_____wasm_bindgen_a358d65700bcadbc___JsError___, zf);
+        return z(e, _, b.wasm_bindgen_a358d65700bcadbc___closure__destroy___dyn_core_9b3796e30d99ddb7___ops__function__FnMut__wasm_bindgen_a358d65700bcadbc___JsValue____Output___core_9b3796e30d99ddb7___result__Result_____wasm_bindgen_a358d65700bcadbc___JsError___, qf);
     }
     function Tf(e, _) {
-        return q(e, _, b.wasm_bindgen_a358d65700bcadbc___closure__destroy___dyn_core_9b3796e30d99ddb7___ops__function__FnMut__wasm_bindgen_a358d65700bcadbc___JsValue____Output_______, Uf);
+        return z(e, _, b.wasm_bindgen_a358d65700bcadbc___closure__destroy___dyn_core_9b3796e30d99ddb7___ops__function__FnMut__wasm_bindgen_a358d65700bcadbc___JsValue____Output_______, Uf);
     }
     function kf(e, _) {
-        return q(e, _, b.wasm_bindgen_a358d65700bcadbc___closure__destroy___dyn_core_9b3796e30d99ddb7___ops__function__FnMut__wasm_bindgen_a358d65700bcadbc___JsValue____Output_______, qf);
+        return z(e, _, b.wasm_bindgen_a358d65700bcadbc___closure__destroy___dyn_core_9b3796e30d99ddb7___ops__function__FnMut__wasm_bindgen_a358d65700bcadbc___JsValue____Output_______, zf);
     }
     function Ff(e) {
         return e;
@@ -1831,10 +1831,10 @@ let __tla = (async ()=>{
     function Uf(e, _, t) {
         b.wasm_bindgen_a358d65700bcadbc___convert__closures_____invoke___wasm_bindgen_a358d65700bcadbc___JsValue______true_(e, _, t);
     }
-    function qf(e, _, t) {
+    function zf(e, _, t) {
         b.wasm_bindgen_a358d65700bcadbc___convert__closures_____invoke___wasm_bindgen_a358d65700bcadbc___JsValue______true__2(e, _, t);
     }
-    function zf(e, _, t) {
+    function qf(e, _, t) {
         const n = b.wasm_bindgen_a358d65700bcadbc___convert__closures_____invoke___wasm_bindgen_a358d65700bcadbc___JsValue__core_9b3796e30d99ddb7___result__Result_____wasm_bindgen_a358d65700bcadbc___JsError___true_(e, _, t);
         if (n[1]) throw R(n[0]);
     }
@@ -1951,7 +1951,7 @@ let __tla = (async ()=>{
         "astc-12x10-unorm-srgb",
         "astc-12x12-unorm",
         "astc-12x12-unorm-srgb"
-    ], z = typeof FinalizationRegistry > "u" ? {
+    ], q = typeof FinalizationRegistry > "u" ? {
         register: ()=>{},
         unregister: ()=>{}
     } : new FinalizationRegistry((e)=>b.__wbg_gpugameoflife_free(e >>> 0, 1)), J = typeof FinalizationRegistry > "u" ? {
@@ -2064,7 +2064,7 @@ ${e.stack}` : n;
     function u(e) {
         return e == null;
     }
-    function q(e, _, t, n) {
+    function z(e, _, t, n) {
         const r = {
             a: e,
             b: _,
@@ -2149,7 +2149,7 @@ ${e.stack}` : n;
             __wbg_get_with_ref_key_6412cf3094599694: cr,
             __wbg_String_8564e559799eccda: X,
             __wbg_new_227d7c05414eb861: va,
-            __wbg_stack_3b0d974bbf31e44f: qb,
+            __wbg_stack_3b0d974bbf31e44f: zb,
             __wbg_error_a6fa202b58aa1cd3: on,
             __wbg_then_9e335f6dd892bc11: Sc,
             __wbg_submit_60f2469dc00130cc: _c,
@@ -2190,7 +2190,7 @@ ${e.stack}` : n;
             __wbg_drawIndirect_73df189881970a43: Yt,
             __wbg_setIndexBuffer_4219294fa3e2d59b: pb,
             __wbg_writeBuffer_b5e6e8f3f93629bc: Af,
-            __wbg_pushErrorScope_72e651b0f8f64c0e: qa,
+            __wbg_pushErrorScope_72e651b0f8f64c0e: za,
             __wbg_maxComputeWorkgroupsPerDimension_8cb3348843013a6b: Yr,
             __wbg_setPipeline_723820e1c5cc61e7: vb,
             __wbg_setIndexBuffer_5eb14c0c19ab80c2: xb,
@@ -2221,7 +2221,7 @@ ${e.stack}` : n;
             __wbg_executeBundles_2905636f81aabf99: un,
             __wbg_length_87e0297027dd7802: Fr,
             __wbg_queue_6b07ccdd49a6ba90: $a,
-            __wbg_maxBindingsPerBindGroup_512a63ba20ee714c: qr,
+            __wbg_maxBindingsPerBindGroup_512a63ba20ee714c: zr,
             __wbg_dispatchWorkgroupsIndirect_64be0198a6df9be7: Lt,
             __wbg_lost_2c34651e3317be8b: Or,
             __wbg_clearBuffer_b08b15b7ee3c9d57: Ye,
@@ -2262,17 +2262,17 @@ ${e.stack}` : n;
             __wbg_mapAsync_8d0ffc031e86e9a0: Wr,
             __wbg_createPipelineLayout_1a8ea1f550cfa5e7: R_,
             __wbg_copyBufferToBuffer_d52339f5d639af9b: y_,
-            __wbg_maxBufferSize_8cef5a2e6fae09fa: zr,
+            __wbg_maxBufferSize_8cef5a2e6fae09fa: qr,
             __wbg_drawIndexed_55f6bf3bda0212ad: Ht,
             __wbg_unmap_4aa38f8c5283cc1d: bf,
             __wbg_createQuerySet_6050df2adcb1f167: W_,
             __wbg_maxVertexAttributes_9c129ee44a6fa783: da,
-            __wbg_createRenderBundleEncoder_a98ecb1771e99ab3: q_,
+            __wbg_createRenderBundleEncoder_a98ecb1771e99ab3: z_,
             __wbg_copyBufferToTexture_48aa78a412b2a467: h_,
             __wbg_maxVertexBufferArrayStride_1d0f177a1fdcdf3c: ga,
             __wbg_draw_57caf8f0bc1ea050: Kt,
             __wbg_drawIndexedIndirect_fcc6ecbd3d698094: $t,
-            __wbg_createRenderPipeline_921034ccba195ffe: z_,
+            __wbg_createRenderPipeline_921034ccba195ffe: q_,
             __wbg_maxInterStageShaderComponents_d6dbbdabbd40588b: ea,
             __wbg_copyTextureToBuffer_5aef45a98e34a97e: A_,
             __wbg_drawIndirect_a2f7c719957f8ec9: Zt,
@@ -2300,13 +2300,13 @@ ${e.stack}` : n;
             __wbg_queueMicrotask_0c399741342fb10f: Qa,
             __wbg_queueMicrotask_a082d78ce798393e: Na,
             __wbg_includes_9f81335525be01f9: sr,
-            __wbg_push_e87b0e732085a946: za,
+            __wbg_push_e87b0e732085a946: qa,
             __wbg_instanceof_Window_23e677d2c6843922: Ir,
             __wbg_uniform2iv_892b6d31137ad198: Mc,
             __wbg_uniform3fv_85a9a17c9635941b: Lc,
             __wbg_clearBufferuiv_d75635e80261ea93: __,
             __wbg_uniform3iv_4c372010ac6def3f: Gc,
-            __wbg_uniform4fv_c416900acf65eca9: zc,
+            __wbg_uniform4fv_c416900acf65eca9: qc,
             __wbg_clear_5a0606f7c62ad39a: c_,
             __wbg_compressedTexSubImage2D_aab12b65159c282e: s_,
             __wbg_clearDepth_3ff5ef5e5fad4016: n_,
@@ -2390,7 +2390,7 @@ ${e.stack}` : n;
             __wbg_fenceSync_460953d9ad5fd31a: sn,
             __wbg_getParameter_e634fa73b5e25287: Wn,
             __wbg_framebufferTextureLayer_01d5b9516636ccae: vn,
-            __wbg_getProgramInfoLog_e03efa51473d657e: zn,
+            __wbg_getProgramInfoLog_e03efa51473d657e: qn,
             __wbg_getProgramParameter_7d3bd54ec02de007: jn,
             __wbg_getShaderInfoLog_40c6a4ae67d82dde: $n,
             __wbg_getBufferSubData_cbabbb87d4c5c57d: Tn,
@@ -2428,7 +2428,7 @@ ${e.stack}` : n;
             __wbg_querySelector_46ff1b81410aebea: ja,
             __wbg_querySelectorAll_ccbf0696a1c6fed8: Ja,
             __wbg_uniform2uiv_6d170469a702f23e: Ec,
-            __wbg_uniform4fv_a4cdb4bd66867df5: qc,
+            __wbg_uniform4fv_a4cdb4bd66867df5: zc,
             __wbg_uniform4iv_d654af0e6b7bdb1a: jc,
             __wbg_uniform3fv_cdf7c84f9119f13b: Cc,
             __wbg_uniform3iv_38e74d2ae9dfbfb8: Rc,
@@ -2475,7 +2475,7 @@ ${e.stack}` : n;
             __wbg_deleteBuffer_b053c58b4ed1ab1c: bt,
             __wbg_getExtension_0b8543b0c6b3068d: Cn,
             __wbg_getParameter_b1431cfde390c2fc: On,
-            __wbg_getProgramInfoLog_50443ddea7475f57: qn,
+            __wbg_getProgramInfoLog_50443ddea7475f57: zn,
             __wbg_getProgramParameter_46e2d49878b56edd: Jn,
             __wbg_getShaderInfoLog_22f9e8c90a52f38d: Nn,
             __wbg_getShaderParameter_46f64f7ca5d534db: Hn,
@@ -2483,7 +2483,7 @@ ${e.stack}` : n;
             __wbg_getUniformLocation_5eb08673afa04eee: _r,
             __wbg_height_ee9ea840e5499878: dr,
             __wbg_framebufferTextureMultiviewOVR_336ea10e261ec5f6: Bn,
-            __wbg_drawBuffersWEBGL_5f9efe378355889a: zt,
+            __wbg_drawBuffersWEBGL_5f9efe378355889a: qt,
             __wbg_drawArraysInstancedANGLE_20ee4b8f67503b54: Ot,
             __wbg_bindVertexArrayOES_082b0791772327fa: Te,
             __wbg_getSupportedProfiles_e089393bebafd3b0: Zn,
@@ -2497,7 +2497,7 @@ ${e.stack}` : n;
             __wbg_depthRange_b42d493a2b9258aa: At,
             __wbg_disable_62ec2189c50a0db7: Vt,
             __wbg_disableVertexAttribArray_124a165b099b763b: Ft,
-            __wbg_drawArrays_c20dedf441392005: qt,
+            __wbg_drawArrays_c20dedf441392005: zt,
             __wbg_enable_91dff7f43064bb54: rn,
             __wbg_enableVertexAttribArray_60dadea3a00e104a: _n,
             __wbg_framebufferRenderbuffer_7a2be23309166ad3: xn,
@@ -2547,11 +2547,11 @@ ${e.stack}` : n;
             __wbg_bufferSubData_3fcefd4648de39b5: Qe,
             __wbg_bindVertexArray_c307251f3ff61930: ke,
             __wbg_blitFramebuffer_c1a68feaca974c87: Ue,
-            __wbg_bufferData_730b629ba3f6824f: qe,
+            __wbg_bufferData_730b629ba3f6824f: ze,
             __wbg_width_4d6fc7fecd877217: vf,
             __wbg_set_width_c0fcaa2da53cd540: Gb,
             __wbg_height_6568c4427c3b889d: ur,
-            __wbg_bufferData_d20232e3d5dcdc62: ze,
+            __wbg_bufferData_d20232e3d5dcdc62: qe,
             __wbg_set_height_b6548a01bdcb689a: Lb,
             __wbg_getContext_f04bf8f22dcb2d53: En,
             __wbg_compressedTexSubImage2D_593058a6f5aca176: g_,
@@ -2583,7 +2583,7 @@ ${e.stack}` : n;
             __wbg_set_7eaa4f96924fd6b3: Mb,
             __wbg_static_accessor_GLOBAL_THIS_ad356e0db91c7913: Jb,
             __wbg_static_accessor_SELF_f207c857566db248: jb,
-            __wbg_static_accessor_GLOBAL_8adb955bd33fac2f: zb,
+            __wbg_static_accessor_GLOBAL_8adb955bd33fac2f: qb,
             __wbg_static_accessor_WINDOW_bb9f1ba69d61b386: Qb,
             __wbg_instanceof_ArrayBuffer_101e2bf31071a9f6: wr,
             __wbg_instanceof_Uint8Array_740438561a5b956d: vr,
@@ -2613,7 +2613,7 @@ ${e.stack}` : n;
             __wbindgen_cast_000000000000000b: Gf,
             __wbindgen_cast_000000000000000c: Of
         }
-    }, N), co = f.memory, fo = f.__wbg_gpugameoflife_free, oo = f.__wbg_webglgameoflife_free, io = f.gpugameoflife_flush_and_render, uo = f.gpugameoflife_grid_pitch, go = f.gpugameoflife_init_device_request_ms, so = f.gpugameoflife_init_panel_ms, wo = f.gpugameoflife_init_renderer_ms, lo = f.gpugameoflife_init_seeding_ms, mo = f.gpugameoflife_init_simulation_ms, po = f.gpugameoflife_last_compute_tick_ms, xo = f.gpugameoflife_last_or_edit_ms, yo = f.gpugameoflife_last_present_ms, ho = f.gpugameoflife_last_render_pass_ms, So = f.gpugameoflife_last_reseed_ms, vo = f.gpugameoflife_last_xor_edit_ms, Bo = f.gpugameoflife_new, Io = f.gpugameoflife_new_offscreen, Ao = f.gpugameoflife_padded_rows, Po = f.gpugameoflife_render_only, Do = f.gpugameoflife_resize, To = f.gpugameoflife_set_camera, ko = f.gpugameoflife_set_init_fade, Fo = f.gpugameoflife_set_scroll, Mo = f.gpugameoflife_set_theme, Vo = f.gpugameoflife_set_transition, Eo = f.gpugameoflife_set_zones, Lo = f.gpugameoflife_tick_and_render, Co = f.gpugameoflife_timestamp_query_supported, Ro = f.gpugameoflife_toggle_cell, Go = f.gpugameoflife_words_per_row, Oo = f.gpugameoflife_world_cols, Wo = f.gpugameoflife_world_rows, Uo = f.webglgameoflife_free, qo = f.webglgameoflife_new_offscreen, zo = f.webglgameoflife_render_only, Jo = f.webglgameoflife_resize, jo = f.webglgameoflife_set_camera, Qo = f.webglgameoflife_set_init_fade, No = f.webglgameoflife_set_theme, $o = f.webglgameoflife_set_transition, Ho = f.webglgameoflife_tick_and_render, Xo = f.webglgameoflife_toggle_cell, Yo = f.webglgameoflife_world_cols, Zo = f.webglgameoflife_grid_pitch, Ko = f.webglgameoflife_world_rows, ei = f.wgpu_render_bundle_draw, _i = f.wgpu_render_bundle_draw_indexed, ti = f.wgpu_render_bundle_set_pipeline, ni = f.wgpu_render_bundle_draw_indirect, ri = f.wgpu_render_bundle_set_bind_group, ai = f.wgpu_render_bundle_set_vertex_buffer, bi = f.wgpu_render_bundle_set_push_constants, ci = f.wgpu_render_bundle_draw_indexed_indirect, fi = f.wgpu_render_bundle_insert_debug_marker, oi = f.wgpu_render_bundle_pop_debug_group, ii = f.wgpu_render_bundle_set_index_buffer, ui = f.wgpu_render_bundle_push_debug_group, di = f.wasm_bindgen_a358d65700bcadbc___closure__destroy___dyn_core_9b3796e30d99ddb7___ops__function__FnMut__wasm_bindgen_a358d65700bcadbc___JsValue____Output___core_9b3796e30d99ddb7___result__Result_____wasm_bindgen_a358d65700bcadbc___JsError___, gi = f.wasm_bindgen_a358d65700bcadbc___closure__destroy___dyn_core_9b3796e30d99ddb7___ops__function__FnMut__wasm_bindgen_a358d65700bcadbc___JsValue____Output_______, si = f.wasm_bindgen_a358d65700bcadbc___convert__closures_____invoke___wasm_bindgen_a358d65700bcadbc___JsValue__core_9b3796e30d99ddb7___result__Result_____wasm_bindgen_a358d65700bcadbc___JsError___true_, wi = f.wasm_bindgen_a358d65700bcadbc___convert__closures_____invoke___js_sys_990bc7099cc48250___Function_fn_wasm_bindgen_a358d65700bcadbc___JsValue_____wasm_bindgen_a358d65700bcadbc___sys__Undefined___js_sys_990bc7099cc48250___Function_fn_wasm_bindgen_a358d65700bcadbc___JsValue_____wasm_bindgen_a358d65700bcadbc___sys__Undefined_______true_, li = f.wasm_bindgen_a358d65700bcadbc___convert__closures_____invoke___wasm_bindgen_a358d65700bcadbc___JsValue______true_, mi = f.wasm_bindgen_a358d65700bcadbc___convert__closures_____invoke___wasm_bindgen_a358d65700bcadbc___JsValue______true__2, pi = f.__wbindgen_malloc, xi = f.__wbindgen_realloc, yi = f.__wbindgen_exn_store, hi = f.__externref_table_alloc, Si = f.__wbindgen_externrefs, vi = f.__wbindgen_free, Bi = f.__externref_table_dealloc, Q = f.__wbindgen_start;
+    }, N), co = f.memory, fo = f.__wbg_gpugameoflife_free, oo = f.__wbg_webglgameoflife_free, io = f.gpugameoflife_flush_and_render, uo = f.gpugameoflife_grid_pitch, go = f.gpugameoflife_init_device_request_ms, so = f.gpugameoflife_init_panel_ms, wo = f.gpugameoflife_init_renderer_ms, lo = f.gpugameoflife_init_seeding_ms, mo = f.gpugameoflife_init_simulation_ms, po = f.gpugameoflife_last_compute_tick_ms, xo = f.gpugameoflife_last_or_edit_ms, yo = f.gpugameoflife_last_present_ms, ho = f.gpugameoflife_last_render_pass_ms, So = f.gpugameoflife_last_reseed_ms, vo = f.gpugameoflife_last_xor_edit_ms, Bo = f.gpugameoflife_new, Io = f.gpugameoflife_new_offscreen, Ao = f.gpugameoflife_padded_rows, Po = f.gpugameoflife_render_only, Do = f.gpugameoflife_resize, To = f.gpugameoflife_set_camera, ko = f.gpugameoflife_set_init_fade, Fo = f.gpugameoflife_set_scroll, Mo = f.gpugameoflife_set_theme, Vo = f.gpugameoflife_set_transition, Eo = f.gpugameoflife_set_zones, Lo = f.gpugameoflife_tick_and_render, Co = f.gpugameoflife_timestamp_query_supported, Ro = f.gpugameoflife_toggle_cell, Go = f.gpugameoflife_words_per_row, Oo = f.gpugameoflife_world_cols, Wo = f.gpugameoflife_world_rows, Uo = f.webglgameoflife_free, zo = f.webglgameoflife_new_offscreen, qo = f.webglgameoflife_render_only, Jo = f.webglgameoflife_resize, jo = f.webglgameoflife_set_camera, Qo = f.webglgameoflife_set_init_fade, No = f.webglgameoflife_set_theme, $o = f.webglgameoflife_set_transition, Ho = f.webglgameoflife_tick_and_render, Xo = f.webglgameoflife_toggle_cell, Yo = f.webglgameoflife_world_cols, Zo = f.webglgameoflife_grid_pitch, Ko = f.webglgameoflife_world_rows, ei = f.wgpu_render_bundle_draw, _i = f.wgpu_render_bundle_draw_indexed, ti = f.wgpu_render_bundle_set_pipeline, ni = f.wgpu_render_bundle_draw_indirect, ri = f.wgpu_render_bundle_set_bind_group, ai = f.wgpu_render_bundle_set_vertex_buffer, bi = f.wgpu_render_bundle_set_push_constants, ci = f.wgpu_render_bundle_draw_indexed_indirect, fi = f.wgpu_render_bundle_insert_debug_marker, oi = f.wgpu_render_bundle_pop_debug_group, ii = f.wgpu_render_bundle_set_index_buffer, ui = f.wgpu_render_bundle_push_debug_group, di = f.wasm_bindgen_a358d65700bcadbc___closure__destroy___dyn_core_9b3796e30d99ddb7___ops__function__FnMut__wasm_bindgen_a358d65700bcadbc___JsValue____Output___core_9b3796e30d99ddb7___result__Result_____wasm_bindgen_a358d65700bcadbc___JsError___, gi = f.wasm_bindgen_a358d65700bcadbc___closure__destroy___dyn_core_9b3796e30d99ddb7___ops__function__FnMut__wasm_bindgen_a358d65700bcadbc___JsValue____Output_______, si = f.wasm_bindgen_a358d65700bcadbc___convert__closures_____invoke___wasm_bindgen_a358d65700bcadbc___JsValue__core_9b3796e30d99ddb7___result__Result_____wasm_bindgen_a358d65700bcadbc___JsError___true_, wi = f.wasm_bindgen_a358d65700bcadbc___convert__closures_____invoke___js_sys_990bc7099cc48250___Function_fn_wasm_bindgen_a358d65700bcadbc___JsValue_____wasm_bindgen_a358d65700bcadbc___sys__Undefined___js_sys_990bc7099cc48250___Function_fn_wasm_bindgen_a358d65700bcadbc___JsValue_____wasm_bindgen_a358d65700bcadbc___sys__Undefined_______true_, li = f.wasm_bindgen_a358d65700bcadbc___convert__closures_____invoke___wasm_bindgen_a358d65700bcadbc___JsValue______true_, mi = f.wasm_bindgen_a358d65700bcadbc___convert__closures_____invoke___wasm_bindgen_a358d65700bcadbc___JsValue______true__2, pi = f.__wbindgen_malloc, xi = f.__wbindgen_realloc, yi = f.__wbindgen_exn_store, hi = f.__externref_table_alloc, Si = f.__wbindgen_externrefs, vi = f.__wbindgen_free, Bi = f.__externref_table_dealloc, Q = f.__wbindgen_start;
     var Ii = Object.freeze({
         __proto__: null,
         __externref_table_alloc: hi,
@@ -2665,8 +2665,8 @@ ${e.stack}` : n;
         wasm_bindgen_a358d65700bcadbc___convert__closures_____invoke___wasm_bindgen_a358d65700bcadbc___JsValue__core_9b3796e30d99ddb7___result__Result_____wasm_bindgen_a358d65700bcadbc___JsError___true_: si,
         webglgameoflife_free: Uo,
         webglgameoflife_grid_pitch: Zo,
-        webglgameoflife_new_offscreen: qo,
-        webglgameoflife_render_only: zo,
+        webglgameoflife_new_offscreen: zo,
+        webglgameoflife_render_only: qo,
         webglgameoflife_resize: Jo,
         webglgameoflife_set_camera: jo,
         webglgameoflife_set_init_fade: Qo,

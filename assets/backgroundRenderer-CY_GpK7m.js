@@ -411,7 +411,7 @@
     async function re() {
         if (!b) return !1;
         try {
-            const { WebglGameOfLife: e } = await import("./game_of_life_gpu-CfGf4grU.js").then(async (m)=>{
+            const { WebglGameOfLife: e } = await import("./game_of_life_gpu-CoVgH6Rx.js").then(async (m)=>{
                 await m.__tla;
                 return m;
             }), r = Math.floor(Math.random() * 4294967296), t = await e.new_offscreen(b, r);
@@ -464,7 +464,7 @@
                     }
                     const s = performance.now();
                     if (n) try {
-                        const { GpuGameOfLife: o } = await import("./game_of_life_gpu-CfGf4grU.js").then(async (m)=>{
+                        const { GpuGameOfLife: o } = await import("./game_of_life_gpu-CoVgH6Rx.js").then(async (m)=>{
                             await m.__tla;
                             return m;
                         }), c = performance.now();
