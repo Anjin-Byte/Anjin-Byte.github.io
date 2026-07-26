@@ -2,7 +2,21 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" href="/favicon.ico" />
+    <!--
+      Icons live in `public/` (Vite copies it to the dist root, so these
+      absolute paths resolve). Sources + how to regenerate: `app/brand/`.
+
+      No `favicon.ico`: this previously pointed at a file that did not exist
+      anywhere in the repo, so every page load 404'd and fell back to the
+      browser default (interface-audit H). The replacement is deliberately
+      .ico-less — every browser in the support matrix takes an SVG or PNG
+      favicon, and the SVG is theme-aware via prefers-color-scheme, which .ico
+      cannot be. The PNG is the fallback for clients that ignore SVG favicons.
+    -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <!--
       `theme-color` colours the mobile-browser chrome strip (URL bar in iOS
@@ -19,7 +33,7 @@
     -->
     <meta name="theme-color" content="oklab(0.9850 -0.0010 0.0040)" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <title>My Portfolio</title>
+    <title>Taylor Hale · Engineer, Designer, Tinkerer</title>
     <!--
       Pre-paint theme bridge.  Resolves the user's theme preference and writes
       the surface + grid CSS vars to <html> BEFORE the stylesheet evaluates,
@@ -68,9 +82,25 @@
         } catch (_) { /* if anything fails, App.vue's CSS fallbacks take over */ }
       })();
     </script>
-    <script type="module" crossorigin src="/assets/index-sDhpV66K.js"></script>
+    <meta name="description" content="Taylor Hale builds careful software: graphics systems, codegen tools, and integration work on short delivery cycles. Based in Bentonville, AR.">
+    <meta name="author" content="Taylor Hale">
+    <link rel="canonical" href="https://anjin-byte.github.io/">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Taylor Hale">
+    <meta property="og:title" content="Taylor Hale · Engineer, Designer, Tinkerer">
+    <meta property="og:description" content="Taylor Hale builds careful software: graphics systems, codegen tools, and integration work on short delivery cycles. Based in Bentonville, AR.">
+    <meta property="og:url" content="https://anjin-byte.github.io/">
+    <meta property="og:image" content="https://anjin-byte.github.io/og-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Taylor Hale, Engineer, Designer, Tinkerer">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Taylor Hale · Engineer, Designer, Tinkerer">
+    <meta name="twitter:description" content="Taylor Hale builds careful software: graphics systems, codegen tools, and integration work on short delivery cycles. Based in Bentonville, AR.">
+    <meta name="twitter:image" content="https://anjin-byte.github.io/og-card.png">
+    <script type="module" crossorigin src="/assets/index-C6_CAQuA.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/mermaid-CTq7gCEb.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-B1BvTuZ0.css">
+    <link rel="stylesheet" crossorigin href="/assets/index-JuGPRQfD.css">
   </head>
   <body>
     <noscript>This page requires JavaScript and WebAssembly to be enabled.</noscript>

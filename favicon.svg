@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Taylor Hale">
+  <!--
+    A Game-of-Life glider on paper: the site's background simulation reduced to
+    its smallest recognisable form. Colours are the real theme endpoints from
+    src/types/theme.ts (light surface #fafaf8 / ink at L 0.28, dark surface
+    #181819 / ink at L 0.84), so the mark sits in the same palette as the page.
+
+    Deliberately NOT a faithful miniature of the grid: at 16px a full graph-paper
+    field turns to mush. Five cells with 1px gaps is the most restraint that
+    still resolves in a browser tab.
+
+    Theme-aware via prefers-color-scheme, which SVG favicons honour in current
+    Chrome/Firefox/Safari. The .ico-less setup is intentional (see index.html).
+  -->
+  <style>
+    .paper { fill: #fafaf8; }
+    .cell  { fill: #3b3b39; }
+    @media (prefers-color-scheme: dark) {
+      .paper { fill: #181819; }
+      .cell  { fill: #d2d2cf; }
+    }
+  </style>
+  <rect class="paper" width="32" height="32" rx="6" />
+  <!-- glider:  . X .  /  . . X  /  X X X   (7px cells on an 8px pitch = 1px gutter) -->
+  <g class="cell">
+    <rect x="12" y="4"  width="7" height="7" rx="1" />
+    <rect x="20" y="12" width="7" height="7" rx="1" />
+    <rect x="4"  y="20" width="7" height="7" rx="1" />
+    <rect x="12" y="20" width="7" height="7" rx="1" />
+    <rect x="20" y="20" width="7" height="7" rx="1" />
+  </g>
+</svg>
