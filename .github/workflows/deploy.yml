@@ -53,6 +53,18 @@ jobs:
         run: |
           cargo test -p game-of-life-core --target "$(rustc -vV | sed -n 's/^host: //p')"
 
+      # WGSL is compiled by the BROWSER at runtime, so neither `cargo build` nor
+      # `wasm-pack build` catches a shader error — without this, a typo is
+      # discovered by loading the deployed page and seeing a blank canvas.
+      # `naga` is wgpu's own WGSL front end, so it validates the same source the
+      # runtime will. Reuses `make check-shaders` (the local dev gate) rather
+      # than duplicating the file list here.
+      - name: Install naga-cli (WGSL validator)
+        run: cargo install naga-cli
+
+      - name: Check WGSL shaders
+        run: make check-shaders
+
       # `game_of_life` (CPU Universe) is dormant, no longer built here: nothing
       # in app/ consumes it (the static-fallback renderer superseded it).
       # See Makefile CRATE_CPU comment + docs/interface-audit-2026-07.md Part 1 #2.
@@ -76,6 +88,19 @@ jobs:
       - name: Install Dependencies
         working-directory: app
         run: pnpm install --frozen-lockfile
+
+      # `pnpm run build` type-checks (vue-tsc -b) but does NOT run the unit
+      # suite or the linter — those were previously only ever run locally, so a
+      # regression could be pushed and deployed without the very tests written
+      # to catch it (frameGate/frameClock/frameBudget/blankZones/... under
+      # app/src/tests/) ever executing in CI.
+      - name: Lint (frontend)
+        working-directory: app
+        run: pnpm run lint
+
+      - name: Test (frontend unit tests)
+        working-directory: app
+        run: pnpm run test
 
       - name: Build
         working-directory: app
