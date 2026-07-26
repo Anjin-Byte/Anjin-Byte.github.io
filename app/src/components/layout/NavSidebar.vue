@@ -62,8 +62,9 @@ const exitLinks = EXIT_LABELS.map(
   padding: var(--space-xs);
   background: var(--island-fill);
   border: 1px solid var(--island-edge);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--island-lip), var(--elev-1);
+  border-radius: var(--radius-die-bold);
+  /* (overlay, sheet, rest) — floating chrome, above content AND the camera. */
+  box-shadow: var(--island-lip), var(--elev-overlay);
 }
 
 /* The entry itself is the recessed track — same recipe as ThemeToggle's
@@ -77,7 +78,8 @@ const exitLinks = EXIT_LABELS.map(
   padding: 4px var(--space-md) 4px 4px;
   background: var(--well-recess);
   border-radius: var(--radius-pill);
-  box-shadow: inset 0 1px 2px var(--shadow-1);
+  /* (shallow-sunken, control, rest) — the ground a nav control sits in. */
+  box-shadow: var(--well-shallow);
   text-decoration: none;
   color: var(--theme-text-tertiary);
   transition: color 160ms ease;
@@ -98,7 +100,7 @@ const exitLinks = EXIT_LABELS.map(
   width: 40px;
   height: 40px;
   flex-shrink: 0;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   color: inherit;
   transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
 }
@@ -138,7 +140,7 @@ const exitLinks = EXIT_LABELS.map(
   place-items: center;
   width: 32px;
   height: 32px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   color: var(--theme-text-tertiary);
   transition: color 160ms ease;
 }

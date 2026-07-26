@@ -36,7 +36,8 @@ const { preference } = useThemePreference();
 .theme-toggle {
   background: var(--well-recess) !important;
   border-radius: var(--radius-pill);
-  box-shadow: inset 0 1px 2px var(--shadow-1);
+  /* (shallow-sunken, control, rest) — a control channel, not a data well. */
+  box-shadow: var(--well-shallow);
   margin-inline-start: 8px;
   padding: 4px;
   gap: 2px;

@@ -254,7 +254,9 @@ const locationLink = contactLinks.find((link) => link.label === 'Location');
 
   .hero-frame {
     padding: 1.5rem;
-    border-radius: 20px;
+    /* No radius override: shape is viewport-invariant. This was the only
+       responsive radius in the codebase, and under the die metaphor it has no
+       justification — the die does not change because the sheet is smaller. */
   }
 }
 </style>

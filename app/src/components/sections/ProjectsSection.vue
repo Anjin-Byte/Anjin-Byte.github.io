@@ -206,7 +206,7 @@ const projectIndex: (Project & { visibleLinks: ResolvedProjectLink[] })[] = proj
   display: block;
   min-height: 210px;
   padding: 7px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-die);
   background: var(--island-fill);
   box-shadow:
     var(--island-lip),
@@ -221,10 +221,14 @@ const projectIndex: (Project & { visibleLinks: ResolvedProjectLink[] })[] = proj
 .project-feature-print-frame {
   position: absolute;
   inset: 7px;
-  border-radius: calc(var(--radius-md) - 6px);
+  /* An inset window takes the NEXT DIE DOWN. Its mat is --radius-die (12) and
+     the window sits at inset 7, so concentric would be 5 and the next die is 6:
+     the physical rule and the concentric rule agree to within 1px here, which is
+     why this needs no calc(). (The old calc subtracted 6 at a 7px inset.) */
+  border-radius: var(--radius-die-fine);
   overflow: hidden;
   background: var(--well-recess);
-  box-shadow: inset 0 0 0 1px var(--island-edge);
+  box-shadow: var(--cut-ring);
   isolation: isolate;
 }
 
@@ -418,7 +422,9 @@ const projectIndex: (Project & { visibleLinks: ResolvedProjectLink[] })[] = proj
   border-radius: var(--radius-pill);
   border: 1px solid var(--island-edge);
   background: var(--well-recess);
-  box-shadow: inset 0 1px 2px var(--shadow-1);
+  /* (shallow-sunken, control, rest) — same control ground as the nav pill
+     and toggle track. NOT the flat metadata badge: this is interactive. */
+  box-shadow: var(--well-shallow);
 }
 
 /* Demo icon rests a touch darker so it reads as the primary action. */

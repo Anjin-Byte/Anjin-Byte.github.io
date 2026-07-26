@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <!--
+    SOURCE for public/og-card.png — the 1200x630 social unfurl card.
+    See brand/README.md to regenerate.
+
+    Design intent: the site's own surface, not a poster. Paper ground, the real
+    graph-paper grid at its real proportions (minor every 40, major every 5th),
+    the glider mark, and the name. Colours are lerped from the theme endpoints
+    in src/types/theme.ts (surface L 0.985 -> ink L 0.28) at the same minor_t
+    0.08 / major_t 0.14 the shader uses, so the card is the page's palette
+    rather than an approximation of it.
+
+    Kept deliberately quiet: LinkedIn and Slack downscale these hard, so the
+    only things that must survive are the name and the mark. Everything else is
+    texture. Light palette only, since unfurl cards are not theme-aware.
+  -->
+  <defs>
+    <pattern id="minor" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#ecece9" stroke-width="1" />
+    </pattern>
+    <pattern id="major" width="200" height="200" patternUnits="userSpaceOnUse">
+      <path d="M200 0H0V200" fill="none" stroke="#e0e0dc" stroke-width="1.5" />
+    </pattern>
+  </defs>
+
+  <rect width="1200" height="630" fill="#fafaf8" />
+  <rect width="1200" height="630" fill="url(#minor)" />
+  <rect width="1200" height="630" fill="url(#major)" />
+
+  <!-- Glider mark, aligned to the major grid so it reads as living ON the paper. -->
+  <g fill="#3b3b39">
+    <rect x="120" y="160" width="34" height="34" rx="4" />
+    <rect x="160" y="200" width="34" height="34" rx="4" />
+    <rect x="80"  y="240" width="34" height="34" rx="4" />
+    <rect x="120" y="240" width="34" height="34" rx="4" />
+    <rect x="160" y="240" width="34" height="34" rx="4" />
+  </g>
+
+  <!-- Name + tagline. Serif matches the site's --font-display stack. -->
+  <text x="80" y="400"
+        font-family="Iowan Old Style, Palatino Linotype, Book Antiqua, Palatino, Georgia, serif"
+        font-size="92" fill="#2e2e2c">Taylor Hale</text>
+  <text x="84" y="452"
+        font-family="Avenir Next, Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif"
+        font-size="31" fill="#6e6e6a" letter-spacing="0.5">Engineer  ·  Designer  ·  Tinkerer</text>
+
+  <!-- Hairline rule + domain: the cut-paper edge, understated. -->
+  <rect x="84" y="498" width="132" height="2" fill="#c8c8c3" />
+  <text x="84" y="546"
+        font-family="Avenir Next, Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif"
+        font-size="25" fill="#8a8a85">anjin-byte.github.io</text>
+</svg>

@@ -68,12 +68,28 @@ const PerfHud = import.meta.env.DEV
   --step-3: clamp(1.95rem, 1.75rem + 0.89vw, 2.2rem);
   --step-4: clamp(2.44rem, 2.11rem + 1.46vw, 3.43rem);
 
-  /* Radius scale */
-  --radius-xs: 11px;
-  --radius-sm: 16px;
-  --radius-md: 18px;
-  --radius-lg: 24px;
-  --radius-pill: 999px;
+  /* ── Shape: the die scale ─────────────────────────────────────────────────
+     Surfaces are paper CUT and laid on the field, so corners are die corners.
+     A die is a steel rule bent to a shape; its radius is a property of the
+     TOOL, not of the piece — cut a business card and a large sheet with the
+     same die and both get the same corner. So radius here does NOT scale with
+     element size (the usual design-system rule); it says *which die made this
+     cut*, and most things are cut with the same one.
+
+     The trade's standard sizes land on exact CSS pixels because CSS defines
+     1in = 96px, which is where these numbers come from — 1/16in increments of
+     a real tool rather than taste. (Nominal, not physical: the CSS px is a
+     reference pixel, so this is a rationale in the way print work reasons in
+     points, not a claim about millimetres on your monitor.)
+
+     Replaced the previous xs/sm/md/lg scale (11/16/18/24), of which 18 and 24
+     were already exactly 3/16in and 1/4in by instinct, while 11 and 16 matched
+     no die and nothing else in the system. See docs/shape-language-audit. */
+  --radius-die-fine:  6px;  /* 1/16" — inline code, inset windows            */
+  --radius-die:      12px;  /* 1/8"  — the default cut: regions, data wells  */
+  --radius-die-bold: 18px;  /* 3/16" — large stock: cards, panels, sidebar   */
+  --radius-pill:    999px;  /* a fully-rounded die (lozenge label)           */
+  --radius-circle:    50%;  /* a round die                                   */
 
   /* Layout */
   --inset-chrome: 16px; /* balanced corner inset (top = sides) */
@@ -111,7 +127,45 @@ const PerfHud = import.meta.env.DEV
     inset 0 -1px 0 oklab(from var(--island-fill) calc(l - var(--cut)) a b);
   --elev-1: 0 1px 2px var(--shadow-1), 0 6px 18px var(--shadow-2);  /* resting */
   --elev-2: 0 2px 4px var(--shadow-1), 0 14px 34px var(--shadow-2); /* hero */
+  /* Floating chrome: the nav sidebar (and future modals / popovers / tooltips)
+     sit above BOTH the content sheets and the flying camera, which is a
+     different plane from a content card — yet they previously borrowed
+     --elev-1 and read as just another resting sheet (elevation audit §6, "the
+     one genuine gap"). Topmost plane, so it casts furthest; kept diffuse rather
+     than dark so a small piece of chrome floats instead of shouting. This is
+     the CEILING of the z-axis, not an open ladder — nothing goes above it. */
+  --elev-overlay: 0 3px 7px var(--shadow-1), 0 18px 42px var(--shadow-2);
+  /* Raised-flush: proud of the field but not lifted off it (chips, keys at
+     rest). Previously unnamed — "a card with --elev-1 omitted" — which is a
+     level the author could see and the vocabulary could not express (F8).
+     Deliberately the lip ALONE: at the flush plane the cut edge IS the depth
+     cue, there being no gap to cast into. Named so the level can be referred
+     to, and so adding a flush surface is a choice rather than an omission. */
+  --elev-flush: var(--island-lip);
   --well-recess: color-mix(in oklab, var(--theme-surface) 96%, var(--theme-ink) 4%);
+  /* ── The sunken planes, mirroring --elev-1/2 on the raised side ────────────
+     Composite depth tokens so a recess is one var() and cannot be hand-rolled
+     (elevation audit F1-F4: raised had one token and stayed uniform, recessed
+     had none and drifted into six spellings across ten elements).
+
+     Two planes because a data region sits deeper than a control channel, and
+     each is anchored to a material so the two depths stay tellable apart:
+       --well-deep     data regions   : code blocks, blockquotes, quiet sheets
+       --well-shallow  control ground : toggle track, nav pill
+     Opaque and derived from the well's OWN fill, which is valid because every
+     element on these planes paints `background: var(--well-recess)`.
+
+     Pre-JS fallbacks only; useThemePreference republishes all four from OKLab
+     on every theme apply. */
+  --well-deep:    inset 0 1px 3px oklab(from var(--well-recess) calc(l - var(--cut)) a b);
+  --well-shallow: inset 0 1px 2px oklab(from var(--well-recess) calc(l - var(--cut)) a b);
+  /* Transient press. Translucent, NOT derived from the well fill: a held key
+     keeps its raised --island-fill, so a state delta has to compose over any
+     material rather than assume one. Distinct from a well by design (F1). */
+  --state-pressed: inset 0 1px 2px rgba(0, 0, 0, 0.14);
+  /* A hairline cut edge, not a basin. Separated from the wells because both
+     were spelled `inset` and the metaphors got confused (F2). */
+  --cut-ring: inset 0 0 0 1px oklab(from var(--island-fill) calc(l - var(--cut)) a b);
   /* Metadata badges (tech tags): a flat tonal token, not a plate. A wash of the
      INK color reads correctly in both modes (dark wash on light paper, light
      wash on dark) — so one token, no per-mode override. Pairs with
@@ -218,7 +272,7 @@ body {
 .content-surface {
   background: var(--island-fill);
   border: 1px solid var(--island-edge);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-die-bold);
   box-shadow: var(--island-lip), var(--elev-1);
 }
 
@@ -233,8 +287,9 @@ body {
 .quiet-sheet {
   background: var(--well-recess);
   border: 1px solid var(--island-edge);
-  border-radius: var(--radius-md);
-  box-shadow: inset 0 1px 3px var(--shadow-1);
+  border-radius: var(--radius-die);
+  /* (deep-sunken, data-region, rest) — a region you read content into. */
+  box-shadow: var(--well-deep);
 }
 
 /* Kicker / tag pills — small, so just the hairline + lit lip; a cast shadow on
@@ -250,7 +305,7 @@ body {
   border-radius: var(--radius-pill);
   border: 1px solid var(--island-edge);
   background: var(--island-fill);
-  box-shadow: var(--island-lip);
+  box-shadow: var(--elev-flush);
   line-height: 1;
 }
 
@@ -263,7 +318,7 @@ body {
   background: var(--island-fill);
   border: 1px solid var(--island-edge);
   border-radius: var(--radius-pill);
-  box-shadow: var(--island-lip);
+  box-shadow: var(--elev-flush);
   color: var(--theme-text-primary);
   text-decoration: none;
   cursor: pointer;
@@ -274,7 +329,7 @@ body {
   border-color: var(--theme-grid-border);
 }
 .paper-key:active {
-  box-shadow: inset 0 1px 2px var(--shadow-1);
+  box-shadow: var(--state-pressed);
 }
 .paper-key:focus-visible {
   outline: 2px solid var(--theme-accent-ring);
@@ -291,7 +346,7 @@ body {
   border-color: var(--theme-grid-border);
 }
 .paper-key--primary:active {
-  box-shadow: inset 0 1px 2px var(--shadow-1);
+  box-shadow: var(--state-pressed);
 }
 
 /* Ghost key: flush until touched (icon buttons in a tray, inactive segments).
@@ -312,7 +367,7 @@ body {
   color: var(--theme-text-primary);
 }
 .paper-key--ghost:active {
-  box-shadow: inset 0 1px 2px var(--shadow-1);
+  box-shadow: var(--state-pressed);
 }
 .paper-key--ghost:focus-visible {
   outline: 2px solid var(--theme-accent-ring);
@@ -359,5 +414,10 @@ html[data-theme-mode="dark"] {
   --island-edge: color-mix(in oklab, var(--theme-surface) 80%, white 8%);
   --shadow-1: rgba(0, 0, 0, 0.55);
   --shadow-2: rgba(0, 0, 0, 0.40);
+  /* The press delta needs the same treatment as --shadow-1/-2: a low-lightness
+     surface needs a stronger shadow to read at all. The well planes need NO
+     override — they derive from --well-recess via `oklab(from ...)`, which
+     resolves lazily and tracks this mode's fill on its own. */
+  --state-pressed: inset 0 1px 2px rgba(0, 0, 0, 0.45);
 }
 </style>

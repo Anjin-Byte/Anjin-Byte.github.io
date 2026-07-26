@@ -2,7 +2,21 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" href="/favicon.ico" />
+    <!--
+      Icons live in `public/` (Vite copies it to the dist root, so these
+      absolute paths resolve). Sources + how to regenerate: `app/brand/`.
+
+      No `favicon.ico`: this previously pointed at a file that did not exist
+      anywhere in the repo, so every page load 404'd and fell back to the
+      browser default (interface-audit H). The replacement is deliberately
+      .ico-less — every browser in the support matrix takes an SVG or PNG
+      favicon, and the SVG is theme-aware via prefers-color-scheme, which .ico
+      cannot be. The PNG is the fallback for clients that ignore SVG favicons.
+    -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <!--
       `theme-color` colours the mobile-browser chrome strip (URL bar in iOS

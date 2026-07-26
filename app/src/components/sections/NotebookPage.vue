@@ -94,7 +94,9 @@ useMermaid(proseRef, props.entry.route);
   padding: 0.4rem 0.9rem 0.4rem 0.7rem;
   background: var(--well-recess);
   border-radius: var(--radius-pill);
-  box-shadow: inset 0 1px 2px var(--shadow-1);
+  /* (shallow-sunken, control, rest) — same control ground as the nav pill
+     and toggle track. NOT the flat metadata badge: this is interactive. */
+  box-shadow: var(--well-shallow);
   color: var(--theme-text-tertiary);
   text-decoration: none;
   font-size: 0.8rem;
@@ -281,8 +283,8 @@ useMermaid(proseRef, props.entry.route);
   max-width: var(--measure);
   background: var(--well-recess);
   border-left: 2px solid var(--theme-accent);
-  border-radius: var(--radius-sm);
-  box-shadow: inset 0 1px 2px var(--well-recess-shadow);
+  border-radius: var(--radius-die);
+  box-shadow: var(--well-deep);
   color: var(--theme-text-secondary);
 }
 .note-prose :deep(blockquote p) {
@@ -296,8 +298,8 @@ useMermaid(proseRef, props.entry.route);
   font-size: 0.85em;
   padding: 0.12em 0.4em;
   background: var(--well-recess);
-  border-radius: var(--radius-xs);
-  box-shadow: inset 0 0 0 1px var(--island-fill-shadow);
+  border-radius: var(--radius-die-fine);
+  box-shadow: var(--cut-ring);
 }
 
 /* ── Code block — a deep inset well carrying a language tab ───────────────── */
@@ -325,9 +327,9 @@ useMermaid(proseRef, props.entry.route);
   margin: 0;
   padding: 1.05rem 1.2rem;
   background: var(--well-recess);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-die);
   overflow-x: auto;
-  box-shadow: inset 0 1px 3px var(--well-recess-shadow);
+  box-shadow: var(--well-deep);
 }
 .note-prose :deep(pre code) {
   font-family: var(--font-mono);
@@ -399,7 +401,7 @@ useMermaid(proseRef, props.entry.route);
   padding: 1.4rem 1.2rem;
   background: var(--island-fill);
   border: 1px solid var(--island-edge);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-die);
   overflow-x: auto;
   visibility: hidden; /* raw source hidden until rendered */
 }

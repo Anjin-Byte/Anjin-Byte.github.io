@@ -5,6 +5,13 @@ import vue from '@vitejs/plugin-vue';
 import vuetify from 'vite-plugin-vuetify';
 import wasm from 'vite-plugin-wasm';
 import topLevelAwait from 'vite-plugin-top-level-await';
+import {
+  profile,
+  siteUrl,
+  siteTitle,
+  siteDescription,
+  ogImagePath,
+} from './src/data/siteIdentity';
 
 // wgpu 22.x serialises 'maxInterStageShaderComponents' into the GPUDeviceDescriptor's
 // requiredLimits. That field was removed from the WebGPU spec (renamed to
@@ -54,13 +61,70 @@ function spaPages404(): Plugin {
   };
 }
 
+// Inject the site-level <title> and social metadata into index.html at build
+// time, sourced from `src/data/siteIdentity.ts`.
+//
+// Why build-time injection rather than static tags typed into index.html: the
+// name, tagline and description already exist in `siteIdentity.ts` (which
+// `profile.ts` re-exports and the Hero renders). Hand-copying them into the
+// head would mean editing the bio silently leaves the search snippet and the
+// unfurl showing last month's text. Injecting keeps ONE source of truth while
+// still emitting fully static HTML — which matters, because most unfurlers
+// (Slack, LinkedIn, iMessage) never run JS and read the served markup verbatim.
+// A client-side head manager would not fix the unfurl at all.
+//
+// Scope: the site-level set only, for `/`. Per-route tags need the prerender
+// step (docs/SEO/03) — until then every route unfurls as the site, which is
+// correct-if-generic rather than wrong.
+function injectSiteMeta(): Plugin {
+  return {
+    name: 'inject-site-meta',
+    transformIndexHtml: {
+      order: 'pre',
+      handler(html) {
+        const ogImage = `${siteUrl}${ogImagePath}`;
+        return {
+          html: html.replace(
+            /<title>.*?<\/title>/,
+            `<title>${escapeHtml(siteTitle)}</title>`,
+          ),
+          tags: [
+            { tag: 'meta', attrs: { name: 'description', content: siteDescription }, injectTo: 'head' },
+            { tag: 'meta', attrs: { name: 'author', content: profile.name }, injectTo: 'head' },
+            { tag: 'link', attrs: { rel: 'canonical', href: `${siteUrl}/` }, injectTo: 'head' },
+            // Open Graph. og:image must be absolute; relative URLs are dropped.
+            { tag: 'meta', attrs: { property: 'og:type', content: 'website' }, injectTo: 'head' },
+            { tag: 'meta', attrs: { property: 'og:site_name', content: profile.name }, injectTo: 'head' },
+            { tag: 'meta', attrs: { property: 'og:title', content: siteTitle }, injectTo: 'head' },
+            { tag: 'meta', attrs: { property: 'og:description', content: siteDescription }, injectTo: 'head' },
+            { tag: 'meta', attrs: { property: 'og:url', content: `${siteUrl}/` }, injectTo: 'head' },
+            { tag: 'meta', attrs: { property: 'og:image', content: ogImage }, injectTo: 'head' },
+            { tag: 'meta', attrs: { property: 'og:image:width', content: '1200' }, injectTo: 'head' },
+            { tag: 'meta', attrs: { property: 'og:image:height', content: '630' }, injectTo: 'head' },
+            { tag: 'meta', attrs: { property: 'og:image:alt', content: `${profile.name}, ${profile.tagline.replace(/\s+·\s+/g, ', ')}` }, injectTo: 'head' },
+            // Twitter/X reads og:* for most fields; card type + image are its own.
+            { tag: 'meta', attrs: { name: 'twitter:card', content: 'summary_large_image' }, injectTo: 'head' },
+            { tag: 'meta', attrs: { name: 'twitter:title', content: siteTitle }, injectTo: 'head' },
+            { tag: 'meta', attrs: { name: 'twitter:description', content: siteDescription }, injectTo: 'head' },
+            { tag: 'meta', attrs: { name: 'twitter:image', content: ogImage }, injectTo: 'head' },
+          ],
+        };
+      },
+    },
+  };
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 // Plugins needed in both the main pipeline and the worker sub-pipeline.
 const sharedPlugins = () => [wasm(), topLevelAwait(), patchWgpuFirefoxLimits()];
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 
 export default defineConfig({
   base: '/',
-  plugins: [vue(), vuetify({ autoImport: true }), spaPages404(), ...sharedPlugins()],
+  plugins: [vue(), vuetify({ autoImport: true }), injectSiteMeta(), spaPages404(), ...sharedPlugins()],
   server: {
     fs: {
       allow: [repoRoot],

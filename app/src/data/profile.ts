@@ -32,21 +32,14 @@ development. I'm chasing elegance where low-level detail and
 high-level design meet. At least once.
 */
 
-export const profile = {
-  name: 'Taylor Hale',
-  tagline: 'Engineer\u00A0\u00A0·\u00A0\u00A0Designer\u00A0\u00A0·\u00A0\u00A0Tinkerer',
-  bio:
-    'I build careful software: graphics systems, codegen tools, ' +
-    'integration work on short delivery cycles. My background spans ' +
-    'computer vision research, contract engineering, and full-stack web ' +
-    'development. I\'m chasing elegance where low-level detail and ' +
-    'high-level design meet. At least once.',
-  location: 'Bentonville, AR',
-  email: 'hale.taylor.dev@gmail.com',
-  phone: '(615) 681-3779',
-  github: 'https://github.com/Anjin-Byte',
-  linkedin: 'https://linkedin.com/in/bits-for-bread',
-};
+// `profile` now lives in `siteIdentity.ts` (a zero-import module) so the Vite
+// build can read the same values when injecting <meta> tags into index.html.
+// Imported AND re-exported (not a bare `export ... from`) because `contactLinks`
+// below dereferences `profile.email` / `.github` / `.linkedin` — a pass-through
+// re-export would not bind the name in this module's scope.
+// Edit the fields in siteIdentity.ts.
+import { profile } from './siteIdentity';
+export { profile };
 
 export const contactLinks: ContactLink[] = [
   { label: 'Location', icon: mdiMapMarkerOutline, href: 'https://maps.google.com/?q=Bentonville,+AR', display: profile.location },

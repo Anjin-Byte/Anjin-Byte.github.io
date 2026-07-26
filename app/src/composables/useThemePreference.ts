@@ -151,9 +151,62 @@ if (typeof window !== 'undefined' && document?.documentElement) {
     s('--island-fill-lit',    oklabCss(islandFillLit));
     s('--island-fill-shadow', oklabCss(islandFillShadow));
     s('--island-lip', `inset 0  1px 0 ${oklabCss(islandFillLit)}, inset 0 -1px 0 ${oklabCss(islandFillShadow)}`);
+    // Raised-flush plane (F8): the lip alone. Republished here rather than left
+    // as a CSS alias so both halves of the Plane axis come from one place — the
+    // sunken planes are derived just below, and a reader looking for "what are
+    // the planes" finds them together instead of split across two files.
+    s('--elev-flush', `inset 0  1px 0 ${oklabCss(islandFillLit)}, inset 0 -1px 0 ${oklabCss(islandFillShadow)}`);
 
     const wellRecessShadow = clampL([wellRecess[0] - CUT, wellRecess[1], wellRecess[2]]);
     s('--well-recess-shadow', oklabCss(wellRecessShadow));
+
+    // ── PLANE tokens: the sunken half of the elevation language ──────────────
+    //
+    // These exist so the recess is a SYSTEM the way the raised half already is.
+    // `--island-lip` above is one composite, theme-derived token used verbatim
+    // everywhere, which is exactly why raised surfaces never drifted; the recess
+    // had only a fill token, so its shadow was hand-rolled in six different
+    // spellings across ten elements (elevation audit F1-F4).
+    //
+    // Two planes, not one: a data region you read content INTO sits deeper than
+    // a control channel. Anchoring each depth to a material is what keeps them
+    // legible — depth read in isolation is only distinguishable at ~3-4 levels,
+    // but depth + an obvious role is far easier to tell apart.
+    //
+    //   --well-deep     data regions   : code blocks, blockquotes, quiet sheets
+    //   --well-shallow  control ground : toggle track, nav pill
+    //
+    // OPAQUE, derived from the well fill minus CUT. That is correct precisely
+    // because every element on these planes paints `background: var(--well-recess)`,
+    // so the shadow blends into its own surface. Contrast `--state-pressed`
+    // below, which must not assume a fill.
+    const wellShadowCss = oklabCss(wellRecessShadow);
+    s('--well-deep',    `inset 0 1px 3px ${wellShadowCss}`);
+    s('--well-shallow', `inset 0 1px 2px ${wellShadowCss}`);
+
+    // ── STATE token: transient, composes over ANY material ───────────────────
+    //
+    // A key being held is not a structural recess, and conflating the two is
+    // audit F1: a recessed label ended up looking as interactive as a key that
+    // is only recessed while pressed. This is deliberately a different physical
+    // event — a momentary sink, not a basin.
+    //
+    // TRANSLUCENT, unlike the plane tokens above, and that difference is
+    // structural rather than stylistic: `.paper-key:active` sets no background,
+    // so it keeps its raised `--island-fill` while held. A shadow derived from
+    // the WELL fill would be tinted for a surface the element does not have.
+    // State deltas layer over whatever Material they land on, so they must be
+    // fill-agnostic. Alpha tracks the theme (dark surfaces need more shadow to
+    // read) via the same reasoning as `--shadow-1`'s dark override in App.vue.
+    s('--state-pressed', `inset 0 1px 2px rgba(0, 0, 0, ${isDark ? 0.45 : 0.14})`);
+
+    // ── CUT RING: an edge, not a depth ───────────────────────────────────────
+    //
+    // Audit F2: a hairline `inset 0 0 0 1px` outline and a `inset 0 1px Npx`
+    // depth well are different metaphors (an edge vs a basin) that happened to
+    // share the `inset` keyword, so which one an element got was an author's
+    // choice rather than a rule. Naming it separates the two vocabularies.
+    s('--cut-ring', `inset 0 0 0 1px ${oklabCss(islandFillShadow)}`);
 
     s('--theme-accent-underline', oklabCss(accentOkLab, 0.4));
 

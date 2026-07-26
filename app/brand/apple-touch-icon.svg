@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
+  <!--
+    SOURCE for public/apple-touch-icon.png (see brand/README.md to regenerate).
+    Not served: iOS wants a raster.
+
+    Differs from favicon.svg in two deliberate ways:
+      1. No rounded corners of its own. iOS applies its own mask; baking in a
+         radius produces a double-rounded icon with pale corner slivers.
+      2. Light palette only. iOS home-screen icons are not theme-aware, so a
+         prefers-color-scheme rule would be dead weight at best and could
+         rasterise to the wrong variant at build time.
+  -->
+  <rect width="180" height="180" fill="#fafaf8" />
+  <!-- Same glider, scaled: 40px cells on a 45px pitch, centred with 22.5 margin. -->
+  <g fill="#3b3b39">
+    <rect x="67.5"  y="22.5"  width="40" height="40" rx="5" />
+    <rect x="112.5" y="67.5"  width="40" height="40" rx="5" />
+    <rect x="22.5"  y="112.5" width="40" height="40" rx="5" />
+    <rect x="67.5"  y="112.5" width="40" height="40" rx="5" />
+    <rect x="112.5" y="112.5" width="40" height="40" rx="5" />
+  </g>
+</svg>

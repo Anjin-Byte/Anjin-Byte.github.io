@@ -1,0 +1,14 @@
+{
+  "name": "Taylor Hale",
+  "short_name": "T. Hale",
+  "description": "Taylor Hale builds careful software: graphics systems, codegen tools, and integration work on short delivery cycles.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fafaf8",
+  "theme_color": "#fafaf8",
+  "icons": [
+    { "src": "/favicon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" },
+    { "src": "/favicon-32.png", "type": "image/png", "sizes": "32x32" },
+    { "src": "/apple-touch-icon.png", "type": "image/png", "sizes": "180x180" }
+  ]
+}
