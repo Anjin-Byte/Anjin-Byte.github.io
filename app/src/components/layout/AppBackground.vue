@@ -9,7 +9,7 @@ import type { BlankZone, BlankZoneDraft, BlankZoneRect } from '../../types/blank
 import { asZoneId } from '../../types/blankZones';
 import { useWorkerBridge } from '../../composables/useWorkerBridge';
 import { useCoordinateMapper } from '../../composables/useCoordinateMapper';
-import { useAnimationLoop } from '../../composables/useAnimationLoop';
+import { onSample } from '../../composables/frameClock';
 import { useDragTools } from '../../composables/useDragTools';
 import { useThemePreference } from '../../composables/useThemePreference';
 import {
@@ -34,7 +34,6 @@ const camera = useCamera();
 // the grid is fixed (worldOffsetDevicePx is {0,0}), so clicks land on the
 // stationary grid; Phase 2 makes the offset live as the grid pans.
 const coords = useCoordinateMapper(bridge.gridInfo, camera.worldOffsetDevicePx);
-const anim = useAnimationLoop();
 const drag = useDragTools(coords);
 const surface = useCanvasSurface(bridge.post);
 const { activeBackend } = useRendererBackend();
@@ -121,6 +120,7 @@ function onDocumentClick(event: MouseEvent): void {
 
 // ── Lifecycle ───────────────────────────────────────────────────────────────
 let detachDrag: (() => void) | null = null;
+let detachFrame: (() => void) | null = null;
 
 onMounted(() => {
   const shell = shellRef.value;
@@ -188,12 +188,17 @@ onMounted(() => {
   document.addEventListener('click', onDocumentClick);
   detachDrag = drag.attachListeners();
 
-  // Frame loop — frame-locks the grid to the render. Each rAF we sample the
-  // active island's live scrollTop (NOT the throttled `scroll` event) plus the
-  // camera, and ship the offset WITH the frame, so the worker renders the exact
-  // position the DOM is at this frame. That's what stops the canvas grid from
-  // juddering behind the compositor-smooth native scroll.
-  anim.start(() => {
+  // Frame-lock the grid to the render, in the frame clock's SAMPLE phase. Each
+  // frame we read the active island's live scrollTop (NOT the throttled
+  // `scroll` event) plus the camera, and ship the offset WITH the frame, so the
+  // worker renders the exact position the DOM is at this frame. That's what
+  // stops the canvas grid from juddering behind the compositor-smooth native
+  // scroll.
+  //
+  // SAMPLE (not ADVANCE) is required, not incidental: the camera easing steps
+  // in the advance phase, so sampling here is what guarantees we ship THIS
+  // frame's position rather than the previous one. See frameClock.ts.
+  detachFrame = onSample(() => {
     const panel = document.querySelector<HTMLElement>('.world-panel--scroll');
     if (panel) camera.setCaptureScroll(panel.scrollTop);
     const off = camera.worldOffsetDevicePx.value;
@@ -202,7 +207,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  anim.stop();
+  detachFrame?.();
   surface.teardown();
   document.removeEventListener('click', onDocumentClick);
   detachDrag?.();

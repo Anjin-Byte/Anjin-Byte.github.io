@@ -79,11 +79,30 @@ impl GpuRenderer {
         let alpha_mode = caps.alpha_modes.iter().copied()
             .find(|m| *m == wgpu::CompositeAlphaMode::PreMultiplied)
             .unwrap_or(caps.alpha_modes[0]);
+        // `desired_maximum_frame_latency: 1` (wgpu's default is 2) — LATENCY,
+        // not throughput, is what this canvas needs.
+        //
+        // The background is frame-locked to the DOM: the grid must show the
+        // camera offset the page is at THIS frame (see frameGate.ts). At
+        // latency 2 the swapchain queues 2-3 buffers, so a frame presented now
+        // can be displayed two vsyncs later, holding a camera offset two frames
+        // stale — and if the compositor's pickup drifts between 1 and 2 frames
+        // of queue depth, the effective lag OSCILLATES. While panning slowly
+        // that is invisible (adjacent frames nearly identical); during a fast
+        // fly, two frames of camera delta is a large jump, so the canvas reads
+        // as flickering between two disagreeing positions.
+        //
+        // The cost of a shallower queue is less buffering headroom: an
+        // overrunning frame stalls instead of drawing from the queue. Our own
+        // measurements say that is affordable with room to spare — worker
+        // render cost sits at 0.2–2ms against an 8.3–33ms slot (under ~12%
+        // utilisation, often ~1%), so there is nothing meaningful for the extra
+        // queued frame to absorb.
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT, format,
             width: grid.canvas_width, height: grid.canvas_height,
             present_mode: wgpu::PresentMode::AutoVsync, alpha_mode,
-            view_formats, desired_maximum_frame_latency: 2,
+            view_formats, desired_maximum_frame_latency: 1,
         };
         surface.configure(device, &surface_config);
 

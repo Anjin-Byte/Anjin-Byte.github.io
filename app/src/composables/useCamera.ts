@@ -10,6 +10,7 @@ import {
   type Spacing,
 } from '../space/layout';
 import { PANEL_MAX_WIDTH, GUTTER_FRACTION } from '../space/layoutConfig';
+import { onAdvance } from './frameClock';
 import {
   stepCamera,
   isSettled,
@@ -79,28 +80,37 @@ if (typeof window !== 'undefined' && window.matchMedia) {
 
 const spacing = computed<Spacing>(() => computeSpacing(viewportRef.value));
 
-// ── rAF easing loop (effectful edge over the pure cameraEasing core) ─────────
-let rafId = 0;
-function tick(): void {
+// ── Easing step (effectful edge over the pure cameraEasing core) ─────────────
+//
+// Runs in the frame clock's ADVANCE phase, NOT in an rAF loop of its own. That
+// is load-bearing, not tidiness: the background worker reads this camera offset
+// in the SAMPLE phase, so the two-phase contract guarantees it observes this
+// frame's step. When both were independent rAF loops, the reader was queued
+// first and shipped the previous frame's position to the renderer for the whole
+// fly — a one-frame canvas-vs-DOM lag that only showed up during fast motion.
+// See frameClock.ts for the full account.
+let unsubscribeAdvance: (() => void) | null = null;
+
+function stepOnce(): void {
   cameraRef.value = stepCamera(cameraRef.value, targetRef.value, EASE);
   if (isSettled(cameraRef.value, targetRef.value)) {
     cameraRef.value = { ...targetRef.value };
-    isAnimatingRef.value = false;
-    rafId = 0;
-    return;
+    stopLoop();
   }
-  rafId = requestAnimationFrame(tick);
 }
+
 function startLoop(): void {
-  if (rafId !== 0) return;
+  if (unsubscribeAdvance) return;
   isAnimatingRef.value = true;
-  rafId = requestAnimationFrame(tick);
+  unsubscribeAdvance = onAdvance(stepOnce);
 }
+
 function stopLoop(): void {
-  if (rafId !== 0) {
-    cancelAnimationFrame(rafId);
-    rafId = 0;
-  }
+  // Unsubscribing from inside `stepOnce` (the settle case) is safe: `runFrame`
+  // iterates over a copy of the subscriber set precisely so a callback may
+  // remove itself mid-frame.
+  unsubscribeAdvance?.();
+  unsubscribeAdvance = null;
   isAnimatingRef.value = false;
 }
 
