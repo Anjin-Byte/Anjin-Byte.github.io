@@ -10,6 +10,7 @@ import {
   type Spacing,
 } from '../space/layout';
 import { PANEL_MAX_WIDTH, GUTTER_FRACTION } from '../space/layoutConfig';
+import { useMotionPreference } from './useMotionPreference';
 import { onAdvance } from './frameClock';
 import {
   stepCamera,
@@ -40,7 +41,20 @@ function computeSpacing(vp: Viewport): Spacing {
   });
 }
 
-const viewportRef = ref<Viewport>({ w: 1, h: 1 });
+/**
+ * Placeholder until `WorldStage` measures its own box (R15).
+ *
+ * This module is imported, and `installCameraRouteSync` resolves the first
+ * route, BEFORE any element exists to measure — so the initial camera and a
+ * deep link's initial snap are both computed against this. Every world position
+ * derived here is wrong; `setViewport` corrects them on the first real
+ * measurement, which happens in WorldStage's `onMounted`, before paint.
+ *
+ * 1×1 rather than 0×0 because `responsiveSpacing` divides by viewport extent.
+ */
+const UNMEASURED_VIEWPORT: Viewport = { w: 1, h: 1 };
+const viewportRef = ref<Viewport>({ ...UNMEASURED_VIEWPORT });
+let viewportMeasured = false;
 
 function initialCamera(): Camera {
   const home = findWaypoint(homeWaypoint.id);
@@ -64,19 +78,11 @@ const anchorRef = ref<Anchor | null>({ gx: homeWaypoint.gx, gy: homeWaypoint.gy 
 // plane transform deliberately does NOT use it.
 const captureScrollRef = ref(0);
 
-// `prefers-reduced-motion: reduce` → snap instead of fly. Tracked live.
-const reducedMotionRef = ref(
-  typeof window !== 'undefined' && window.matchMedia
-    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    : false,
-);
-if (typeof window !== 'undefined' && window.matchMedia) {
-  const mql = window.matchMedia('(prefers-reduced-motion: reduce)');
-  const onChange = (e: MediaQueryListEvent): void => {
-    reducedMotionRef.value = e.matches;
-  };
-  if (typeof mql.addEventListener === 'function') mql.addEventListener('change', onChange);
-}
+// `prefers-reduced-motion: reduce` → snap instead of fly. This module used to
+// own its own matchMedia; the signal now comes from the single publisher in
+// useMotionPreference so the camera, the CSS, and the render WORKER cannot
+// disagree about it (responsive R11).
+const { reducedMotion: reducedMotionRef } = useMotionPreference();
 
 const spacing = computed<Spacing>(() => computeSpacing(viewportRef.value));
 
@@ -146,14 +152,31 @@ function panToWaypoint(id: WaypointId, opts: { snap?: boolean } = {}): void {
   panToNode({ gx: wp.gx, gy: wp.gy, zoom: wp.zoom }, opts);
 }
 
-/** Detach from the parked waypoint (called when free-panning) so a viewport
- *  resize won't snap the camera back to that waypoint. */
-function releaseAnchor(): void {
-  anchorRef.value = null;
+/**
+ * Re-centre the camera on the parked anchor for a given spacing.
+ *
+ * Two callers, and naming it is the point of R15: the resize watcher below, and
+ * the FIRST viewport measurement in `setViewport`. Those look like one thing
+ * (spacing changed, re-centre) but they are not — the second is bootstrap
+ * correction, fixing positions computed against UNMEASURED_VIEWPORT. That
+ * correction used to happen only as a side effect of the resize watcher
+ * noticing 1×1 → real, which is true but accidental: it read as resize handling
+ * and nothing recorded that a deep link's correctness depended on it.
+ */
+function recentreOnAnchor(sp: Spacing): void {
+  const node = anchorRef.value;
+  if (node === null) return; // free-panning; nothing parked to re-centre on
+  const world = gridToWorld(node, sp);
+  snapTo(world.x, world.y, node.zoom ?? cameraRef.value.zoom);
 }
 
 function setViewport(w: number, h: number): void {
   viewportRef.value = { w: Math.max(1, w), h: Math.max(1, h) };
+  if (viewportMeasured) return;
+  viewportMeasured = true;
+  // Explicit bootstrap correction, not a hoped-for side effect of the watcher.
+  // Harmless if the watcher also fires — both snap to the same world position.
+  recentreOnAnchor(spacing.value);
 }
 
 /** Set the captured island's vertical scroll offset (CSS px). Called by the
@@ -164,12 +187,12 @@ function setCaptureScroll(px: number): void {
 
 // When spacing changes (viewport resize), the parked waypoint's WORLD position
 // moves — re-snap the camera to keep it centered. No-op when free-panning.
-watch(spacing, (sp) => {
-  const node = anchorRef.value;
-  if (node === null) return;
-  const world = gridToWorld(node, sp);
-  snapTo(world.x, world.y, node.zoom ?? cameraRef.value.zoom);
-});
+// Resize: when spacing changes, the parked waypoint's WORLD position moves, so
+// re-centre to keep it under the camera. No-op when free-panning. (This also
+// fires on the 1×1 → measured transition, which is why the bootstrap used to
+// work by accident; `setViewport` now does that correction explicitly and this
+// is back to being only what its name says.)
+watch(spacing, recentreOnAnchor);
 
 const cameraStyle = computed(() => ({
   transform: cssTransformFor(cameraRef.value, viewportRef.value),
@@ -203,7 +226,13 @@ export interface CameraController {
   panToWaypoint: (id: WaypointId, opts?: { snap?: boolean }) => void;
   panToNode: (node: { gx: number; gy: number; zoom?: number | undefined }, opts?: { snap?: boolean }) => void;
   snapTo: (x: number, y: number, zoom?: number) => void;
-  releaseAnchor: () => void;
+  // (No `releaseAnchor`. It existed to null the anchor when free-panning so a
+  // resize would not yank the camera back to a waypoint — but free-panning is
+  // gesture navigation, which is `GESTURE_NAV_ENABLED = false` and compiled
+  // out, so nothing ever called it. Deleted rather than kept "for later", on
+  // the same reasoning as the dead zoom compensations in Stage 1.2: dead code
+  // reads as live to the next person. Re-enabling free-pan means restoring one
+  // line that sets `anchorRef.value = null`.)
   setViewport: (w: number, h: number) => void;
   setCaptureScroll: (px: number) => void;
 }
@@ -220,7 +249,6 @@ export function useCamera(): CameraController {
     panToWaypoint,
     panToNode,
     snapTo,
-    releaseAnchor,
     setViewport,
     setCaptureScroll,
   };

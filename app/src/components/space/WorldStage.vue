@@ -32,7 +32,7 @@ const CORE_SECTIONS: readonly { id: WaypointId; component: Component }[] = [
 ];
 const coreSections = CORE_SECTIONS.map((s) => ({ ...s, node: findWaypoint(s.id) }));
 
-const stageRef = ref<HTMLDivElement | null>(null);
+const stageRef = ref<HTMLElement | null>(null);
 let resizeObserver: ResizeObserver | null = null;
 
 // Vertical wheel anywhere in the viewport drives the active island's native
@@ -43,6 +43,10 @@ let resizeObserver: ResizeObserver | null = null;
 // the grid untouched. The programmatic scroll fires the panel's `scroll` event,
 // so the existing camera sync is unchanged.
 function onMarginWheel(e: WheelEvent): void {
+  // ctrl+wheel is the browser's zoom gesture (and what a trackpad pinch is
+  // reported as). Forwarding it as scroll — and then preventDefault-ing —
+  // silently disabled page zoom over the margins, which is a WCAG 1.4.4 path.
+  if (e.ctrlKey) return;
   const panel = document.querySelector<HTMLElement>('.world-panel--scroll');
   if (!panel || panel.contains(e.target as Node)) return;
   // Normalise wheel delta to px: Firefox reports lines (deltaMode 1) for mouse
@@ -55,8 +59,9 @@ function onMarginWheel(e: WheelEvent): void {
 onMounted(() => {
   const el = stageRef.value;
   if (!el) return;
-  // Feed the stage's own box size to the camera (robust to html { zoom }):
-  // the centering term in the transform needs the live viewport dimensions.
+  // Feed the stage's own box size to the camera: the centering term in the
+  // transform needs the live viewport dimensions, and measuring the element the
+  // panels actually live in beats re-deriving them from window/vh units.
   const sync = (): void => setViewport(el.clientWidth, el.clientHeight);
   sync();
   resizeObserver = new ResizeObserver(sync);
@@ -71,7 +76,14 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="stageRef" class="world-stage">
+  <!-- The stage is the document's <main>: the only landmark holding content, as
+       opposed to AppChrome (identity + theme) and NavSidebar (its own <nav>).
+       It wraps ALL panels rather than just the active one, because swapping the
+       tag per active state would remount the panel; the inactive panels are
+       `inert` (WorldPanel), so they are already out of the a11y tree and the
+       landmark exposes exactly the active island. `tabindex="-1"` makes it a
+       valid target for the skip link in App.vue. -->
+  <main id="main-content" ref="stageRef" class="world-stage" tabindex="-1">
     <div class="world-plane" :class="{ 'world-plane--animating': isAnimating }" :style="cameraStyle">
       <WorldPanel v-for="s in coreSections" :key="s.id" :node="s.node" :waypoint-id="s.id">
         <component :is="s.component" />
@@ -80,7 +92,7 @@ onUnmounted(() => {
         <NotebookPage :entry="entry" />
       </WorldPanel>
     </div>
-  </div>
+  </main>
 </template>
 
 <style scoped>

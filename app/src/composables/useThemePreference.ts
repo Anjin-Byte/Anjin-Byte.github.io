@@ -11,7 +11,16 @@ import { vuetify } from '../plugins/vuetify';
 // Declaring the refs at module scope makes this a singleton; every call to
 // useThemePreference() returns references to the same underlying state.
 
+// Three STORED values, two OFFERED ones. `system` is not a third theme — it is
+// the absence of a preference, which is a different kind of thing from 'light'
+// and 'dark', and presenting all three as peers in one control was the reason
+// the toggle read as over-provisioned. It stays in the storage vocabulary
+// (it is the first-visit default, and existing visitors have it persisted), but
+// the UI offers only the two real answers. See `mode` below.
 export type ThemePreference = 'light' | 'system' | 'dark';
+
+/** What the two-segment toggle offers. */
+export type ThemeMode = 'light' | 'dark';
 
 const STORAGE_KEY = 'theme-preference';
 
@@ -57,6 +66,29 @@ const themeRef = computed<ThemePalette>(() => {
   if (preferenceRef.value === 'light') return LIGHT_THEME;
   if (preferenceRef.value === 'dark') return DARK_THEME;
   return systemIsDarkRef.value ? DARK_THEME : LIGHT_THEME;
+});
+
+/**
+ * The two-segment toggle's binding: RESOLVED on read, EXPLICIT on write.
+ *
+ * Reading resolves `system` against the OS, so the lit segment always equals
+ * what the reader is actually looking at — the control is never lit for a mode
+ * that is not on screen, and it never sits unlit looking inert.
+ *
+ * Writing always stores a concrete choice, so the first click pins the theme
+ * and the OS stops being consulted. That is the whole behaviour: follow the
+ * system silently until told otherwise, then obey.
+ *
+ * Consequence, accepted deliberately: once a visitor picks, there is no in-UI
+ * route back to auto-switching (it would need a third state, which is the thing
+ * being removed). Clearing `localStorage['theme-preference']` restores it.
+ */
+const modeRef = computed<ThemeMode>({
+  get: () => {
+    if (preferenceRef.value === 'system') return systemIsDarkRef.value ? 'dark' : 'light';
+    return preferenceRef.value;
+  },
+  set: (v) => { preferenceRef.value = v; },
 });
 
 // ── CSS custom-property bridge ──────────────────────────────────────────────
@@ -224,12 +256,16 @@ if (typeof window !== 'undefined' && document?.documentElement) {
 }
 
 export function useThemePreference(): {
+  /** Raw stored preference, including `system`. Rarely what a component wants. */
   preference: typeof preferenceRef;
+  /** Resolved light/dark for the two-segment toggle — see `modeRef`. */
+  mode: typeof modeRef;
   theme: typeof themeRef;
   setPreference: (v: ThemePreference) => void;
 } {
   return {
     preference: preferenceRef,
+    mode: modeRef,
     theme: themeRef,
     setPreference(v: ThemePreference) {
       preferenceRef.value = v;

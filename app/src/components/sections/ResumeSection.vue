@@ -1,10 +1,32 @@
 <script setup lang="ts">
-import { experience, education } from '../../data/profile';
+import { experience, education, profile, contactLinks } from '../../data/profile';
+
+// Print-only identity block. On screen the name and contact details live on the
+// hero, one camera flight away, which is fine — the reader can see they are on
+// Taylor Hale's site. On PAPER that context is gone: the printed page arrived
+// as a PDF attachment with no header, so without this it is a list of jobs
+// belonging to nobody, which is not a résumé. Sourced from the same `profile`
+// data as everywhere else, so it cannot drift.
+const printContacts = contactLinks.filter(
+  (l) => l.label === 'Email' || l.label === 'Phone'
+    || l.label === 'Location' || l.label === 'GitHub' || l.label === 'LinkedIn',
+);
 </script>
 
 <template>
   <section id="resume" class="resume-section">
     <v-container class="resume-container">
+      <!-- `hidden` keeps it out of the a11y tree and the screen layout; the
+           print stylesheet reveals it. Not v-if, because it must exist in the
+           DOM for the browser's own print path to find it. -->
+      <header class="resume-print-identity" hidden>
+        <h1 class="resume-print-name">{{ profile.name }}</h1>
+        <p class="resume-print-tagline">{{ profile.tagline }}</p>
+        <ul class="resume-print-contacts">
+          <li v-for="c in printContacts" :key="c.label">{{ c.display }}</li>
+        </ul>
+      </header>
+
       <div class="resume-head">
         <div class="resume-heading">
           <span class="glass-chip section-kicker">Resume</span>
@@ -136,8 +158,14 @@ import { experience, education } from '../../data/profile';
   flex-wrap: wrap;
 }
 
+/* The flex basis that keeps role and employer on one line before the meta
+   wraps. `min-width: 16rem` alone is a hard floor measured in ROOT ems, so it
+   grows with the reader's font size: at a 24px root it demands 384px, more than
+   a 390px phone has after padding, and the row is then clipped by the panel.
+   `min(16rem, 100%)` keeps the intent at the default size and yields when the
+   container is genuinely smaller — the floor stops outranking the container. */
 .entry-titleblock {
-  min-width: 16rem;
+  min-width: min(16rem, 100%);
 }
 
 .entry-role {
@@ -247,13 +275,13 @@ import { experience, education } from '../../data/profile';
   padding: 1.4rem 1.5rem;
 }
 
-@media (max-width: 960px) {
+@container island (max-width: 660px) {
   .resume-head {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .timeline-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.75rem;
   }
 

@@ -67,6 +67,12 @@ export type WorkerInMsg =
   // on. `op` is a small closed union, switched exhaustively in ONE place.
   | { type: 'feature'; feature: string; op: FeatureOp; payload?: unknown }
   | { type: 'set_theme'; theme: ThemePalette }
+  // `prefers-reduced-motion`, crossing the worker boundary the same way the
+  // theme does. Without it the worker cannot know, and the simulation animates
+  // forever for a reader who asked the platform for less motion (R11).
+  // Singleton value, fire-and-forget: bespoke by design, NOT a feature-channel
+  // candidate (that channel is only for `FeatureState<HasId>` collections).
+  | { type: 'set_motion'; reduced: boolean }
   | { type: 'perf_snapshot' };
 
 /**

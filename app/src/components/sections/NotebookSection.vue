@@ -115,7 +115,7 @@ const formatDate = (iso: string): string => dateFmt.format(new Date(`${iso}T12:0
   color: var(--theme-text-secondary);
   font-size: 0.96rem;
   line-height: 1.7;
-  max-width: 62ch;
+  max-width: var(--measure);
 }
 
 .note-tags {

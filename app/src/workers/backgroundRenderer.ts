@@ -58,6 +58,14 @@ let lastRenderedCameraY = Number.NaN;
 // applies to the identical stale-buffer ghosting during pans and scrolls.
 const THEME_PRESENT_BURST_MS = 300;
 let forceRenderUntil = 0;
+
+// `prefers-reduced-motion: reduce`, published from the main thread (R11).
+// When set, the simulation STOPS ADVANCING: no base tick, and the between-
+// generation transition is pinned at 0 so the cell field holds one frozen
+// generation. The grid still repaints and still follows the camera, because
+// that motion is the reader's own scroll and stopping it would just make the
+// background lag behind the page. Defaults false until the main thread speaks.
+let reducedMotion = false;
 // Smoothed cost of a rendered frame on THIS device, feeding the gate's
 // sustainable-rate check while the camera moves (rationale in frameGate.ts).
 // Always-on, NOT PERF_ENABLED-gated: the adaptation has to work in production,
@@ -463,7 +471,11 @@ ws.onmessage = async (e: MessageEvent<unknown>) => {
         renderer.setInitFade?.(initFadeT);
       }
 
-      const action = resolveFrameAction(frameCount);
+      // Under reduced motion the field is frozen: force the cheap path and hold
+      // the transition at 0, so what renders is one generation, unchanging. The
+      // camera/resize/theme paths are untouched — this removes the animation,
+      // not the background.
+      const action = reducedMotion ? 'render_only' : resolveFrameAction(frameCount);
       switch (action) {
         case 'base_tick':
           renderer.setTransition?.(0);
@@ -477,7 +489,12 @@ ws.onmessage = async (e: MessageEvent<unknown>) => {
           }
           break;
         case 'render_only':
-          renderer.setTransition?.(easeTransition((frameCount % TICK_EVERY) / TICK_EVERY));
+          // The transition is what morphs one generation into the next, so it
+          // is animation in its own right even between ticks — pinned at 0 for
+          // reduced motion rather than left running against a frozen field.
+          renderer.setTransition?.(
+            reducedMotion ? 0 : easeTransition((frameCount % TICK_EVERY) / TICK_EVERY),
+          );
           if (r.renderOnly) {
             const renderOnly = r.renderOnly;
             if (perf) { perf.time('render', () => renderOnly()); }
@@ -599,6 +616,18 @@ ws.onmessage = async (e: MessageEvent<unknown>) => {
       // ticks. All presents stay on the normal per-'frame' path (no extra
       // out-of-band submit here), so present ordering is never in question.
       forceRenderUntil = performance.now() + THEME_PRESENT_BURST_MS;
+      lastRenderTime = 0;
+      break;
+
+    case 'set_motion':
+      reducedMotion = e.data.reduced;
+      // Force the next frame through the gate so the change is visible at once
+      // rather than at the next camera move: turning the preference ON should
+      // stop the field immediately, and turning it OFF should resume without
+      // waiting for the reader to scroll. Same lever 'set_theme' uses, but a
+      // single frame is enough here — there is no stale-swapchain problem to
+      // flush, only one uniform to re-present.
+      forceRenderUntil = performance.now();
       lastRenderTime = 0;
       break;
 

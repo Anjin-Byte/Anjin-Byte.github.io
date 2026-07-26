@@ -335,7 +335,7 @@ const projectIndex: (Project & { visibleLinks: ResolvedProjectLink[] })[] = proj
 
 .project-feature-blurb {
   margin: 0 0 1.25rem;
-  max-width: 62ch;
+  max-width: var(--measure);
   color: var(--theme-text-secondary);
   font-size: 1rem;
   line-height: 1.75;
@@ -450,9 +450,9 @@ const projectIndex: (Project & { visibleLinks: ResolvedProjectLink[] })[] = proj
   border-radius: var(--radius-pill);
 }
 
-@media (max-width: 960px) {
+@container island (max-width: 660px) {
   .projects-head {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .projects-intro {
@@ -462,7 +462,7 @@ const projectIndex: (Project & { visibleLinks: ResolvedProjectLink[] })[] = proj
   /* Stack: the print becomes a full-width banner above the content. A fixed
      landscape ratio replaces the full-height fill it had beside the text. */
   .project-feature--media {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 1.4rem;
   }
 
@@ -476,7 +476,7 @@ const projectIndex: (Project & { visibleLinks: ResolvedProjectLink[] })[] = proj
   }
 
   .project-index {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

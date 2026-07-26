@@ -1,0 +1,220 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Print (responsive R5, site-needs Tier 1 #2).
+
+   MEASURED BEFORE (Cmd-P on /resume, US Letter): two pages that were IDENTICAL
+   DUPLICATES of each other, every line clipped mid-word at the right edge, 3 of
+   7 jobs present and the rest unreachable, and the wordmark, theme toggle, nav
+   bar and even the "Skip to content" link all printed. Worse than nothing to
+   hand a recruiter.
+
+   None of that is a styling oversight; it is the spatial model meeting paper.
+   The site is a fixed-position stage holding a transformed plane of panels,
+   each clamped to viewport height and clipped. Paper has no viewport and no
+   camera, so all of it has to be undone:
+
+     - `position: fixed` repeats on EVERY printed page. That is the duplicate.
+     - the panel is a fixed-height scroll container, so only the visible scroll
+       window is on paper. That is the 3-of-7.
+     - the plane's camera `transform` is an INLINE style, as are the panel's
+       `opacity`, `max-height` and `transform`. Beating an inline style needs
+       `!important`, which is why this file uses it freely. That is the narrow,
+       legitimate case the elevation audit's F7 policy excludes, not a violation
+       of it — there is no other way to reach an inline style from a stylesheet.
+
+   Loaded globally from main.ts rather than App.vue: App.vue is already 566
+   lines, and this is one self-contained concern rather than part of the token
+   system. ───────────────────────────────────────────────────────────────── */
+
+@page {
+  size: auto;
+  margin: 0.7in 0.75in;
+}
+
+@media print {
+  /* ── 1. Everything that is chrome, not content ────────────────────────── */
+  .app-bg-shell,
+  canvas.app-bg,
+  .chrome,
+  .nav-sidebar,
+  .skip-link,
+  .perf-hud {
+    display: none !important;
+  }
+
+  /* ── 2. Unbuild the stage ─────────────────────────────────────────────── */
+  /* The stage stops being a fixed viewport-sized window and becomes an
+     ordinary block, so content can flow across pages instead of repeating. */
+  .world-stage {
+    position: static !important;
+    overflow: visible !important;
+    inset: auto !important;
+    pointer-events: auto !important;
+  }
+
+  /* The plane's transform IS the camera. On paper there is no camera. */
+  .world-plane {
+    position: static !important;
+    transform: none !important;
+    width: auto !important;
+    height: auto !important;
+  }
+
+  /* Only the island the reader is actually on. The others are already `inert`
+     for assistive tech (Stage 0.1), which makes that attribute an exact,
+     already-maintained selector for "not the current page" — no new state. */
+  .world-panel[inert] {
+    display: none !important;
+  }
+
+  .world-panel {
+    position: static !important;
+    transform: none !important;
+    opacity: 1 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    width: auto !important;
+    /* The nav reserve exists to clear a rail that is not printed. */
+    padding-inline-start: 0 !important;
+    padding-block-end: 0 !important;
+    /* Drop inline-size containment so the section rules resolve against the
+       page rather than a container that no longer means anything. A 7in page
+       is comfortably past --bp-island, so sections print in their two-column
+       form, which is the right use of the width. */
+    container-type: normal !important;
+  }
+
+  .world-panel .v-container {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  /* Screen spacing is generous because the island floats in a field. On paper
+     that is just a wasted third of the first sheet. */
+  .hero-section,
+  .demos-section,
+  .resume-section,
+  .contact-section,
+  .notebook-section,
+  .note-page-shell {
+    min-height: 0 !important;
+    padding-block: 0 !important;
+  }
+
+  /* ── 3. Ink on white, whatever the reader's theme ─────────────────────── */
+  /* Overriding the TOKENS rather than the elements: useThemePreference writes
+     the palette as inline custom properties on <html>, and everything else
+     reads them through var(), so redefining them here re-colours the whole
+     document through the cascade instead of element by element. A reader who
+     prints in dark mode gets a readable page rather than a black rectangle. */
+  :root {
+    --theme-surface: #fff !important;
+    --theme-ink: #000 !important;
+    --theme-text-primary: #111 !important;
+    --theme-text-secondary: #333 !important;
+    --theme-text-tertiary: #555 !important;
+    --theme-ink-secondary: #333 !important;
+    --theme-ink-tertiary: #555 !important;
+    --island-fill: #fff !important;
+    --island-edge: #bbb !important;
+    --well-recess: #fff !important;
+    --badge-fill: transparent !important;
+    --theme-grid-minor: transparent !important;
+    --theme-grid-major: transparent !important;
+    --theme-accent: #000 !important;
+    --theme-accent-ring: #666 !important;
+    /* Depth is a screen affordance. On paper it is grey mush. */
+    --island-lip: none !important;
+    --elev-1: none !important;
+    --elev-2: none !important;
+    --elev-flush: none !important;
+    --elev-overlay: none !important;
+    --well-deep: none !important;
+    --well-shallow: none !important;
+    --state-pressed: none !important;
+    --cut-ring: none !important;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    /* The html element paints the grid as a background-image; it has no
+       business on paper even with backgrounds enabled. */
+    background-image: none !important;
+  }
+
+  /* ── 4. Fragmentation ─────────────────────────────────────────────────── */
+  /* A job or a degree split across a page boundary is the "guillotined
+     mid-sentence" complaint in R5. These are the units that must stay whole. */
+  .timeline-row,
+  .entry,
+  .education-card,
+  .hero-note,
+  .project-feature,
+  .project-card {
+    break-inside: avoid;
+  }
+
+  /* A heading stranded at the foot of a page is the other half. */
+  h1, h2, h3,
+  .section-heading,
+  .section-kicker,
+  .edu-head {
+    break-after: avoid;
+  }
+
+  /* ── 5. Who this résumé belongs to ────────────────────────────────────── */
+  /* Screen readers of the site got the name from the hero. A PDF attachment
+     has no hero, so the printed page has to introduce itself. Markup lives in
+     ResumeSection.vue behind `hidden`; this is what reveals it. */
+  .resume-print-identity[hidden] {
+    display: block !important;
+    margin-bottom: 1.6rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #bbb;
+  }
+
+  .resume-print-name {
+    margin: 0 0 0.15rem;
+    font-family: var(--font-display);
+    font-size: 1.9rem;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+
+  .resume-print-tagline {
+    margin: 0 0 0.5rem;
+    font-size: 0.95rem;
+    color: #333;
+  }
+
+  .resume-print-contacts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1.1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.85rem;
+    color: #333;
+  }
+
+  /* The résumé kicker is redundant once the page says whose résumé it is. */
+  .resume-head .section-kicker {
+    display: none !important;
+  }
+
+  /* ── 6. Links ─────────────────────────────────────────────────────────── */
+  /* A printed résumé is read on paper, where "GitHub" is not clickable. Print
+     the destination after the label — but only for OFF-SITE links, since a
+     printed `/projects` helps nobody. */
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.85em;
+    color: #555;
+    word-break: break-all;
+  }
+
+  a[href^="mailto:"]::after {
+    content: "";
+  }
+}

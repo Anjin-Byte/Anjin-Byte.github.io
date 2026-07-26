@@ -12,6 +12,7 @@ import { useCoordinateMapper } from '../../composables/useCoordinateMapper';
 import { onSample } from '../../composables/frameClock';
 import { useDragTools } from '../../composables/useDragTools';
 import { useThemePreference } from '../../composables/useThemePreference';
+import { useMotionPreference } from '../../composables/useMotionPreference';
 import {
   useCanvasSurface,
   applyGridPitchVars,
@@ -69,6 +70,17 @@ const zoneDraft = ref<BlankZoneDraft>({
 const { theme: currentTheme } = useThemePreference();
 watch(currentTheme, (next) => {
   bridge.post({ type: 'set_theme', theme: next });
+});
+
+// ── Motion preference ───────────────────────────────────────────────────────
+// Same shape as the theme above, and for the same reason: the worker owns the
+// only perpetual animation on the site and cannot read a media query from
+// inside a worker scope. Pushed on change here and on worker 'ready' below, so
+// a reader who has asked for reduced motion never sees the field animate — not
+// even for the first few frames after the renderer spawns (R11).
+const { reducedMotion } = useMotionPreference();
+watch(reducedMotion, (next) => {
+  bridge.post({ type: 'set_motion', reduced: next });
 });
 
 // ── Object factories ──────────────────────────────────────────────────────
@@ -156,6 +168,9 @@ onMounted(() => {
       applyGridPitchVars(msg.gridInfo.gridPitch);
     }
     bridge.post({ type: 'set_theme', theme: currentTheme.value });
+    // Before anything else the worker might animate: the worker defaults to
+    // full motion, so this has to arrive on 'ready', not merely on change.
+    bridge.post({ type: 'set_motion', reduced: reducedMotion.value });
     // Push the composable's current zones down to the freshly-spawned worker
     // (its state starts empty; the composable may have loaded some from storage).
     zoneChannel.onSet(blankZones.zones.value);

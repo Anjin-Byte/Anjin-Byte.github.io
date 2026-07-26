@@ -33,8 +33,10 @@ import {
  *    edge breaks to the north/south neighbour (Phase 2 logic).
  *  - horizontal-locked → the camera tugs off the lane with damping; past the
  *    break threshold it flies to the east/west neighbour, else springs back on
- *    idle. preventDefault on horizontal events (plus overscroll-behavior-x in
- *    App.vue) suppresses the browser's two-finger back/forward swipe.
+ *    idle. preventDefault on horizontal events suppresses the browser's
+ *    two-finger back/forward swipe. (The `overscroll-behavior-x: none` that
+ *    used to back this up was removed with the other suppressions this flag
+ *    was costing while off; re-enabling the gesture means reinstating it.)
  *
  * The gesture resets after `ACCUM_RESET_MS` of idle, so each scroll re-decides
  * its axis. This complements the on-screen nav sidebar (NavSidebar — the

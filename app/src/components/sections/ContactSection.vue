@@ -67,9 +67,14 @@ import ContactStrip from '../layout/ContactStrip.vue';
   justify-content: flex-end;
 }
 
-@media (max-width: 900px) {
+/* 960 (--bp-content), not the 900 this used to carry. 900 was the only value
+   of its kind in the codebase and it created an inconsistent 901-960 band that
+   landed on landscape phones: every other section had already collapsed to one
+   column while this one had not. It also left the left column at ~356px, below
+   the ~380px floor the set is now derived from. */
+@container island (max-width: 660px) {
   .contact-band {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .contact-strip-wrap {

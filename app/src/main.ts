@@ -4,6 +4,10 @@ import { vuetify } from './plugins/vuetify';
 import { router, installCameraRouteSync } from './router';
 // KaTeX stylesheet for notebook math (the markdown pipeline renders to KaTeX HTML).
 import 'katex/dist/katex.min.css';
+// Print rules. Global (not scoped to a component) because they have to unbuild
+// the whole spatial model — the fixed stage, the camera transform, the panel
+// clipping — none of which any single component owns. See the file header.
+import './styles/print.css';
 
 const app = createApp(App).use(vuetify).use(router);
 

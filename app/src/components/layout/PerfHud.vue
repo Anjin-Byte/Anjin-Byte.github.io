@@ -12,6 +12,12 @@
 // averaging 6ms with one 40ms spike per second reads as fine and feels broken.
 //
 // Toggle with the `\` key (and `?perf=1` to start open).
+//
+// The renderer-backend switcher lives here too, rather than as its own
+// permanently-visible overlay in the corner. Two reasons: the tier you are on
+// and the cost of a frame are the same question asked twice — you switch tiers
+// in order to compare these numbers — and a debug control that is always on
+// screen is a debug control that is always in a screenshot.
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { RafMonitor } from '../../perf/RafMonitor';
 import {
@@ -21,6 +27,11 @@ import {
 } from '../../perf/frameBudget';
 import type { RenderCostStats } from '../../workers/rendererProtocol';
 import { onRenderCost } from '../../composables/useRenderCost';
+import {
+  useRendererBackend,
+  currentForcedSelection,
+  type ForcedSelection,
+} from '../../composables/useRendererBackend';
 
 const open = ref(new URLSearchParams(window.location.search).get('perf') === '1');
 const report = ref<SmoothnessReport | null>(null);
@@ -101,6 +112,28 @@ const shedPct = computed(() => {
   if (!c || c.received === 0) return 0;
   return ((c.received - c.rendered) / c.received) * 100;
 });
+
+// ── Renderer backend ────────────────────────────────────────────────────────
+// Backend selection is one-shot at worker init (a canvas context is claimed
+// once and permanently), so choosing a tier RELOADS with `?renderer=` applied
+// rather than hot-swapping. `forced` is what the URL pins; `activeLabel` is what
+// the worker actually reported — they differ in Auto, which is the interesting
+// case, since it shows which rung the WebGPU → WebGL2 → static probe landed on.
+const { activeBackend, forceBackendReload } = useRendererBackend();
+
+const BACKENDS: { id: ForcedSelection; label: string }[] = [
+  { id: 'auto', label: 'Auto' },
+  { id: 'webgpu', label: 'WebGPU' },
+  { id: 'webgl2', label: 'WebGL2' },
+  { id: 'static', label: 'Static' },
+];
+
+const forced = currentForcedSelection();
+
+const ACTIVE_LABEL: Record<string, string> = { gpu: 'WebGPU', webgl2: 'WebGL2', cpu: 'Static' };
+const activeLabel = computed(() =>
+  activeBackend.value ? ACTIVE_LABEL[activeBackend.value] ?? activeBackend.value : '…',
+);
 </script>
 
 <template>
@@ -164,6 +197,27 @@ const shedPct = computed(() => {
       </template>
     </template>
     <div v-else class="hud-dim">sampling…</div>
+
+    <!-- Outside the `report` block on purpose: the tier is worth seeing (and
+         switchable) before the first sample lands, which is exactly when you
+         are diagnosing a renderer that failed to start. -->
+    <hr class="hud-hr" />
+    <div class="hud-row hud-dim">
+      <span>renderer</span>
+      <span>active <strong class="hud-active">{{ activeLabel }}</strong></span>
+    </div>
+    <div class="hud-backends" role="group" aria-label="Renderer backend (reloads the page)">
+      <button
+        v-for="b in BACKENDS"
+        :key="b.id"
+        type="button"
+        class="hud-be"
+        :class="{ 'hud-be--on': forced === b.id }"
+        :aria-pressed="forced === b.id"
+        :title="`Reload with ${b.label}`"
+        @click="forceBackendReload(b.id)"
+      >{{ b.label }}</button>
+    </div>
   </div>
 </template>
 
@@ -237,4 +291,48 @@ const shedPct = computed(() => {
 .hud-note { font-size: 10px; margin: -3px 0 5px; }
 .hud-hr { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 6px 0; }
 em { font-style: normal; opacity: 0.5; }
+
+/* ── Renderer backend switcher ─────────────────────────────────────────────
+   Styled from literal values like the rest of this overlay, NOT from the app's
+   theme tokens. That is the same rule the panel background follows and it is
+   deliberate: this HUD is used to debug the renderer that paints those tokens,
+   so a readout that changes appearance with them is a readout that can lie
+   about the thing it is diagnosing. (As its own overlay this control did read
+   --theme-surface / --island-edge; folding it in drops that dependency.) */
+.hud-active { color: rgba(240, 243, 247, 0.94); font-weight: 600; }
+
+.hud-backends {
+  display: flex;
+  gap: 3px;
+  margin-top: 5px;
+}
+
+.hud-be {
+  flex: 1;
+  padding: 3px 4px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+  color: rgba(240, 243, 247, 0.7);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+}
+.hud-be:hover {
+  border-color: rgba(255, 255, 255, 0.34);
+  color: rgba(240, 243, 247, 0.98);
+}
+.hud-be:focus-visible {
+  outline: 2px solid rgba(126, 190, 255, 0.9);
+  outline-offset: 1px;
+}
+/* The pinned tier. Reads as "this is forced", distinct from `active` above,
+   which is what the worker actually got — in Auto those differ, and that
+   difference is the whole reason the readout exists. */
+.hud-be--on {
+  background: rgba(126, 190, 255, 0.9);
+  border-color: transparent;
+  color: #10141a;
+  font-weight: 600;
+}
 </style>

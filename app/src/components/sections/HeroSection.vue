@@ -140,7 +140,7 @@ const locationLink = contactLinks.find((link) => link.label === 'Location');
   font-size: 1.05rem;
   line-height: 1.75;
   color: var(--theme-text-primary);
-  max-width: 62ch;
+  max-width: var(--measure);
   margin: 0 0 2.4rem;
 }
 
@@ -237,9 +237,16 @@ const locationLink = contactLinks.find((link) => link.label === 'Location');
   opacity: 0.78;
 }
 
-@media (max-width: 960px) {
+@container island (max-width: 660px) {
   .hero-frame {
-    grid-template-columns: 1fr;
+    /* `minmax(0, 1fr)`, never a bare `1fr`. A bare `1fr` is `minmax(auto, 1fr)`
+       and that `auto` floor is the element's MIN-CONTENT width, so the track
+       refuses to shrink below its widest unbreakable child and pushes out of
+       the panel — which clips, because .world-panel is overflow:hidden. It is
+       invisible at the default text size and appears the moment a reader turns
+       their font size up. Every desktop rule here already had the guard; only
+       the mobile collapses were missing it. */
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .hero-name {

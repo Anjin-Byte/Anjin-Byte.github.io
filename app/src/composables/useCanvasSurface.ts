@@ -23,18 +23,19 @@ export function applyGridPitchVars(devicePitch: number): void {
   s.setProperty('--grid-pitch-minor', `${cssPitch.toFixed(2)}px`);
   s.setProperty('--grid-pitch-major', `${(cssPitch * MAJOR_EVERY).toFixed(2)}px`);
 }
-// Floor for the canvas backing-texture height: max(initial shell, screen
-// height × dpr, MIN_CANVAS_HEIGHT_DEVICE_PX). The shell clips overflow so
-// excess height is purely fragment-shader overdraw; we pay sub-millisecond
-// per frame in exchange for never reconfiguring the surface on shell-height
-// changes (browser toolbar collapse, window-edge drag, iOS address bar).
+// Floor for the canvas backing-texture height: max(shell, screen height × dpr,
+// MIN_CANVAS_HEIGHT_DEVICE_PX). The shell clips overflow so excess height is
+// purely fragment-shader overdraw; we pay sub-millisecond per frame in exchange
+// for not reconfiguring the surface on the shell-height changes that oscillate
+// (browser toolbar collapse, window-edge drag, iOS address bar). Height that
+// genuinely GROWS past the floor is still followed — see `growCanvasHeight`.
 const MIN_CANVAS_HEIGHT_DEVICE_PX = 2160;
 
 export interface CanvasSurface {
   /**
    * Size the canvas, transfer control to an OffscreenCanvas, install the
-   * width-only ResizeObserver + DPR listener (both publish to the worker), and
-   * return what `WorkerBridge.init` needs. Call once, after refs are mounted.
+   * ResizeObserver + DPR listener (both publish to the worker), and return what
+   * `WorkerBridge.init` needs. Call once, after refs are mounted.
    */
   initialize(shell: HTMLElement, canvas: HTMLCanvasElement): { offscreen: OffscreenCanvas };
   /** Crossfade the canvas in on the worker's first painted frame. */
@@ -43,8 +44,7 @@ export interface CanvasSurface {
 }
 
 /**
- * Owns the AppBackground canvas surface: device-pixel sizing, the Chrome/
- * Firefox effective-zoom compensation under `html { zoom }`, resize/DPR
+ * Owns the AppBackground canvas surface: device-pixel sizing, resize/DPR
  * republishing, the hide-during-resize mask, and the first-frame crossfade.
  * Extracted verbatim from AppBackground.vue so that component stays a thin host
  * (and under the file-size limit). Posts `resize` messages via `post`.
@@ -52,15 +52,17 @@ export interface CanvasSurface {
 export function useCanvasSurface(post: (msg: WorkerInMsg) => void): CanvasSurface {
   let canvasEl: HTMLCanvasElement | null = null;
   let canvasW = 0;
-  // Picked once at mount and recomputed only on DPR change. Width is the only
-  // dimension that triggers actual reconfigures; height is held constant at a
-  // generous "exceeds any plausible viewport" value.
+  // GROW-ONLY within a session (see `growCanvasHeight`). Starts at a generous
+  // "exceeds any plausible viewport" value and only ever rises.
   let canvasH = 0;
   let resizeObserver: ResizeObserver | null = null;
   let canvasHideTimer: number | null = null;
-  // rAF coalescer for width changes — drag the window edge at 60+ events/s and
+  // rAF coalescer for size changes — drag the window edge at 60+ events/s and
   // we still publish at most one resize per frame to the worker.
   let pendingWidth = 0;
+  // Set when `growCanvasHeight` raised `canvasH`, so a height-only growth still
+  // reaches the worker (the rAF path is otherwise gated on a width change).
+  let pendingHeightGrowth = false;
   let resizeRafId: number | null = null;
   // Settle-debounce for the worker surface reconfigure: a window drag fires the
   // rAF coalescer ~60×/s, and a per-frame surface.configure() in the worker
@@ -69,9 +71,6 @@ export function useCanvasSurface(post: (msg: WorkerInMsg) => void): CanvasSurfac
   // throughout, so this is invisible).
   let resizeSettleTimer: number | null = null;
   let detachDprListener: (() => void) | null = null;
-  // Cached "Chrome effective-zoom asymmetry" flag. Refreshed at mount and on
-  // DPR change. See `probeEffectiveZoomAsymmetry` / `applyCanvasBox`.
-  let effectiveZoomActive = false;
   let disposed = false;
 
   function readCanvasPixelSize(el: Element): { width: number; height: number } {
@@ -83,71 +82,89 @@ export function useCanvasSurface(post: (msg: WorkerInMsg) => void): CanvasSurfac
     };
   }
 
-  /** Read width in device pixels with sub-pixel precision when available.
-   *  `devicePixelContentBoxSize` reports TRUE device pixels (uncapped) — when
-   *  the effective DPR is capped below the true ratio, rescale it down to the
-   *  same capped space the rest of this module (and the canvas backing store)
-   *  uses, so a width change still compares correctly against `canvasW`.
-   *  Rounded to an integer (matching `canvasW`, always an integer) — an
-   *  unrounded rescale can land a hair off an otherwise-unchanged width,
-   *  which defeats the `w === canvasW` no-op check below and spuriously
-   *  replays the whole resize/hide/reconfigure dance (visible as a flicker)
-   *  on any incidental layout nudge, e.g. a scrollbar appearing after a
-   *  `color-scheme` change on theme toggle. */
-  function readWidthDevicePx(entry: ResizeObserverEntry): number {
-    const dpr = effectiveDpr();
-    const dp = entry.devicePixelContentBoxSize?.[0]?.inlineSize;
-    if (typeof dp === 'number' && dp > 0) return Math.round(dp * (dpr / devicePixelRatio));
-    return Math.max(1, Math.round(entry.contentRect.width * dpr));
-  }
+  // NOTE: there is no `readWidthDevicePx`. Width, like height, is measured ONLY
+  // by `readCanvasPixelSize` above — `getBoundingClientRect() × effectiveDpr()`.
+  //
+  // It used to read `entry.devicePixelContentBoxSize[0].inlineSize` and rescale
+  // it by the ratio of capped-to-true DPR, on the premise that the property
+  // reports TRUE device pixels. When that premise holds the two agree; when it
+  // does not, the canvas CSS box comes out at exactly shell width DIVIDED by the
+  // true ratio — a hard vertical seam, with the grid painting only the leftmost
+  // 1/ratio of the viewport, and correct at ratio 1 (where the two units
+  // coincide), which is why it never showed on a plain desktop display.
+  //
+  // Init and the DPR listener always used `readCanvasPixelSize`, so the two
+  // paths could disagree the moment the observer fired. That is the same defect
+  // as the height bug found in Stage 0.2, in the same function, left in place
+  // because only height was being touched. One derivation now, for both axes.
+  //
+  // The precision argument for the old path does not survive contact with this:
+  // `devicePixelContentBoxSize` is more precise only if it means what the spec
+  // says, and a sub-pixel gain is not worth a whole-axis failure mode. The
+  // anti-flicker property it was documented for is preserved anyway —
+  // `readCanvasPixelSize` also rounds to an integer, so the `w === canvasW`
+  // no-op check still absorbs incidental layout nudges.
 
-  function pickCanvasHeight(initialShellHeightDevicePx: number): number {
+  function pickCanvasHeight(shellHeightDevicePx: number): number {
     const screenDevicePx = Math.round(screen.height * effectiveDpr());
-    return Math.max(initialShellHeightDevicePx, screenDevicePx, MIN_CANVAS_HEIGHT_DEVICE_PX);
+    return Math.max(shellHeightDevicePx, screenDevicePx, MIN_CANVAS_HEIGHT_DEVICE_PX);
   }
 
   /**
-   * Detect whether this browser exhibits Chrome's "effective zoom" asymmetry
-   * under `html { zoom: !=1 }`: `getBoundingClientRect` returns post-zoom
-   * (visual) CSS pixels while `style.width` writes are interpreted as pre-zoom
-   * (logical) CSS pixels and visually re-scaled by the html zoom factor.
-   * Round-tripping a value between the two then ends up scaled twice.
+   * Raise `canvasH` if the shell now needs more than the backing texture has.
+   * Returns whether it moved.
    *
-   * Probe: write 100 logical CSS px to a hidden div, read its rect, compare.
-   * If they differ by more than a sub-pixel epsilon, the asymmetry is active.
+   * GROW-ONLY, deliberately. `pickCanvasHeight` used to run at mount and on DPR
+   * change only, so a shell that got TALLER at a constant DPR was never noticed
+   * — an Android landscape→portrait rotation left ~200 css px of bare fallback
+   * grid below the canvas, and dragging a DPR-2 laptop window onto a 5K display
+   * (same effective DPR, much taller `screen.height`) left ~360.
+   *
+   * Never shrinking is the other half: the shell's height oscillates constantly
+   * on mobile as the browser toolbar collapses and re-expands, and a shrink
+   * would replay the hide/reconfigure dance on every one of those. That churn
+   * is exactly what MIN_CANVAS_HEIGHT_DEVICE_PX exists to prevent, so the floor
+   * keeps doing its job and this only lifts it. Cost is a session-lifetime
+   * high-water mark of texture memory; the shell clips the overflow, so the
+   * extra rows are fragment-shader overdraw and nothing else.
+   *
+   * Callers pass `readCanvasPixelSize(shell).height`, NOT anything off the
+   * ResizeObserver entry. `devicePixelContentBoxSize` is unreliable under DPR
+   * emulation — measured at 2000 for a shell whose true device height was 4000
+   * — and `entry.contentRect` was a second coordinate space back when
+   * `html { zoom }` existed. `getBoundingClientRect × effectiveDpr()` is the one
+   * path already used at init and by the DPR listener, so height has exactly one
+   * derivation. Keep it that way even though the zoom is gone: two ways to
+   * measure the same box is how the original bug happened.
    */
-  function probeEffectiveZoomAsymmetry(): boolean {
-    const probe = document.createElement('div');
-    probe.style.cssText = 'position:fixed;left:-9999px;top:0;width:100px;height:100px;';
-    document.body.appendChild(probe);
-    const measured = probe.getBoundingClientRect().width;
-    probe.remove();
-    return Math.abs(measured - 100) > 0.1;
+  function growCanvasHeight(shellHeightDevicePx: number): boolean {
+    const next = pickCanvasHeight(shellHeightDevicePx);
+    if (next <= canvasH) return false;
+    canvasH = next;
+    return true;
   }
 
+  /**
+   * Set the canvas CSS box from its device-pixel backing size.
+   *
+   * MUST divide by the same (possibly capped) ratio `widthPx`/`heightPx` were
+   * multiplied by when sized, not the raw devicePixelRatio, or the canvas
+   * renders under/over its intended box.
+   *
+   * There used to be a second correction here for Chrome's "effective zoom"
+   * asymmetry under `html { zoom: != 1 }` — `getBoundingClientRect` returns
+   * post-zoom visual px while `style.width` writes are read as pre-zoom logical
+   * px, so a round-trip scaled twice — behind a `probeEffectiveZoomAsymmetry()`
+   * feature probe. With the html zoom removed there is one coordinate space and
+   * both the probe and the correction are gone. Deleted rather than neutered:
+   * dead compensation reads as necessary to the next person, and report 02's D5
+   * (applyGridPitchVars did NOT compensate while this did — at most one could be
+   * right) dissolves rather than needing a ruling.
+   */
   function applyCanvasBox(canvas: HTMLCanvasElement, widthPx: number, heightPx: number): void {
-    // Intended visual size is `widthPx / effectiveDpr()` CSS px — MUST divide by
-    // the same (possibly capped) ratio `widthPx`/`heightPx` were multiplied by
-    // when sized, not the raw devicePixelRatio, or the canvas renders under/over
-    // its intended CSS box. Under Chrome's effective-zoom model with
-    // `html { zoom: !=1 }`, `style.width` is interpreted as pre-zoom logical CSS
-    // px and re-scaled by the html zoom factor on render — so we pre-divide by
-    // zoom to land at the right visual size. Safari's classic-zoom model agrees
-    // on coord systems and skips this.
     const dpr = effectiveDpr();
-    const visualWCss = widthPx / dpr;
-    const visualHCss = heightPx / dpr;
-    let logicalWCss = visualWCss;
-    let logicalHCss = visualHCss;
-    if (effectiveZoomActive) {
-      const zoom = parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
-      if (zoom > 0 && zoom !== 1) {
-        logicalWCss = visualWCss / zoom;
-        logicalHCss = visualHCss / zoom;
-      }
-    }
-    canvas.style.width = `${logicalWCss.toFixed(2)}px`;
-    canvas.style.height = `${logicalHCss.toFixed(2)}px`;
+    canvas.style.width = `${(widthPx / dpr).toFixed(2)}px`;
+    canvas.style.height = `${(heightPx / dpr).toFixed(2)}px`;
   }
 
   function hideCanvasDuringResize(canvas: HTMLCanvasElement): void {
@@ -180,8 +197,12 @@ export function useCanvasSurface(post: (msg: WorkerInMsg) => void): CanvasSurfac
     if (resizeRafId !== null) return;
     resizeRafId = requestAnimationFrame(() => {
       resizeRafId = null;
-      if (pendingWidth === 0 || pendingWidth === canvasW) return;
-      publishCanvasResize(canvas, pendingWidth);
+      const widthChanged = pendingWidth > 0 && pendingWidth !== canvasW;
+      // A height-only growth must still publish — `canvasH` has already moved,
+      // but the worker has not been told, so its surface is still the old size.
+      if (!widthChanged && !pendingHeightGrowth) return;
+      pendingHeightGrowth = false;
+      publishCanvasResize(canvas, widthChanged ? pendingWidth : canvasW);
     });
   }
 
@@ -213,21 +234,15 @@ export function useCanvasSurface(post: (msg: WorkerInMsg) => void): CanvasSurfac
   ): { offscreen: OffscreenCanvas } {
     canvasEl = canvas;
 
-    // Detect Chrome/Firefox effective-zoom asymmetry once (refreshed on DPR
-    // change). `applyCanvasBox` reads this to decide whether to compensate
-    // `canvas.style.{width,height}` for `html { zoom }`.
-    effectiveZoomActive = probeEffectiveZoomAsymmetry();
-
     const initialSize = readCanvasPixelSize(shell);
     canvasW = initialSize.width;
-    canvasH = pickCanvasHeight(initialSize.height);
+    growCanvasHeight(initialSize.height); // canvasH is 0 here, so this seeds it
     canvas.width = canvasW;
     canvas.height = canvasH;
     applyCanvasBox(canvas, canvasW, canvasH);
     log.debug(
       'Canvas initialised', canvasW, 'x', canvasH,
       'dpr', devicePixelRatio, `(effective ${effectiveDpr()})`,
-      'effectiveZoom', effectiveZoomActive,
     );
 
     const offscreen = canvas.transferControlToOffscreen();
@@ -236,29 +251,36 @@ export function useCanvasSurface(post: (msg: WorkerInMsg) => void): CanvasSurfac
     // when the worker reports 'ready', which also cross-checks the constant.)
     applyGridPitchVars(GRID_CELL_DEVICE_PX);
 
-    // Resize observer — width-only. Shell-height changes are deliberately
-    // ignored: the canvas is fixed-positioned and clipped by the shell's
-    // overflow:hidden, so the backing texture only needs to be at least as tall
-    // as any plausible viewport (handled by `pickCanvasHeight`). Width changes
-    // are coalesced to one publish per frame to avoid swapchain-rebuild storms.
+    // Resize observer. Width tracks the shell in both directions; height only
+    // ever grows (see `growCanvasHeight` — the canvas is fixed-positioned and
+    // clipped by the shell's overflow:hidden, so being too TALL costs only
+    // overdraw while being too SHORT shows bare fallback grid). Both are
+    // coalesced to one publish per frame to avoid swapchain-rebuild storms.
     resizeObserver = new ResizeObserver(([entry]) => {
       if (!canvasEl || !entry) return;
-      const w = readWidthDevicePx(entry);
-      if (w <= 0 || w === canvasW) return;
-      pendingWidth = w;
-      scheduleResizePublish(canvasEl);
+      // One measurement, both axes, same path as init and the DPR listener.
+      // `entry` is only the trigger; it is deliberately not the ruler.
+      const size = readCanvasPixelSize(shell);
+      if (growCanvasHeight(size.height)) pendingHeightGrowth = true;
+      const w = size.width;
+      // Record the latest width unconditionally, even when it matches canvasW:
+      // an entry that returns to the current width mid-frame must CLEAR an
+      // earlier pending value, not leave it queued for the rAF to publish.
+      if (w > 0) pendingWidth = w;
+      if (pendingWidth !== canvasW || pendingHeightGrowth) scheduleResizePublish(canvasEl);
     });
     resizeObserver.observe(shell);
 
     // DPR listener — fires when the user moves the window between displays of
-    // different DPI or changes OS scaling. Recomputes the constant canvas height
-    // for the new DPR, re-runs the effective-zoom probe, and republishes the
-    // current width so the worker re-applies CSS dims and uniforms.
+    // different DPI or changes OS scaling. Re-checks the canvas height for the
+    // new DPR and republishes the current width so the worker re-applies CSS
+    // dims and uniforms. The height goes through the same grow-only rule as the
+    // observer: a DPR *drop* shrinks `screen.height × dpr`, and following it
+    // down would surrender height the shell may still be using.
     detachDprListener = watchDevicePixelRatio(() => {
       if (!canvasEl) return;
-      effectiveZoomActive = probeEffectiveZoomAsymmetry();
       const shellH = Math.round(shell.getBoundingClientRect().height * effectiveDpr());
-      canvasH = pickCanvasHeight(shellH);
+      growCanvasHeight(shellH);
       // The CSS pitch is device-pitch ÷ effectiveDpr, so a DPR change moves it.
       applyGridPitchVars(GRID_CELL_DEVICE_PX);
       publishCanvasResize(canvasEl, canvasW);

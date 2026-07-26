@@ -18,10 +18,16 @@ import * as path from 'path';
 const ALLOWED: Record<string, number> = {
   // The definition site itself (1 use + 1 doc mention).
   'utils/devicePixelRatio.ts': 2,
-  // (a) rescaling ResizeObserver's TRUE-device-px width into capped space,
-  // (b) the matchMedia change-detector (must key off the real ratio),
-  // (c) a debug log printing raw vs effective, (d) one doc-comment mention.
-  'composables/useCanvasSurface.ts': 4,
+  // (a) the matchMedia change-detector (must key off the real ratio),
+  // (b) a debug log printing raw vs effective, (c) one doc-comment mention.
+  // Was 4. Dropped to 3 when `readWidthDevicePx` was deleted: BOTH axes now
+  // measure via readCanvasPixelSize (getBoundingClientRect × effectiveDpr), the
+  // same path as init and the DPR listener, so nothing rescales a
+  // ResizeObserver entry by the raw ratio any more. Do not raise this back
+  // without a use-site justification — the read it used to cover produced a
+  // canvas sized to 1/ratio of the viewport wherever the entry's units were
+  // not what the spec promises.
+  'composables/useCanvasSurface.ts': 3,
   // Doc comment describing the coordinate spaces.
   'utils/gridCoords.ts': 1,
   // Doc comment on the `Dpr` branded type (always effectiveDpr(), never raw).

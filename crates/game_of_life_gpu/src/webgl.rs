@@ -98,9 +98,11 @@ pub struct WebglGameOfLife {
     queue: wgpu::Queue,
     surface: wgpu::Surface<'static>,
     config: wgpu::SurfaceConfiguration,
-    /// WebGL2's `max_texture_dimension_2d` — the surface must fit within it on
-    /// both axes (2048 on the spec floor / plenty of mobile GPUs), far below
-    /// WebGPU's, while the canvas is sized for WebGPU. Clamp or configure fails.
+    /// This adapter's `max_texture_dimension_2d` — the surface must fit within
+    /// it on both axes, and the canvas is sized for WebGPU, so it can exceed
+    /// it. Clamp or configure fails. Derived from the adapter (see
+    /// `using_resolution` in `from_surface`); 2048 is only the spec floor, hit
+    /// on weak mobile GPUs rather than on everything.
     max_dim: u32,
 
     // ── Ping-pong simulation ────────────────────────────────────────────────
@@ -146,12 +148,21 @@ impl WebglGameOfLife {
         // WebGL2 caps: NO compute, NO storage buffers. downlevel_webgl2_defaults
         // advertises exactly what WebGL2 provides, so any accidental use of an
         // unsupported feature fails loudly at pipeline creation.
+        //
+        // `using_resolution` then lifts ONLY the resolution limits
+        // (max_texture_dimension_1d/2d/3d) to what this adapter actually
+        // reports, leaving every other downlevel guarantee intact. Without it
+        // the defaults' hard-coded 2048 — the GLES3 spec FLOOR, not a real
+        // device limit — clamped every surface. Since MIN_CANVAS_HEIGHT is
+        // 2160, that meant *every* WebGL2 session rendered short and rescaled
+        // vertically, on hardware that commonly reports 8192 or 16384.
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: Some("gles_device"),
                     required_features: wgpu::Features::empty(),
-                    required_limits: wgpu::Limits::downlevel_webgl2_defaults(),
+                    required_limits: wgpu::Limits::downlevel_webgl2_defaults()
+                        .using_resolution(adapter.limits()),
                     memory_hints: wgpu::MemoryHints::default(),
                 },
                 None,
@@ -159,6 +170,9 @@ impl WebglGameOfLife {
             .await
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
+        // Echoes the request above, which is now adapter-derived rather than
+        // the 2048 floor. Still clamped, because a surface larger than the
+        // device's real limit fails to configure.
         let max_dim = device.limits().max_texture_dimension_2d;
         let cfg_w = width.clamp(1, max_dim);
         let cfg_h = height.clamp(1, max_dim);
