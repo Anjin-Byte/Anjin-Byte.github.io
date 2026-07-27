@@ -22,7 +22,7 @@ import type { Waypoint } from '../types/space';
 
 export const WAYPOINTS = [
   { id: 'hero', route: '/', label: 'Home', gx: 0, gy: 0, icon: mdiHome },
-  { id: 'projects', route: '/projects', label: 'Demos', gx: 1, gy: 0, icon: mdiViewGridOutline },
+  { id: 'projects', route: '/projects', label: 'Projects', gx: 1, gy: 0, icon: mdiViewGridOutline },
   { id: 'resume', route: '/resume', label: 'Resume', gx: -1, gy: 0, icon: mdiFileAccountOutline },
   { id: 'contact', route: '/contact', label: 'Contact', gx: 0, gy: 1, icon: mdiEmailOutline },
   { id: 'notebook', route: '/notebook', label: 'Notebook', gx: 0, gy: -1, icon: mdiNotebookOutline },

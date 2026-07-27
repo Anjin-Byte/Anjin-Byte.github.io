@@ -84,6 +84,17 @@ export interface Project {
   thumb?: string;
   /** Alt text for the thumbnail. Describe what the image shows, for screen readers. */
   thumbAlt?: string;
+  /**
+   * `object-position` for the thumbnail, as art direction.
+   *
+   * The wide 16:9 print shows the whole frame and ignores this. The CIRCULAR
+   * form on large displays cannot: a circle of a 16:9 source keeps 45% of it,
+   * so it is a DETAIL, not a summary, and which detail is a per-project
+   * decision. Centre is right for an image with a subject in the middle; it is
+   * wrong for a UI screenshot, where the identifying thing is usually off to
+   * one side. Omit for centre.
+   */
+  thumbFocus?: string;
 }
 
 export const projects: Project[] = [
@@ -92,6 +103,10 @@ export const projects: Project[] = [
     featured: true,
     thumb: okraThumb,
     thumbAlt: 'The Okra debugger workbench: disassembly, CPU and PPU registers, and a running Game Boy screen.',
+    // Left of centre, onto the running Game Boy screen. A centred circle here
+    // lands between panels and shows only unreadable debugger text; the green
+    // DMG viewport is the thing that says "Game Boy emulator" at a glance.
+    thumbFocus: '28% 50%',
     blurb:
       'A cycle-accurate Game Boy (DMG) emulator in Rust, built out into an ' +
       'in-browser debugger workbench: live disassembly, CPU/PPU/APU/memory ' +
@@ -225,7 +240,7 @@ export const experience: Experience[] = [
     ],
   },
   {
-    role: 'Contract Developer · XChange Connector Engineering',
+    role: 'Software Developer · XChange Connector Engineering',
     company: 'Pipeline Data Services',
     location: 'Remote',
     dates: 'Sep 2025 – Present',

@@ -231,11 +231,29 @@ function skipToContent(): void {
      and 660 is the container width at which the left column reaches the 325px
      validated by eye in 1.6.
 
-     THREE values, and that is the whole set. `breakpointDiscipline.test.ts`
+     --bp-island-media 800px is a SECOND container threshold, for the project
+     card's print-beside-text spread. It is not 660 because 660 was derived for
+     the head grids (kicker/title vs intro), and a spread with a fixed-ratio
+     image in it has a different floor: the print's height follows its column
+     width while the text's height follows its measure, so narrowing the card
+     makes the print SHORTER and the text TALLER at the same time and the gap
+     under the print grows from both ends. Measured by container width, the void
+     under the print runs 20% at 670, 17% at 734, 14% at 820, 12% at 900, 9% at
+     960, 6% at 1184. Moving the action links under the print reclaims ~76px of
+     it, which brings 800 down to a ~60px residual; 800 is also about where the text
+     column first reaches ~400px (a readable ~47ch). It sits just BELOW 808 on
+     purpose: 808 is the container a 1024px laptop has once the nav rail takes
+     its 216px reserve, and a threshold above it would drop that very common
+     width to one column while both 960 and 1280 kept two. Below that the card is one
+     column. Two thresholds because there are two compositions, not because one
+     drifted.
+
+     FOUR values, and that is the whole set. `breakpointDiscipline.test.ts`
      fails the build on any other. */
   --bp-content: 960px;
   --bp-small: 640px;
   --bp-island: 660px;
+  --bp-island-media: 800px;
 
   /* ── Navigation dock ────────────────────────────────────────────────────
      The dock is fixed chrome floating OVER the world plane, so it can cover

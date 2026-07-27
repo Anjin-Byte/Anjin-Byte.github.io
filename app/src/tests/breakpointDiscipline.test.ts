@@ -43,7 +43,9 @@ const VIEWPORT_BREAKPOINTS = new Set([
  *  A different quantity from viewport width — in rail mode they differ by
  *  --nav-reserve — so they are a separate set, not extra viewport values. */
 const CONTAINER_BREAKPOINTS = new Set([
-  660,  // --bp-island : two-column grids stop fitting below this
+  660,  // --bp-island       : the head grids stop fitting below this
+  800,  // --bp-island-media : the project card's print-beside-text spread
+  801,  // --bp-island-media + 1: the min-width half of the pair
 ]);
 
 /** Feature queries that carry no px threshold are not breakpoints at all. */
@@ -143,14 +145,17 @@ function checkPanelMaxMirror(srcRoot: string, violations: string[]): void {
 function checkTokensDeclared(srcRoot: string, violations: string[]): void {
   const css = fs.readFileSync(path.join(srcRoot, 'App.vue'), 'utf8');
   const declared: Record<string, number> = {};
-  for (const m of css.matchAll(/--bp-([a-z]+):\s*(\d+)px/g)) {
+  // `[a-z-]+`, not `[a-z]+`: token names are kebab-case and a hyphenated one
+  // (--bp-island-media) silently failed to match, so the test reported its
+  // value as undeclared while the declaration was sitting right there.
+  for (const m of css.matchAll(/--bp-([a-z-]+):\s*(\d+)px/g)) {
     declared[`--bp-${m[1]}`] = Number(m[2]);
   }
-  // Every canonical number must be a declared token (961 is the off-by-one
-  // partner of 960, so it is spelled by --bp-content rather than its own token).
   const declaredValues = new Set(Object.values(declared));
   for (const v of [...VIEWPORT_BREAKPOINTS, ...CONTAINER_BREAKPOINTS]) {
-    if (v === 961) continue;
+    // The +1 partner of a max/min pair is spelled by the token it brackets,
+    // not by one of its own. Derived rather than hard-coded per value.
+    if (declaredValues.has(v - 1)) continue;
     if (!declaredValues.has(v)) {
       violations.push(
         `${v}px is canonical here but no --bp-* token in App.vue declares it — ` +

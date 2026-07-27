@@ -7,10 +7,11 @@ import {
 
 interface DisplayProject extends Project {
   visibleLinks: ResolvedProjectLink[];
-  /** Where the thumbnail print links: the live demo, or the first link if none. */
+  /** Where the print itself links: the live demo, or the first link if none. */
   thumbLink?: ResolvedProjectLink | undefined;
-  /** Action-row links with the print's own target removed, so the demo isn't
-   *  offered twice (once as the clickable print, once as a button). */
+  /** The remaining links, rendered as badges ON the print. The print's own
+   *  target is removed so the demo is not offered twice — once as the image,
+   *  once as a badge — which usually leaves exactly the repository. */
   actionLinks: ResolvedProjectLink[];
 }
 
@@ -64,48 +65,53 @@ const projectIndex: (Project & { visibleLinks: ResolvedProjectLink[] })[] = proj
         <!-- A photographic print set into a window cut in the sheet. Links to
              the live demo (or the first available link) so it acts as the card's
              primary affordance. -->
-        <a
-          v-if="featuredProject.thumb"
-          class="project-feature-print"
-          :href="featuredProject.thumbLink?.href"
-          target="_blank"
-          rel="noopener noreferrer"
-          :aria-label="featuredProject.thumbLink?.ariaLabel ?? `${featuredProject.title} preview`"
-          :tabindex="featuredProject.thumbLink ? undefined : -1"
-        >
+        <div v-if="featuredProject.thumb" class="project-feature-print">
           <span class="project-feature-print-frame">
             <img
               class="project-feature-print-img"
+              :style="featuredProject.thumbFocus ? { objectPosition: featuredProject.thumbFocus } : undefined"
               :src="featuredProject.thumb"
               :alt="featuredProject.thumbAlt ?? `${featuredProject.title} preview`"
               loading="lazy"
               decoding="async"
             />
-            <span v-if="featuredProject.thumbLink?.kind === 'demo'" class="project-feature-print-cue">
-              <v-icon :icon="featuredProject.thumbLink.icon" size="18" />
-              <span>Live demo</span>
-            </span>
           </span>
-        </a>
-        <div class="project-feature-content">
-          <div class="project-feature-body">
-            <h3 class="project-feature-title">{{ featuredProject.title }}</h3>
-            <p class="project-feature-blurb">{{ featuredProject.blurb }}</p>
-          </div>
-          <div v-if="featuredProject.actionLinks.length" class="project-feature-actions">
-            <a
-              v-for="link in featuredProject.actionLinks"
-              :key="link.kind"
-              :href="link.href"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="project-link paper-key"
-              :class="{ 'paper-key--primary': link.kind === 'demo' }"
-            >
-              <v-icon :icon="link.icon" />
-              <span>{{ link.label }}</span>
-            </a>
-          </div>
+
+          <!-- The PRINT is the demo link. A stretched sibling rather than an <a>
+               wrapping everything, because the repo button below sits on top of
+               it and a link inside a link is invalid. Empty by design: the whole
+               image is its hit area and `aria-label` carries its name. -->
+          <a
+            v-if="featuredProject.thumbLink"
+            class="project-print-demo"
+            :href="featuredProject.thumbLink.href"
+            target="_blank"
+            rel="noopener noreferrer"
+            :aria-label="featuredProject.thumbLink.ariaLabel"
+          />
+
+          <!-- The ONE button, and the only thing the image itself cannot be.
+               `actionLinks` is the visible links minus the print's own target,
+               so on a project with a demo this is exactly the repository. -->
+          <a
+            v-for="link in featuredProject.actionLinks"
+            :key="link.kind"
+            class="project-print-repo paper-key"
+            :href="link.href"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <v-icon :icon="link.icon" size="18" />
+            <span>{{ link.label }}</span>
+          </a>
+        </div>
+
+        <!-- Title and blurb only. With the demo on the image and the repo on a
+             badge over it, the card is TWO blocks, so there is no third element
+             whose leftover height has to be parked somewhere. -->
+        <div class="project-feature-body">
+          <h3 class="project-feature-title">{{ featuredProject.title }}</h3>
+          <p class="project-feature-blurb">{{ featuredProject.blurb }}</p>
         </div>
       </article>
 
@@ -185,15 +191,118 @@ const projectIndex: (Project & { visibleLinks: ResolvedProjectLink[] })[] = proj
   margin-bottom: 1.4rem;
 }
 
-/* With a thumbnail, the card is a two-panel spread: the print on the left, the
-   content column (body + actions) on the right, both stretched to a shared
-   height so the print reads as a full-height inset window, not a floating
-   image. */
+/* A card with a thumbnail is TWO blocks: the print, and the title + blurb.
+   Not three. Both entry points live on the print itself (the image is the demo
+   link, a badge over it is the repo), which is what removed the third block —
+   and with it the question of which column the leftover height belongs to.
+   Every arrangement that had a separate button row could only choose where the
+   gap appeared, never close it.
+
+   TOP-ALIGNED, never stretched. Stretching is what made the print's aspect
+   ratio a function of how long the blurb happened to be, measured swinging from
+   0.68 (portrait) to 1.40. Centring was tried and is worse for unequal masses:
+   nothing lines up. Top alignment puts the print's top edge on the same datum
+   as the title's cap-height. */
+/* DEFAULT is one column at every width: print, then title and blurb, then the
+   links. The two-column spread is opt-in above --bp-island-media, because it
+   only composes when there is room for it (see that token). */
 .project-feature--media {
   display: grid;
-  grid-template-columns: clamp(240px, 40%, 460px) minmax(0, 1fr);
-  gap: clamp(1.4rem, 3vw, 2.4rem);
-  align-items: stretch;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "print"
+    "body";
+  gap: 1.4rem;
+  align-items: start;
+}
+
+.project-feature--media > .project-feature-print { grid-area: print; }
+.project-feature--media > .project-feature-body { grid-area: body; }
+
+@container island (min-width: 801px) {
+  /* The spread: print left, text right. Two blocks, one row. */
+  .project-feature--media {
+    grid-template-columns: clamp(200px, 26%, 260px) minmax(0, 1fr);
+    grid-template-areas: "print body";
+    gap: clamp(1.4rem, 3vw, 2.4rem);
+  }
+
+  /* ── The tondo ──────────────────────────────────────────────────────────
+     On a wide card the print becomes a CIRCLE, for a geometric reason rather
+     than a decorative one. A 16:9 window is height = width / 1.78, so to stand
+     as tall as the text column it would have to be far wider than the column
+     allows — which is why every arrangement of a rectangle left a gap that
+     could only be moved from one column to the other, never closed. A circle's
+     height IS its diameter, so one number tunes it to the text's height at a
+     width the column can afford.
+
+     `--radius-circle` already exists in the die scale as "a round die", so this
+     is the existing shape vocabulary.
+
+     Cost, paid in art direction rather than layout: a circle keeps 45% of a
+     1400x796 source, so it is a DETAIL, not the whole frame. Each project says
+     which detail via `thumbFocus` (profile.ts) — Okra centres on the running
+     DMG screen, because a centred crop there is unreadable debugger text. The
+     narrow card keeps the full 16:9 frame, so nothing is permanently lost. */
+  .project-feature--media > .project-feature-print,
+  .project-feature--media .project-feature-print-frame {
+    border-radius: var(--radius-circle);
+  }
+
+  /* Diameter, not a cap on a ratio. Sized to land near the text column's
+     height so the two columns finish together. */
+  .project-feature--media > .project-feature-print {
+    width: min(100%, 15rem);
+    max-width: min(100%, 15rem);
+  }
+
+  .project-feature--media .project-feature-print-frame {
+    aspect-ratio: 1;
+  }
+}
+
+/* ── The print's affordances ───────────────────────────────────────────────
+   Two links, no nesting. The DEMO is a stretched, empty anchor covering the
+   whole print, so clicking the image goes to the demo. The REPO is a small
+   badge resting on the print above it: the single button on the card, and the
+   only entry point the image itself cannot be.
+
+   This is what settles the card's composition. With both links on the print,
+   the text column is title and blurb and nothing else, so the card is TWO
+   blocks. Every earlier arrangement had three, and the third block is what
+   forced the leftover height into one column or the other. */
+.project-print-demo {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+}
+.project-print-demo:focus-visible {
+  outline: 2px solid var(--theme-accent);
+  outline-offset: 3px;
+}
+
+.project-print-repo {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: 6%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.34rem 0.7rem;
+  font-size: 0.82rem;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+@media (pointer: coarse) {
+  .project-print-repo {
+    min-height: var(--touch-min);
+    padding-inline: 0.9rem;
+  }
 }
 
 /* The print: a matted photographic print laid on the sheet. The link itself is
@@ -209,8 +318,11 @@ const projectIndex: (Project & { visibleLinks: ResolvedProjectLink[] })[] = proj
      the height came from the row, the row was auto-sized from content, and the
      content was absolutely positioned and therefore zero. Engines resolved that
      circularity differently: Chrome honoured the ratio, others collapsed the
-     print to its 14px of padding, a clickable nub. `start` removes the
-     competition, leaving exactly one height source (the window's ratio). */
+     print to its 14px of padding, a clickable nub. An explicit `align-self`
+     removes the competition, leaving exactly one height source (the window's
+     ratio). Stated here as well as on the grid because the load-bearing part is
+     that it is NEVER `stretch` — the grid's `align-items` is one edit away from
+     bringing the nub back, and this is the line that stops it. */
   align-self: start;
   width: 100%;
   /* Height cap expressed as a width, so the RATIO is never violated to satisfy
@@ -262,9 +374,11 @@ const projectIndex: (Project & { visibleLinks: ResolvedProjectLink[] })[] = proj
 
 /* Lifts a touch and deepens its shadow on hover/focus: the print reacts, the
    card stays put (a lifting container reads as a giant button, per the note on
-   the index cards below). The photo pushes in inside its fixed window. */
+   the index cards below). The photo pushes in inside its fixed window.
+   `:focus-within`, not `:focus-visible` — the print is a container now, and the
+   thing that takes focus is the stretched demo link inside it. */
 .project-feature-print:hover,
-.project-feature-print:focus-visible {
+.project-feature-print:focus-within {
   transform: translateY(-2px);
   box-shadow:
     var(--island-lip),
@@ -273,73 +387,34 @@ const projectIndex: (Project & { visibleLinks: ResolvedProjectLink[] })[] = proj
 }
 
 .project-feature-print:hover .project-feature-print-img,
-.project-feature-print:focus-visible .project-feature-print-img {
+.project-feature-print:focus-within .project-feature-print-img {
   transform: scale(1.04);
-}
-
-.project-feature-print:focus-visible {
-  outline: 2px solid var(--theme-accent);
-  outline-offset: 3px;
-}
-
-/* A caption plate in the corner of the window: names the affordance so the
-   print reads as the live-demo entry point. An opaque paper chip laid on the
-   photo (matte stock + cut lip, never glass, per the cut-paper direction), so
-   it stays legible over any image. Rests quiet, brightens on hover. */
-.project-feature-print-cue {
-  position: absolute;
-  left: 0.7rem;
-  bottom: 0.7rem;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.34rem 0.66rem 0.34rem 0.5rem;
-  border-radius: var(--radius-pill);
-  font-size: 0.76rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: var(--theme-text-primary);
-  background: var(--island-fill);
-  border: 1px solid var(--island-edge);
-  box-shadow: var(--island-lip), var(--elev-1);
-  opacity: 0.94;
-  transform: translateY(0);
-  transition: opacity 220ms ease, transform 220ms ease;
-}
-
-.project-feature-print:hover .project-feature-print-cue,
-.project-feature-print:focus-visible .project-feature-print-cue {
-  opacity: 1;
-  transform: translateY(-1px);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .project-feature-print,
-  .project-feature-print-img,
-  .project-feature-print-cue {
+  .project-feature-print-img {
     transition: none;
   }
   .project-feature-print:hover,
-  .project-feature-print:focus-visible {
+  .project-feature-print:focus-within {
     transform: none;
   }
   .project-feature-print:hover .project-feature-print-img,
-  .project-feature-print:focus-visible .project-feature-print-img {
+  .project-feature-print:focus-within .project-feature-print-img {
     transform: none;
   }
 }
 
-/* Content column: body grows, actions sink to the baseline so multiple cards
-   with differing blurb lengths keep their action rows aligned to the bottom. */
-.project-feature-content {
-  display: flex;
-  flex-direction: column;
+.project-feature-body {
   min-width: 0;
 }
 
-.project-feature-body {
-  flex: 1;
+/* The blurb's bottom margin is spacing BETWEEN paragraphs; as the last child it
+   is spacing to whatever comes next, which the grid gap already owns. Left in,
+   the two stack and the card gains a phantom band of padding. */
+.project-feature-body > :last-child {
+  margin-bottom: 0;
 }
 
 .project-feature-title {
@@ -363,23 +438,6 @@ const projectIndex: (Project & { visibleLinks: ResolvedProjectLink[] })[] = proj
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
-}
-
-/* Material + states from .paper-key (demo links also carry .paper-key--primary);
-   layout only here. */
-.project-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  padding: 0.8rem 1rem;
-}
-
-.project-feature-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  gap: 0.7rem;
-  margin-top: 1.5rem;
 }
 
 .project-index {
@@ -475,19 +533,6 @@ const projectIndex: (Project & { visibleLinks: ResolvedProjectLink[] })[] = proj
 
   .projects-intro {
     justify-self: start;
-  }
-
-  /* Stack: the print moves above the content. Nothing about its SHAPE changes
-     here any more — the ratio is declared once on the window and holds at every
-     width, which is the whole point. This block used to re-declare 16/9 and
-     zero the min-height, i.e. it owned half of a two-system shape rule. */
-  .project-feature--media {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 1.4rem;
-  }
-
-  .project-feature-actions {
-    margin-top: 1.25rem;
   }
 
   .project-index {
