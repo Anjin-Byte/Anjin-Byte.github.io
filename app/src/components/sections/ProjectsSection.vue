@@ -204,8 +204,20 @@ const projectIndex: (Project & { visibleLinks: ResolvedProjectLink[] })[] = proj
 .project-feature-print {
   position: relative;
   display: block;
-  min-height: 210px;
-  padding: 7px;
+  /* NEVER stretched. The parent grid is `align-items: stretch`, and a stretched
+     item has a definite block size, which makes `aspect-ratio` ignorable — so
+     the height came from the row, the row was auto-sized from content, and the
+     content was absolutely positioned and therefore zero. Engines resolved that
+     circularity differently: Chrome honoured the ratio, others collapsed the
+     print to its 14px of padding, a clickable nub. `start` removes the
+     competition, leaving exactly one height source (the window's ratio). */
+  align-self: start;
+  width: 100%;
+  /* Height cap expressed as a width, so the RATIO is never violated to satisfy
+     it (a max-height would squash the window and re-crop the photo). */
+  max-width: calc(var(--print-max-h) * var(--print-ratio) + 2 * var(--print-mat));
+  margin-inline: auto;
+  padding: var(--print-mat);
   border-radius: var(--radius-die);
   background: var(--island-fill);
   box-shadow:
@@ -219,8 +231,14 @@ const projectIndex: (Project & { visibleLinks: ResolvedProjectLink[] })[] = proj
 /* The window cut into the mat: recessed, hairline-edged, and overflow-clipped so
    the photo takes the window's corners and the hover push-in stays inside it. */
 .project-feature-print-frame {
-  position: absolute;
-  inset: 7px;
+  /* In NORMAL FLOW, not absolute, and this is the load-bearing change: the
+     window's own aspect-ratio is now what gives the print its height, so the
+     box can never collapse and there is nothing for an engine to arbitrate.
+     (Absolutely positioned children contribute no height, which is what left
+     the old box with no size of its own.) */
+  position: relative;
+  display: block;
+  aspect-ratio: var(--print-ratio);
   /* An inset window takes the NEXT DIE DOWN. Its mat is --radius-die (12) and
      the window sits at inset 7, so concentric would be 5 and the next die is 6:
      the physical rule and the concentric rule agree to within 1px here, which is
@@ -459,16 +477,13 @@ const projectIndex: (Project & { visibleLinks: ResolvedProjectLink[] })[] = proj
     justify-self: start;
   }
 
-  /* Stack: the print becomes a full-width banner above the content. A fixed
-     landscape ratio replaces the full-height fill it had beside the text. */
+  /* Stack: the print moves above the content. Nothing about its SHAPE changes
+     here any more — the ratio is declared once on the window and holds at every
+     width, which is the whole point. This block used to re-declare 16/9 and
+     zero the min-height, i.e. it owned half of a two-system shape rule. */
   .project-feature--media {
     grid-template-columns: minmax(0, 1fr);
     gap: 1.4rem;
-  }
-
-  .project-feature-print {
-    min-height: 0;
-    aspect-ratio: 16 / 9;
   }
 
   .project-feature-actions {

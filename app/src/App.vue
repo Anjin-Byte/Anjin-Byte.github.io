@@ -145,6 +145,35 @@ function skipToContent(): void {
   --state-selected:       0 0 0 var(--ring-selected-w) var(--theme-accent-ring);
   --state-selected-inset: inset 0 0 0 var(--ring-selected-w) var(--theme-accent-ring);
 
+  /* ── Media: the print ─────────────────────────────────────────────────────
+     An image on this site is a photographic PRINT set into a window cut in the
+     sheet. A print has ONE shape. It does not change because the page got
+     narrower, and the window never re-crops it.
+
+     That was not true before. Above the collapse breakpoint the print had no
+     declared shape at all: it was `align-items: stretch`-ed to whatever height
+     the adjacent text column happened to be, measured swinging from 0.68
+     (PORTRAIT) through 1.02 (square) to 1.40 as the viewport moved, while below
+     the breakpoint a separate rule declared 16/9. Two shape systems either side
+     of one threshold, and neither matched the source.
+
+     16/9 because the content is SCREEN CAPTURES — the sources are 1400x796
+     (1.76). A print of a screen is screen-shaped, and any other ratio makes
+     `object-fit: cover` throw away the interface the image exists to show; at
+     0.68 it was showing a narrow vertical slice of a 16:9 screenshot. At 16/9
+     the crop is ~1%.
+
+     --print-max-h caps how much of the view a print may take, so it stays
+     evidence rather than the headline. Bound in VIEWPORT height, because that
+     is the axis dominance is felt on: it barely engages on a tall phone
+     (a 390x844 print is already only 201px) and bites hard in landscape, where
+     a full-width 16:9 banner would otherwise eat most of the screen. Width
+     follows from the ratio, so a capped print centres on the sheet with paper
+     either side, which is what a print laid on paper does. */
+  --print-ratio: 16 / 9;
+  --print-mat: 7px;   /* the mat board between the print's edge and its window */
+  --print-max-h: min(32vh, 18rem);
+
   /* Layout */
   --inset-chrome: 16px; /* balanced corner inset (top = sides) */
   /* Prose line-length cap, and the ONE authority for it. Was 64ch and bound to
