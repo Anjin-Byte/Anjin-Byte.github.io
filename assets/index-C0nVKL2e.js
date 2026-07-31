@@ -11704,20 +11704,20 @@ Expected #hex, #hexa, rgb(), rgba(), hsl(), hsla(), object or number`);
       ]
     },
     {
-      title: "Schmith",
-      blurb: "A Python CLI that generates C# DataObjects from API specifications. Supports deterministic and LLM-augmented (Anthropic, OpenAI) generation with stable, reproducible output and partial regeneration that preserves downstream hand-edits as specs evolve.",
+      title: "SpecBridge",
+      blurb: "A Python CLI that turns one endpoint of a provider's OpenAPI or RAML description into a typed, PII-classified C# data contract: it resolves the full schema closure, classifies every field for sensitive data, and drives one LLM call per type to produce a ready-to-use DataObject. Canonical IR hashing surfaces schema drift as source descriptions evolve, and partial regeneration reassembles a single type without touching the rest.",
       tech: [
         "Python",
         "C#",
-        "LLM",
+        "OpenAPI",
+        "RAML",
         "Anthropic",
-        "OpenAI",
-        "CLI"
+        "OpenAI"
       ],
       links: [
         {
           kind: "source",
-          href: "https://github.com/Anjin-Byte/Schmith"
+          href: "https://github.com/Anjin-Byte/SpecBridge"
         }
       ]
     }
@@ -11751,7 +11751,7 @@ Expected #hex, #hexa, rgb(), rgba(), hsl(), hsla(), object or number`);
       role: "Software Developer \xB7 XChange Connector Engineering",
       company: "Pipeline Data Services",
       location: "Remote",
-      dates: "Sep 2025 \u2013 Present",
+      dates: "Sep 2025 \u2013 Jun 2026",
       tech: [
         "C#",
         ".NET",
@@ -11761,8 +11761,11 @@ Expected #hex, #hexa, rgb(), rgba(), hsl(), hsla(), object or number`);
         "Python"
       ],
       highlights: [
-        "Delivered 5 production-ready connectors on an accelerated timeline, unifying client data across workforce-management and project-planning systems via Trimble's App Xchange platform.",
-        "Designed an automated contract-testing framework validating API documentation, client data, and XChange Data Objects, reducing T&E cycles by 45%."
+        "Delivered production-ready connectors on an accelerated timeline, unifying client data across workforce-management and project-planning systems via Trimble's App Xchange platform.",
+        "Designed an automated contract-testing framework validating API documentation, client data, and XChange Data Objects, reducing T&E cycles by 45%.",
+        "Built tooling to onboard third-party API data sources into typed, PII-classified data contracts across five provider APIs, two description formats, and ~19,000 schemas.",
+        "Isolated per-provider data quirks (composition variants, pagination envelopes, naming conventions) into tested adapters, keeping integration knowledge reviewable rather than buried in one-off fixes.",
+        "Added schema-drift detection via canonical hashing and field-level lineage back to source, so provider description changes surface at the point of change instead of downstream."
       ]
     },
     {
