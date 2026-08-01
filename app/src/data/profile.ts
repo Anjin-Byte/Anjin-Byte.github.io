@@ -226,12 +226,13 @@ export const experience: Experience[] = [
     company: 'Brynhild Industries',
     location: 'Washington, DC · Remote',
     dates: 'Feb 2024 – Present',
-    tech: ['Rust', 'Python', 'Pydantic'],
+    tech: ['Rust', 'WGSL', 'WebAssembly', 'Python', 'Pydantic', 'Node.js', 'WebSockets', 'MCP'],
     highlights: [
       'Led development of the lattice-geometry generation pipeline for an SBIR program developing 3D-printable PFAS-free respirator filters for warfighter PM2.5 protection; cut peak resource usage 221×, runtime 7×, and scaled output capacity ~1,700× against prior approaches that hit scale or topology ceilings.',
-      'Built an intake-and-routing system that transformed open-ended requests into structured, hierarchical workflows, enabling automated assignment to specialists.',
+      'Built a multi-agent orchestration system that recursively decomposes open-ended requests into a dependency-ordered task DAG and dispatches each node to a specialist agent.',
     ],
   },
+  /*
   {
     role: 'Dispatcher · NW: Nationwide Service & Projects',
     company: 'Wachter, Inc.',
@@ -242,25 +243,26 @@ export const experience: Experience[] = [
       'Managed full lifecycle of service tickets (creation, assignment, tracking, closeout) across multiple concurrent projects.',
     ],
   },
+  */
   {
-    role: 'Software Developer · XChange Connector Engineering',
+    role: 'Software Developer · Contractor',
     company: 'Pipeline Data Services',
     location: 'Remote',
-    dates: 'Sep 2025 – Jun 2026',
-    tech: ['C#', '.NET', 'XChange SDK', 'Postman', 'REST', 'Python'],
+    dates: 'Aug 2025 – Jun 2026',
+    tech: ['C#', '.NET', 'XChange SDK', 'Python', 'TypeScript', 'SQL', 'OpenAPI/RAML', 'REST', 'Postman'],
     highlights: [
       'Delivered production-ready connectors on an accelerated timeline, unifying client data across workforce-management and project-planning systems via Trimble\'s App Xchange platform.',
-      'Designed an automated contract-testing framework validating API documentation, client data, and XChange Data Objects, reducing T&E cycles by 45%.',
-      'Built tooling to onboard third-party API data sources into typed, PII-classified data contracts across five provider APIs, two description formats, and ~19,000 schemas.',
+      'Designed an automated contract-testing framework diffing the connector\'s SQL record store against live vendor responses, validating API documentation, client data, and XChange Data Objects, and reducing T&E cycles by 45%.',
+      'Built tooling to onboard third-party API data sources into typed, PII-classified data contracts across six provider APIs, two description formats, and ~19,000 schemas.',
       'Isolated per-provider data quirks (composition variants, pagination envelopes, naming conventions) into tested adapters, keeping integration knowledge reviewable rather than buried in one-off fixes.',
       'Added schema-drift detection via canonical hashing and field-level lineage back to source, so provider description changes surface at the point of change instead of downstream.'
     ],
   },
   {
-    role: 'Senior Capstone · Data Collection & Model Training',
+    role: 'Data Collection · Model Training Team',
     company: 'UARK Computer Vision & Image Understanding Lab',
     location: 'Fayetteville, AR',
-    dates: 'Jul 2023 – Jun 2024',
+    dates: 'Jun 2023 – Jul 2024',
     tech: ['Python', 'OpenCV', 'FFmpeg', 'Detectron2', 'PyTorch'],
     highlights: [
       'Engineered an end-to-end video-to-training pipeline: ingesting raw multi-device footage, parallelizing instance segmentation with Detectron2, and aligning outputs to CASIA-B gait dataset standards to produce model-ready training data for gait-recognition research.',
@@ -276,12 +278,13 @@ export const experience: Experience[] = [
     ],
   },
   {
-    role: 'IT Internship',
+    role: 'Independent Contractor',
     company: 'Daybright Financial',
     location: 'Brentwood, TN · Chennai, India',
-    dates: 'Apr 2021 – May 2022',
+    dates: 'Apr 2021 – Jun 2022',
     highlights: [
       'Connected rich-text HTML email templates to Oracle databases via PL/SQL (UTL_MAIL, UTL_SMTP) to automate internal and customer-facing communications with consistent rendering across mail clients.',
+      'Collaborated with CIO, business analysts, and QA teams during weekly Scrum meetings across US and India offices, supporting ongoing project delivery.'
     ],
   },
 ];
