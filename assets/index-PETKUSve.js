@@ -11500,7 +11500,7 @@ Expected #hex, #hexa, rgb(), rgba(), hsl(), hsla(), object or number`);
     alternateName: "Anjin-Byte",
     jobTitle: "Software Engineer",
     tagline: "Engineer\xA0\xA0\xB7\xA0\xA0Designer\xA0\xA0\xB7\xA0\xA0Tinkerer",
-    bio: "I build careful software: graphics systems, codegen tools, integration work on short delivery cycles. My background spans computer vision research, contract engineering, and full-stack web development. I'm chasing elegance where low-level detail and high-level design meet. At least once.",
+    bio: "I've worked in a university computer vision lab, on enterprise data integration, and on GPU software for a federally funded program developing 3D-printed respirator filters. I led the geometry pipeline behind the filters. Most of my work starts out underspecified but I help define the problem(s) and deliver on schedule...mostly. Away from work I like to draw and sculpt. I love the work that goes into building digital environments, and lately the tools for making them.",
     locality: wE,
     region: DE,
     country: "US",
