@@ -42,7 +42,7 @@ import { profile } from './siteIdentity';
 export { profile };
 // `skills` lives there too (the build reads it for JSON-LD `knowsAbout`); it is
 // re-exported here so this file stays the one import site for page content.
-export { skills, type SkillGroup } from './siteIdentity';
+export { skills, type SkillGroup, education, type Education } from './siteIdentity';
 
 export const contactLinks: ContactLink[] = [
   { label: 'Location', icon: mdiMapMarkerOutline, href: 'https://maps.google.com/?q=Bentonville,+AR', display: profile.location },
@@ -279,22 +279,5 @@ export const experience: Experience[] = [
   },
 ];
 
-export interface Education {
-  degree: string;
-  school: string;
-  field: string;
-  location: string;
-  dates: string;
-  focus?: string;
-}
-
-export const education: Education[] = [
-  {
-    degree: 'BA',
-    school: 'University of Arkansas',
-    field: 'Computer Science',
-    location: 'Fayetteville, AR',
-    dates: 'Graduated 2024',
-    focus: 'GPGPU Programming',
-  },
-];
+// `education` + `Education` now live in siteIdentity.ts (re-exported at the top
+// of this file) so JSON-LD `alumniOf` reads the same record the Resume renders.

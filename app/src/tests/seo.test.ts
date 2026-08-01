@@ -177,24 +177,42 @@ function testFeedExactOutput(): void {
 function testJsonLdGraph(): void {
   const raw = jsonLdGraph({
     name: 'A Person',
+    alternateName: 'handle',
     jobTitle: 'Engineer',
     description: 'Bio </script> injection attempt',
+    email: 'a@b.dev',
+    address: { locality: 'Town', region: 'ST', country: 'US' },
+    alumniOf: ['A University'],
     siteUrl: 'https://x.dev',
     siteTitle: 'Site',
     sameAs: ['https://github.com/x'],
     knowsAbout: ['Rust'],
   });
   assert(!raw.includes('</'), 'JSON-LD must not contain a raw "</" sequence');
-  const parsed = JSON.parse(raw) as { '@graph': { '@type': string; '@id': string }[] };
+  const parsed = JSON.parse(raw) as {
+    '@graph': {
+      '@type': string;
+      '@id': string;
+      email?: string;
+      address?: { addressLocality?: string };
+      alumniOf?: { '@type': string; name: string }[];
+    }[];
+  };
   assertEq(
     parsed['@graph'].map((node) => node['@type']),
     ['Person', 'WebSite'],
     'graph carries Person then WebSite',
   );
+  const person = parsed['@graph'][0];
+  assertEq(person?.['@id'], 'https://x.dev/#person', 'Person @id is stable and absolute');
+  // The disambiguation fields: a contested name is told apart by handle, city,
+  // and school, so a silent drop of any of them is a real regression.
+  assertEq(person?.email, 'mailto:a@b.dev', 'email is a mailto URI, as schema.org expects');
+  assertEq(person?.address?.addressLocality, 'Town', 'address carries the locality');
   assertEq(
-    parsed['@graph'][0]?.['@id'],
-    'https://x.dev/#person',
-    'Person @id is stable and absolute',
+    person?.alumniOf,
+    [{ '@type': 'CollegeOrUniversity', name: 'A University' }],
+    'alumniOf is a typed entity, not a bare string',
   );
 }
 

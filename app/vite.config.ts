@@ -8,6 +8,7 @@ import topLevelAwait from 'vite-plugin-top-level-await';
 import {
   profile,
   skills,
+  education,
   siteUrl,
   siteTitle,
   siteDescription,
@@ -91,8 +92,16 @@ function injectSiteMeta(): Plugin {
         // Every field maps to something the Hero actually renders.
         const jsonLd = jsonLdGraph({
           name: profile.name,
+          alternateName: profile.alternateName,
           jobTitle: profile.jobTitle,
           description: siteDescription,
+          email: profile.email,
+          address: {
+            locality: profile.locality,
+            region: profile.region,
+            country: profile.country,
+          },
+          alumniOf: education.map((entry) => entry.school),
           siteUrl,
           siteTitle,
           sameAs: [profile.github, profile.linkedin],

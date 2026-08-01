@@ -108,8 +108,14 @@ export function renderFeed(
 
 export interface JsonLdIdentity {
   name: string;
+  /** The GitHub handle. The one search term for this person with no competition. */
+  alternateName: string;
   jobTitle: string;
   description: string;
+  email: string;
+  address: { locality: string; region: string; country: string };
+  /** School names for `alumniOf`, most recent first. */
+  alumniOf: readonly string[];
   siteUrl: string;
   siteTitle: string;
   sameAs: readonly string[];
@@ -119,7 +125,13 @@ export interface JsonLdIdentity {
 /**
  * The site-level `Person` + `WebSite` graph. Every field here corresponds to
  * content the page actually renders (the Hero's bio and skills, the contact
- * links) — structured data describing invisible content is a penalty, not a win.
+ * links, the Resume's education) — structured data describing invisible content
+ * is a penalty, not a win.
+ *
+ * The Person block is deliberately attribute-rich. "Taylor Hale" is a contested
+ * name, so the job of this block is DISAMBIGUATION: handle, role, city, school
+ * and skills together let search tell this person apart from the others sharing
+ * the name. `sameAs` only corroborates if those profiles link back here.
  */
 export function jsonLdGraph(identity: JsonLdIdentity): string {
   const graph = {
@@ -129,9 +141,21 @@ export function jsonLdGraph(identity: JsonLdIdentity): string {
         '@type': 'Person',
         '@id': `${identity.siteUrl}/#person`,
         name: identity.name,
+        alternateName: identity.alternateName,
         url: `${identity.siteUrl}/`,
         jobTitle: identity.jobTitle,
         description: identity.description,
+        email: `mailto:${identity.email}`,
+        address: {
+          '@type': 'PostalAddress',
+          addressLocality: identity.address.locality,
+          addressRegion: identity.address.region,
+          addressCountry: identity.address.country,
+        },
+        alumniOf: identity.alumniOf.map((school) => ({
+          '@type': 'CollegeOrUniversity',
+          name: school,
+        })),
         sameAs: [...identity.sameAs],
         knowsAbout: [...identity.knowsAbout],
       },
