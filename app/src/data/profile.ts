@@ -24,14 +24,6 @@ export interface ContactLink {
   display?: string; // override text shown alongside icon
 }
 
-/*
-I build careful software: graphics systems, codegen tools, 
-integration work on short delivery cycles. My background spans 
-computer vision research, contract engineering, and full-stack web 
-development. I'm chasing elegance where low-level detail and 
-high-level design meet. At least once.
-*/
-
 // `profile` now lives in `siteIdentity.ts` (a zero-import module) so the Vite
 // build can read the same values when injecting <meta> tags into index.html.
 // Imported AND re-exported (not a bare `export ... from`) because `contactLinks`

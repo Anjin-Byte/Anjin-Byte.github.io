@@ -28,12 +28,22 @@ export const profile = {
   // structured-data value is stated separately rather than parsed out of it.
   jobTitle: 'Software Engineer',
   tagline: 'Engineer  ·  Designer  ·  Tinkerer',
+  // Hero paragraph. Written for a general reader (a hiring manager outside
+  // graphics), not for a specialist. The range across three unrelated domains is
+  // the signal. Depth is left for Projects and Resume to prove.
+  //
+  // Style rules, applied deliberately: short declarative sentences, active
+  // voice, no metrics, no adjective claims. Earlier drafts used a
+  // "Different fields, same job:" setup with a three-part list after the colon.
+  // Balanced constructions like that one read as machine-written. Keep the
+  // sentences plain and uneven.
   bio:
-    'I build careful software: graphics systems, codegen tools, ' +
-    'integration work on short delivery cycles. My background spans ' +
-    'computer vision research, contract engineering, and full-stack web ' +
-    'development. I\'m chasing elegance where low-level detail and ' +
-    'high-level design meet. At least once.',
+    'I\'ve worked in a university computer vision lab, on enterprise data ' +
+    'integration, and on GPU software for a federally funded program developing ' +
+    '3D-printed respirator filters. I led the geometry pipeline behind the ' +
+    'filters. Most of my work starts out underspecified but I help define the problem(s) and ' +
+    'deliver on schedule...mostly. Away from work I like to draw and sculpt. I love the work ' +
+    'that goes into building digital environments, and lately the tools for making them.',
   locality,
   region,
   country: 'US',
@@ -96,8 +106,8 @@ export const siteTitle = 'Taylor Hale · Engineer, Designer, Tinkerer';
  *  would clip it mid-sentence. Same voice, same claims, sized for the slot.
  *  No em-dashes. */
 export const siteDescription =
-  'Taylor Hale builds careful software: graphics systems, codegen tools, and '
-  + 'integration work on short delivery cycles. Based in Bentonville, AR.';
+  'Taylor Hale is a software engineer working across computer vision, data '
+  + 'integration, and GPU systems. Based in Bentonville, AR.';
 
 /** 1200x630 social card in `public/`. Sources + regeneration: `app/brand/`. */
 export const ogImagePath = '/og-card.png';
