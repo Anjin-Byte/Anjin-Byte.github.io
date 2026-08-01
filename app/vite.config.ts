@@ -7,11 +7,14 @@ import wasm from 'vite-plugin-wasm';
 import topLevelAwait from 'vite-plugin-top-level-await';
 import {
   profile,
+  skills,
   siteUrl,
   siteTitle,
   siteDescription,
   ogImagePath,
 } from './src/data/siteIdentity';
+import { jsonLdGraph } from './src/seo/render';
+import { seoAssets } from './build/seo';
 
 // wgpu 22.x serialises 'maxInterStageShaderComponents' into the GPUDeviceDescriptor's
 // requiredLimits. That field was removed from the WebGPU spec (renamed to
@@ -83,6 +86,18 @@ function injectSiteMeta(): Plugin {
       order: 'pre',
       handler(html) {
         const ogImage = `${siteUrl}${ogImagePath}`;
+        // Person + WebSite. This is the identity anchor for a named-person
+        // portfolio: how search models "who is this and what did they build".
+        // Every field maps to something the Hero actually renders.
+        const jsonLd = jsonLdGraph({
+          name: profile.name,
+          jobTitle: profile.jobTitle,
+          description: siteDescription,
+          siteUrl,
+          siteTitle,
+          sameAs: [profile.github, profile.linkedin],
+          knowsAbout: skills.flatMap((group) => group.items),
+        });
         return {
           html: html.replace(
             /<title>.*?<\/title>/,
@@ -107,6 +122,23 @@ function injectSiteMeta(): Plugin {
             { tag: 'meta', attrs: { name: 'twitter:title', content: siteTitle }, injectTo: 'head' },
             { tag: 'meta', attrs: { name: 'twitter:description', content: siteDescription }, injectTo: 'head' },
             { tag: 'meta', attrs: { name: 'twitter:image', content: ogImage }, injectTo: 'head' },
+            // Feed autodiscovery: readers and aggregators look for this link.
+            {
+              tag: 'link',
+              attrs: {
+                rel: 'alternate',
+                type: 'application/rss+xml',
+                title: `${profile.name} · Notebook`,
+                href: '/feed.xml',
+              },
+              injectTo: 'head',
+            },
+            {
+              tag: 'script',
+              attrs: { type: 'application/ld+json' },
+              children: jsonLd,
+              injectTo: 'head',
+            },
           ],
         };
       },
@@ -124,7 +156,14 @@ const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 
 export default defineConfig({
   base: '/',
-  plugins: [vue(), vuetify({ autoImport: true }), injectSiteMeta(), spaPages404(), ...sharedPlugins()],
+  plugins: [
+    vue(),
+    vuetify({ autoImport: true }),
+    injectSiteMeta(),
+    seoAssets(),
+    spaPages404(),
+    ...sharedPlugins(),
+  ],
   server: {
     fs: {
       allow: [repoRoot],

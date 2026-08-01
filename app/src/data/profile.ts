@@ -40,6 +40,9 @@ high-level design meet. At least once.
 // Edit the fields in siteIdentity.ts.
 import { profile } from './siteIdentity';
 export { profile };
+// `skills` lives there too (the build reads it for JSON-LD `knowsAbout`); it is
+// re-exported here so this file stays the one import site for page content.
+export { skills, type SkillGroup } from './siteIdentity';
 
 export const contactLinks: ContactLink[] = [
   { label: 'Location', icon: mdiMapMarkerOutline, href: 'https://maps.google.com/?q=Bentonville,+AR', display: profile.location },
@@ -47,19 +50,6 @@ export const contactLinks: ContactLink[] = [
   { label: 'Phone',    icon: mdiPhoneOutline,     href: `tel:${profile.phone.replace(/[^\d+]/g, '')}`, display: profile.phone },
   { label: 'GitHub',   icon: mdiGithub,           href: profile.github,                                display: 'Anjin-Byte' },
   { label: 'LinkedIn', icon: mdiLinkedin,         href: profile.linkedin,                              display: 'bits-for-bread' },
-];
-
-// ── Skills ──────────────────────────────────────────────────────────────────
-
-export interface SkillGroup {
-  label: string;
-  items: string[];
-}
-
-export const skills: SkillGroup[] = [
-  { label: 'Languages',           items: ['Rust', 'TypeScript', 'Python', 'Java', 'C/C++', 'JavaScript', 'SQL'] },
-  { label: 'Frameworks & Libraries', items: ['WebGPU', 'WGSL', 'WebAssembly', 'Three.js', 'Svelte', 'Vue', 'React', 'Tauri', 'PyTorch', 'CUDA', 'OpenCV', 'Detectron2', 'Pydantic'] },
-  { label: 'Tools & Platforms',   items: ['Git', 'Docker', 'FFmpeg', 'Vite', 'Excel', 'Google Cloud APIs (Drive, Workspace)'] },
 ];
 
 // ── Projects / demos ────────────────────────────────────────────────────────

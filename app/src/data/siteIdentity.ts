@@ -14,6 +14,9 @@
 
 export const profile = {
   name: 'Taylor Hale',
+  // Schema.org `Person.jobTitle`. `tagline` is voice, not a job title, so the
+  // structured-data value is stated separately rather than parsed out of it.
+  jobTitle: 'Software Engineer',
   tagline: 'Engineer  ·  Designer  ·  Tinkerer',
   bio:
     'I build careful software: graphics systems, codegen tools, ' +
@@ -27,6 +30,21 @@ export const profile = {
   github: 'https://github.com/Anjin-Byte',
   linkedin: 'https://linkedin.com/in/bits-for-bread',
 };
+
+export interface SkillGroup {
+  label: string;
+  items: string[];
+}
+
+// Lives here rather than in `profile.ts` for the same reason `profile` does: the
+// build imports it (JSON-LD `Person.knowsAbout`), and `profile.ts` pulls in
+// `@mdi/js` + `.webp` assets that only resolve inside the app pipeline.
+// `profile.ts` re-exports it, so the Hero is unchanged.
+export const skills: SkillGroup[] = [
+  { label: 'Languages',           items: ['Rust', 'TypeScript', 'Python', 'Java', 'C/C++', 'JavaScript', 'SQL'] },
+  { label: 'Frameworks & Libraries', items: ['WebGPU', 'WGSL', 'WebAssembly', 'Three.js', 'Svelte', 'Vue', 'React', 'Tauri', 'PyTorch', 'CUDA', 'OpenCV', 'Detectron2', 'Pydantic'] },
+  { label: 'Tools & Platforms',   items: ['Git', 'Docker', 'FFmpeg', 'Vite', 'Excel', 'Google Cloud APIs (Drive, Workspace)'] },
+];
 
 /** Absolute origin, no trailing slash. Required: Open Graph rejects relative
  *  `og:image` / `og:url`, so every injected URL is built from this. */
