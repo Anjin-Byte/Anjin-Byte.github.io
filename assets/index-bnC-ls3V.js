@@ -11497,6 +11497,7 @@ Expected #hex, #hexa, rgb(), rgba(), hsl(), hsla(), object or number`);
     ]
   ]), u9 = "/assets/okra_hero-OwtZ_t5d.webp", d9 = "/assets/gestalt_hero-DKNpkSMW.webp", Ir = {
     name: "Taylor Hale",
+    jobTitle: "Software Engineer",
     tagline: "Engineer\xA0\xA0\xB7\xA0\xA0Designer\xA0\xA0\xB7\xA0\xA0Tinkerer",
     bio: "I build careful software: graphics systems, codegen tools, integration work on short delivery cycles. My background spans computer vision research, contract engineering, and full-stack web development. I'm chasing elegance where low-level detail and high-level design meet. At least once.",
     location: "Bentonville, AR",
@@ -11504,38 +11505,7 @@ Expected #hex, #hexa, rgb(), rgba(), hsl(), hsla(), object or number`);
     phone: "(615) 681-3779",
     github: "https://github.com/Anjin-Byte",
     linkedin: "https://linkedin.com/in/bits-for-bread"
-  }, rl = [
-    {
-      label: "Location",
-      icon: P3,
-      href: "https://maps.google.com/?q=Bentonville,+AR",
-      display: Ir.location
-    },
-    {
-      label: "Email",
-      icon: k3,
-      href: `mailto:${Ir.email}`,
-      display: Ir.email
-    },
-    {
-      label: "Phone",
-      icon: ZO,
-      href: `tel:${Ir.phone.replace(/[^\d+]/g, "")}`,
-      display: Ir.phone
-    },
-    {
-      label: "GitHub",
-      icon: L3,
-      href: Ir.github,
-      display: "Anjin-Byte"
-    },
-    {
-      label: "LinkedIn",
-      icon: QO,
-      href: Ir.linkedin,
-      display: "bits-for-bread"
-    }
-  ], m9 = [
+  }, m9 = [
     {
       label: "Languages",
       items: [
@@ -11576,6 +11546,37 @@ Expected #hex, #hexa, rgb(), rgba(), hsl(), hsla(), object or number`);
         "Excel",
         "Google Cloud APIs (Drive, Workspace)"
       ]
+    }
+  ], rl = [
+    {
+      label: "Location",
+      icon: P3,
+      href: "https://maps.google.com/?q=Bentonville,+AR",
+      display: Ir.location
+    },
+    {
+      label: "Email",
+      icon: k3,
+      href: `mailto:${Ir.email}`,
+      display: Ir.email
+    },
+    {
+      label: "Phone",
+      icon: ZO,
+      href: `tel:${Ir.phone.replace(/[^\d+]/g, "")}`,
+      display: Ir.phone
+    },
+    {
+      label: "GitHub",
+      icon: L3,
+      href: Ir.github,
+      display: "Anjin-Byte"
+    },
+    {
+      label: "LinkedIn",
+      icon: QO,
+      href: Ir.linkedin,
+      display: "bits-for-bread"
     }
   ], wE = [
     {

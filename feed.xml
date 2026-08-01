@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Taylor Hale · Engineer, Designer, Tinkerer · Notebook</title>
+    <link>https://anjin-byte.github.io/notebook</link>
+    <description>Taylor Hale builds careful software: graphics systems, codegen tools, and integration work on short delivery cycles. Based in Bentonville, AR.</description>
+    <language>en</language>
+    <lastBuildDate>Sat, 01 Aug 2026 00:00:00 GMT</lastBuildDate>
+    <atom:link href="https://anjin-byte.github.io/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>HashDAG: editing a compressed voxel scene without decompressing it</title>
+      <link>https://anjin-byte.github.io/notebook/hashdag</link>
+      <guid isPermaLink="true">https://anjin-byte.github.io/notebook/hashdag</guid>
+      <description>A build-up from voxels and octrees to the Sparse Voxel DAG, then the hash-table trick that lets you carve, fill, and paint a billion-voxel scene in real time without ever decompressing it.</description>
+      <pubDate>Fri, 17 Jul 2026 00:00:00 GMT</pubDate>
+      <category>voxels</category>
+      <category>data-structures</category>
+      <category>compression</category>
+      <category>graphics</category>
+    </item>
+    <item>
+      <title>Compressing voxel color without breaking the edit</title>
+      <link>https://anjin-byte.github.io/notebook/hashdag-attribute-compression</link>
+      <guid isPermaLink="true">https://anjin-byte.github.io/notebook/hashdag-attribute-compression</guid>
+      <description>Geometry compresses beautifully; color refuses to. This is the story of decoupling the two, bridging them with a 24-bit trick that costs almost nothing, and compressing color in blocks small enough to edit one at a time.</description>
+      <pubDate>Thu, 16 Jul 2026 00:00:00 GMT</pubDate>
+      <category>voxels</category>
+      <category>compression</category>
+      <category>graphics</category>
+    </item>
+    <item>
+      <title>Taking HashDAG editing onto the GPU</title>
+      <link>https://anjin-byte.github.io/notebook/hashdag-gpu-editing</link>
+      <guid isPermaLink="true">https://anjin-byte.github.io/notebook/hashdag-gpu-editing</guid>
+      <description>The CPU HashDAG hits a wall the moment an edit gets large, and the wall is the bus between the chips. This is how the whole edit pipeline moves onto the GPU, and why a hash table that thousands of threads write at once is the hard part.</description>
+      <pubDate>Wed, 15 Jul 2026 00:00:00 GMT</pubDate>
+      <category>voxels</category>
+      <category>gpu</category>
+      <category>graphics</category>
+    </item>
+    <item>
+      <title>The rendering equation</title>
+      <link>https://anjin-byte.github.io/notebook/rendering-equation</link>
+      <guid isPermaLink="true">https://anjin-byte.github.io/notebook/rendering-equation</guid>
+      <description>A long test piece: light transport from first principles, from radiance and the BRDF to the Monte Carlo estimator a path tracer actually runs.</description>
+      <pubDate>Fri, 12 Jun 2026 00:00:00 GMT</pubDate>
+      <category>graphics</category>
+      <category>math</category>
+      <category>rendering</category>
+    </item>
+  </channel>
+</rss>
