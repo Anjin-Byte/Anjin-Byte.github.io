@@ -13,6 +13,7 @@ import {
   siteTitle,
   siteDescription,
   ogImagePath,
+  portraitPath,
 } from './src/data/siteIdentity';
 import { jsonLdGraph } from './src/seo/render';
 import { seoAssets } from './build/seo';
@@ -96,6 +97,7 @@ function injectSiteMeta(): Plugin {
           jobTitle: profile.jobTitle,
           description: siteDescription,
           email: profile.email,
+          image: `${siteUrl}${portraitPath}`,
           address: {
             locality: profile.locality,
             region: profile.region,

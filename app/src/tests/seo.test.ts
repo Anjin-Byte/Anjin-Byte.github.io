@@ -181,6 +181,7 @@ function testJsonLdGraph(): void {
     jobTitle: 'Engineer',
     description: 'Bio </script> injection attempt',
     email: 'a@b.dev',
+    image: 'https://x.dev/portrait.webp',
     address: { locality: 'Town', region: 'ST', country: 'US' },
     alumniOf: ['A University'],
     siteUrl: 'https://x.dev',
@@ -194,6 +195,7 @@ function testJsonLdGraph(): void {
       '@type': string;
       '@id': string;
       email?: string;
+      image?: string;
       address?: { addressLocality?: string };
       alumniOf?: { '@type': string; name: string }[];
     }[];
@@ -209,6 +211,7 @@ function testJsonLdGraph(): void {
   // and school, so a silent drop of any of them is a real regression.
   assertEq(person?.email, 'mailto:a@b.dev', 'email is a mailto URI, as schema.org expects');
   assertEq(person?.address?.addressLocality, 'Town', 'address carries the locality');
+  assertEq(person?.image, 'https://x.dev/portrait.webp', 'image is an absolute URL');
   assertEq(
     person?.alumniOf,
     [{ '@type': 'CollegeOrUniversity', name: 'A University' }],

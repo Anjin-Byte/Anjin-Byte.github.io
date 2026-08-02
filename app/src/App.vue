@@ -248,12 +248,29 @@ function skipToContent(): void {
      column. Two thresholds because there are two compositions, not because one
      drifted.
 
-     FOUR values, and that is the whole set. `breakpointDiscipline.test.ts`
+     --bp-island-identity 960px is a THIRD container threshold, for the hero's
+     portrait-beside-name spread. It is not 800 because that floor was derived
+     for the project card, whose text column holds a title and a wrapping blurb
+     — prose reflows into whatever width it is given, so a narrow column is ugly
+     but never broken. The identity block's text column holds a DISPLAY NAME at
+     --step-4, which does not reflow: it either fits on one line or it does not.
+     Measured at an 808 container (the 1024 laptop once the rail takes its
+     216px, i.e. exactly the width --bp-island-media was tuned to keep in two
+     columns): .hero-main is 449px, the portrait and gap take 195px, and the
+     name is left 254px to render a string that needs 250-280px at that step.
+     It wrapped, and "Engineer · Designer · Tinkerer" broke mid-word beneath it.
+     Shrinking the portrait to 112px buys the name a 306px column, which fits by
+     ~25px — a margin one font fallback or one tagline edit erases, so the fix
+     was a threshold rather than a tuning. At 960 the container gives .hero-main
+     ~600px and both lines hold.
+
+     FIVE values, and that is the whole set. `breakpointDiscipline.test.ts`
      fails the build on any other. */
   --bp-content: 960px;
   --bp-small: 640px;
   --bp-island: 660px;
   --bp-island-media: 800px;
+  --bp-island-identity: 960px;
 
   /* ── Navigation dock ────────────────────────────────────────────────────
      The dock is fixed chrome floating OVER the world plane, so it can cover

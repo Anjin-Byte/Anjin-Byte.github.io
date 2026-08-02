@@ -113,6 +113,8 @@ export interface JsonLdIdentity {
   jobTitle: string;
   description: string;
   email: string;
+  /** Absolute URL of a photograph of the person. Feeds knowledge panels. */
+  image: string;
   address: { locality: string; region: string; country: string };
   /** School names for `alumniOf`, most recent first. */
   alumniOf: readonly string[];
@@ -146,6 +148,7 @@ export function jsonLdGraph(identity: JsonLdIdentity): string {
         jobTitle: identity.jobTitle,
         description: identity.description,
         email: `mailto:${identity.email}`,
+        image: identity.image,
         address: {
           '@type': 'PostalAddress',
           addressLocality: identity.address.locality,

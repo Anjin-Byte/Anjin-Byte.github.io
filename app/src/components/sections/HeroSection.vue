@@ -13,15 +13,42 @@ const locationLink = contactLinks.find((link) => link.label === 'Location');
     <v-container class="hero-container">
       <div class="hero-frame glass-panel glass-panel--strong">
         <div class="hero-main">
-          <a
-            :href="locationLink?.href"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="hero-kicker glass-chip section-kicker"
-            :aria-label="`${profile.location}, open in maps`"
-          ><v-icon :icon="mdiMapMarkerOutline" class="hero-location-icon" />{{ profile.location }}</a>
-          <h1 class="hero-name section-heading">{{ profile.name }}</h1>
-          <p class="hero-tagline">{{ profile.tagline }}</p>
+          <!-- Identity block: the tondo and the name read as one unit, so the
+               first thing on the page is a person rather than a heading. The
+               portrait is a CIRCLE for the same reason the featured project
+               print is (ProjectsSection "the tondo"): the shape is already in
+               the die scale, so this borrows the vocabulary instead of adding
+               to it. Served from `public/` rather than imported from
+               `src/assets/` because the same file is the JSON-LD
+               `Person.image`, which needs a stable absolute URL the build can
+               name before Vite has hashed anything. -->
+          <div class="hero-identity">
+            <div class="hero-portrait">
+              <span class="hero-portrait-frame">
+                <img
+                  class="hero-portrait-img"
+                  src="/portrait.webp"
+                  width="560"
+                  height="560"
+                  alt="Taylor Hale sitting on a rock ledge above a snow-dusted canyon in Zion National Park."
+                  fetchpriority="high"
+                  decoding="async"
+                />
+              </span>
+            </div>
+            <div class="hero-identity-text">
+              <a
+                :href="locationLink?.href"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="hero-kicker glass-chip section-kicker"
+                :aria-label="`${profile.location}, open in maps`"
+              ><v-icon :icon="mdiMapMarkerOutline" class="hero-location-icon" />{{ profile.location }}</a>
+              <h1 class="hero-name section-heading">{{ profile.name }}</h1>
+              <p class="hero-tagline">{{ profile.tagline }}</p>
+            </div>
+          </div>
+
           <p class="hero-bio">{{ profile.bio }}</p>
 
           <div class="hero-actions">
@@ -90,6 +117,120 @@ const locationLink = contactLinks.find((link) => link.label === 'Location');
 
 .hero-main {
   max-width: 58rem;
+}
+
+/* ── The identity block ─────────────────────────────────────────────────────
+   Portrait and name on one row, bio full width beneath. `auto` on the first
+   track lets the tondo size itself from its own clamp rather than from a
+   fraction of the column, so the circle never collapses when the rail takes
+   its minimum width. Centred, because the two masses are unequal and the name
+   block is the shorter one. */
+/* DEFAULT is one column at every width: portrait, then the name block. The
+   two-column spread is opt-in above --bp-island-identity, the same shape as the
+   project card's print-beside-text spread, but at a HIGHER floor: the card's
+   text column holds prose, which reflows into any width, while this one holds a
+   display name that either fits on one line or wraps. Derivation of the 960 in
+   App.vue's token block.
+
+   Measured below that floor, the spread failed three ways at once: "Taylor
+   Hale" wrapped to two lines, "Tinkerer" broke mid-word, and the location chip
+   floated above the portrait's top edge with nothing to sit against. All three
+   are the text column being starved by a column that cannot shrink.
+
+   Gap follows the print's two values: a flat 1.4rem stacked, the fluid clamp in
+   the spread. Matching the neighbouring component rather than inventing a
+   measure (the `--space-*` scale exists but its adoption is deferred, see
+   docs/responsive/07). */
+.hero-identity {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "portrait"
+    "text";
+  gap: 1.4rem;
+  /* Inherited rhythm: the tagline used to own this 1.8rem gap to the bio. */
+  margin-bottom: 1.8rem;
+}
+
+.hero-identity > .hero-portrait { grid-area: portrait; }
+.hero-identity > .hero-identity-text { grid-area: text; }
+
+@container island (min-width: 961px) {
+  /* The spread: portrait left, name block right. Centred, because the two
+     masses are unequal and the name block is the shorter one. */
+  .hero-identity {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas: "portrait text";
+    gap: clamp(1.4rem, 3vw, 2.4rem);
+    align-items: center;
+  }
+}
+
+/* ── The portrait, as a print ───────────────────────────────────────────────
+   Same three-part structure as the featured project print (ProjectsSection):
+   a MAT sheet, a WINDOW cut into it, and the image inside the window. An
+   earlier pass shipped a bare `border-radius: 50%` image, which read as a
+   circle but sat outside the elevation language entirely: no mat, no recessed
+   well, no lit cut edge. Photographs on this site are prints laid on paper,
+   and one that skips the frame is a different material.
+
+   Circular via `--radius-circle` for the same reason as the project tondo:
+   a circle's height IS its diameter, so one number tunes it against the name
+   block beside it.
+
+   NOT interactive, so the print's affordances are deliberately absent: no
+   `cursor: pointer`, no hover lift, no scale transition. Interaction state
+   belongs to things you can act on. */
+.hero-portrait {
+  width: clamp(6.5rem, 16vw, 11rem);
+  /* Explicit, and never `stretch`. A stretched grid item has a definite block
+     size, which makes the window's `aspect-ratio` ignorable and collapses the
+     print (the nub bug documented on the project print). `center` is the
+     composition; the load-bearing part is that it is stated at all, because the
+     grid's `align-items` is one edit away from bringing that back. */
+  align-self: center;
+  padding: var(--print-mat);
+  border-radius: var(--radius-circle);
+  background: var(--island-fill);
+  box-shadow:
+    var(--island-lip),
+    0 0 0 1px var(--island-edge),
+    var(--elev-1);
+}
+
+/* The window. Recessed well plus the lit cut edge, exactly as the project
+   print's window, so the two read as the same operation on the same stock. */
+.hero-portrait-frame {
+  position: relative;
+  display: block;
+  aspect-ratio: 1;
+  border-radius: var(--radius-circle);
+  overflow: hidden;
+  background: var(--well-recess);
+  box-shadow: var(--cut-ring);
+  isolation: isolate;
+}
+
+.hero-portrait-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* The subject sits right of centre and looks left, so a centred crop is
+     already correct. Stated rather than assumed: the source is pre-cropped
+     square, so nudging this re-frames the circle without touching the file. */
+  object-position: 50% 50%;
+  display: block;
+}
+
+.hero-identity-text {
+  min-width: 0;
+}
+
+/* The block owns the gap to the bio now, so the tagline stops carrying it. */
+.hero-identity-text .hero-tagline {
+  margin-bottom: 0;
 }
 
 .hero-kicker {

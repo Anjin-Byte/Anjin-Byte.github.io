@@ -46,6 +46,13 @@ const CONTAINER_BREAKPOINTS = new Set([
   660,  // --bp-island       : the head grids stop fitting below this
   800,  // --bp-island-media : the project card's print-beside-text spread
   801,  // --bp-island-media + 1: the min-width half of the pair
+  // --bp-island-identity: the hero's portrait-beside-NAME spread. A separate
+  // floor from 800 because a display name at --step-4 does not reflow the way
+  // the project card's blurb does: at an 808 container the name column is 254px
+  // for a string needing 250-280px, so it wrapped and the tagline broke
+  // mid-word. Full derivation in App.vue's token block.
+  960,
+  961,  // --bp-island-identity + 1: the min-width half of the pair
 ]);
 
 /** Feature queries that carry no px threshold are not breakpoints at all. */
