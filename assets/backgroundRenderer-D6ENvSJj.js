@@ -12,12 +12,12 @@
     const de = !1, U = 175, oe = {
         surface: [
             .985,
-            -.001,
-            .004
+            5e-4,
+            .006
         ],
         ink: [
             .28,
-            .001,
+            4e-4,
             .005
         ],
         minor_t: .08,
@@ -411,7 +411,7 @@
     async function ne() {
         if (!b) return !1;
         try {
-            const { WebglGameOfLife: e } = await import("./game_of_life_gpu-U0KGtTVi.js").then(async (m)=>{
+            const { WebglGameOfLife: e } = await import("./game_of_life_gpu-CwyFZttc.js").then(async (m)=>{
                 await m.__tla;
                 return m;
             }), r = Math.floor(Math.random() * 4294967296), t = await e.new_offscreen(b, r);
@@ -464,7 +464,7 @@
                     }
                     const s = performance.now();
                     if (n) try {
-                        const { GpuGameOfLife: o } = await import("./game_of_life_gpu-U0KGtTVi.js").then(async (m)=>{
+                        const { GpuGameOfLife: o } = await import("./game_of_life_gpu-CwyFZttc.js").then(async (m)=>{
                             await m.__tla;
                             return m;
                         }), c = performance.now();

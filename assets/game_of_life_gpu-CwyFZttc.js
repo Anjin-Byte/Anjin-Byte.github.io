@@ -1,6 +1,6 @@
 let P, D;
 let __tla = (async ()=>{
-    var N = "/assets/game_of_life_gpu_bg-Dgv8zR8P.wasm", $ = async (e = {}, _)=>{
+    var N = "/assets/game_of_life_gpu_bg-4VR-jPzD.wasm", $ = async (e = {}, _)=>{
         let t;
         if (_.startsWith("data:")) {
             const n = _.replace(/^data:.*?base64,/, "");
