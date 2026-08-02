@@ -55,12 +55,12 @@ const projectIndex: (Project & { visibleLinks: ResolvedProjectLink[] })[] = proj
       <!--<div class="projects-head">
         <h2 class="section-heading">Selected works</h2>
       </div>-->
-      <div class="projects-head">
+      <!-- <div class="projects-head"> -->
         <!-- <div class="resume-heading"> -->
           <!-- <span class="glass-chip section-kicker">Selected Projects</span> -->
           <!-- <h2 class="section-heading resume-title">Cool stuff</h2> -->
         <!-- </div> -->
-      </div>
+      <!-- </div> -->
 
       <article
         v-for="featuredProject in featuredProjects"
