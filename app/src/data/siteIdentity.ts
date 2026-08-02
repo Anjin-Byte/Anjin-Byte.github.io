@@ -116,7 +116,7 @@ export const ogImagePath = '/og-card.png';
  *  `Person.image`. One file, so the face search shows and the face the page
  *  shows cannot diverge. Regenerate from the full-resolution source with:
  *    cwebp -q 88 -m 6 -sharp_yuv -crop 735 200 960 960 -resize 560 0 \
- *      me.png -o public/portrait.webp
+ *      src/assets/me.jpg -o public/portrait.webp
  *  The crop is deliberate: a circular mask clips the square's corners, so the
  *  subject needs headroom or the mask cuts his hair. */
 export const portraitPath = '/portrait.webp';
