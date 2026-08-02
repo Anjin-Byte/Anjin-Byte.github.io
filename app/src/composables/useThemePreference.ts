@@ -1,7 +1,7 @@
 import { ref, computed, watch } from 'vue';
 import type { ThemePalette, OkLab } from '../types/theme';
 import {
-  CUT, LIGHT_THEME, DARK_THEME, lerpOkLab, oklabCss, oklchCss,
+  CUT, LIGHT_THEME, DARK_THEME, lerpOkLab, liftOkLab, oklabCss, oklchCss,
   oklchToOklab, clampL, mixOkLab, fadeOkLab,
 } from '../types/theme';
 import { vuetify } from '../plugins/vuetify';
@@ -151,9 +151,16 @@ if (typeof window !== 'undefined' && document?.documentElement) {
     // pre-hydration fallback; they are dead weight only once this code runs.
     const accentOkLab = oklchToOklab(t.accent, t.accent_chroma_scale);
 
-    const islandFill = isDark
-      ? lerpOkLab(t.ink, t.surface, 0.88)   // 88% surface + 12% ink
-      : lerpOkLab(WHITE, t.surface, 0.97);  // 97% surface + 3% white
+    // Raised plane. `liftOkLab(_, +1)` warms it and adds a little chroma: it is
+    // the sheet catching light. In light mode this is the ONLY thing separating
+    // the island's fill from the page (both resolve to #fcfaf6 without it), so
+    // the lift is load-bearing here rather than ornamental. See theme.ts.
+    const islandFill = liftOkLab(
+      isDark
+        ? lerpOkLab(t.ink, t.surface, 0.88)   // 88% surface + 12% ink
+        : lerpOkLab(WHITE, t.surface, 0.97),  // 97% surface + 3% white
+      1,
+    );
     s('--island-fill', oklabCss(islandFill));
 
     if (isDark) {
@@ -163,7 +170,9 @@ if (typeof window !== 'undefined' && document?.documentElement) {
       s('--island-edge', oklabCss(lerpOkLab(t.ink, t.surface, 0.90))); // 90% surface + 10% ink
     }
 
-    const wellRecess = lerpOkLab(t.surface, t.ink, 0.04); // 96% surface + 4% ink
+    // Sunken plane. `liftOkLab(_, -1)` cools it and takes chroma away: it is the
+    // recess in shadow. Symmetric with the raised lift above, one knob apart.
+    const wellRecess = liftOkLab(lerpOkLab(t.surface, t.ink, 0.04), -1); // 96% surface + 4% ink
     s('--well-recess', oklabCss(wellRecess));
 
     const badgeFill = fadeOkLab(t.ink, 6);

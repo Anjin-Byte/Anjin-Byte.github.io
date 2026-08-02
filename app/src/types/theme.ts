@@ -35,6 +35,53 @@ export type OkLch = readonly [L: number, C: number, H: number];
  */
 export const CUT = 0.05;
 
+/**
+ * The neutral spine: the OKLCH hue every neutral in the system rides.
+ * Both endpoints of both palettes sit here. See docs/color/03 §1.1.
+ */
+export const SPINE_HUE = 85;
+
+/**
+ * ── Warm lift: elevation expressed in hue and chroma, not only lightness ────
+ *
+ * `CUT` above nudges L to cut an edge. These do the other half: a plane that
+ * rises catches more light, so it goes WARMER (hue rotates down the warm-earth
+ * band, toward sienna) and gains a little chroma. A plane that sinks is in
+ * shadow, so it goes cooler and greyer. That is how real material behaves, and
+ * it is the oldest device in representational painting.
+ *
+ * Why this earns its place rather than being decoration: in LIGHT mode the
+ * raised island fill and the page surface resolve to the same 8-bit color
+ * (#fcfaf6 both). Elevation there is carried entirely by the lip and the edge,
+ * never by the fill, so a raised sheet reads as an outlined region rather than
+ * as a different piece of stock. Hue and chroma are the only channels left to
+ * say "this is lit" without touching L and flattening the cut.
+ *
+ * Magnitudes are deliberately below the threshold at which anyone would call
+ * it colour: one plane step is 5° of hue and 0.002 of chroma. Across the full
+ * range (sunken to raised) that is 10° and 0.004, which keeps every plane
+ * inside the spine's C ≤ 0.010 ceiling. It compounds with the existing
+ * lightness separation rather than replacing it.
+ */
+export const LIFT_HUE = 5;
+export const LIFT_CHROMA = 0.002;
+
+/**
+ * Apply the warm lift for an elevation `level`: +1 raised, 0 field, -1 sunken.
+ * Rotates hue and scales chroma while holding L, so it composes with `CUT`
+ * (which moves L and holds hue) instead of competing with it.
+ *
+ * A colour at negligible chroma has no meaningful hue to rotate, so it is
+ * anchored to the spine rather than to whatever `atan2(0, 0)` returns.
+ */
+export function liftOkLab([L, a, b]: OkLab, level: number): OkLab {
+  const chroma = Math.hypot(a, b);
+  const hue = chroma < 1e-6 ? (SPINE_HUE * Math.PI) / 180 : Math.atan2(b, a);
+  const lifted = Math.max(0, chroma + LIFT_CHROMA * level);
+  const rotated = hue - ((LIFT_HUE * Math.PI) / 180) * level;
+  return [L, lifted * Math.cos(rotated), lifted * Math.sin(rotated)];
+}
+
 export interface ThemePalette {
   // ── Shader-bound ─────────────────────────────────────────────────────────
   surface: OkLab;        // paper / page background
@@ -95,8 +142,20 @@ export interface ThemePalette {
 
 /** Light palette: airy paper, ghostly cells, no grain needed. */
 export const LIGHT_THEME: ThemePalette = {
-  surface: [0.985, -0.001,  0.004],   // ≈ #fafaf8 — faintly warm near-white
-  ink:     [0.280,  0.001,  0.005],   // kept at readable L for grid/text use
+  // Both endpoints ride the NEUTRAL SPINE at OKLCH hue 85° (warm amber-straw).
+  // They already carried a warm cast before this (surface 104°, ink 79°); the
+  // rotation onto one shared axis is what makes them one family instead of two
+  // near-neutrals that happen to be warm. See docs/color/03 §1.1.
+  //
+  // Chroma: ink is UNCHANGED at 0.005, so text moves by 6° of hue at a chroma
+  // below the visible-cast floor, i.e. not at all. Only the surface gains
+  // anything, 0.0041 → 0.006, which is the smallest step that reads as paper
+  // rather than as grey. The spine ceiling is 0.010; this deliberately stops
+  // short of it. The canvas picks the tint up for free through `surface_linear`
+  // (docs/color/07 §4.1 D4), so the largest surface on the site warms with no
+  // shader change.
+  surface: [0.985,  0.0005, 0.0060],  // ≈ #fcfaf6 — warm paper, C 0.006 @ H 85
+  ink:     [0.280,  0.0004, 0.0050],  // C 0.005 @ H 85 — same chroma as before
   minor_t:  0.08,
   major_t:  0.14,
   border_t: 0.24,
@@ -115,8 +174,18 @@ export const LIGHT_THEME: ThemePalette = {
 
 /** Dark palette: deep cool surface, faint-glow cells, subtle dither. */
 export const DARK_THEME: ThemePalette = {
-  surface: [0.180,  0.000, -0.003],   // ≈ #181819 — deep, faintly cool
-  ink:     [0.840,  0.000, -0.002],   // kept at readable L for grid/text use
+  // Dark rides the SAME 85° spine as light. This is the one place the spine
+  // changes character rather than formalising it: dark's endpoints were faintly
+  // COOL (both ≈270°). docs/color/03 §1.1 treats that cast as noise rather than
+  // intent, since dark ink sits at C 0.002, below the visible-cast floor, and a
+  // shared axis is the "one family" tell. Chroma stays at a whisper: the surface
+  // moves 0.003 → 0.005 and ink is unchanged at 0.002.
+  //
+  // This does NOT touch the transposed-pair asymmetry, which lives in the
+  // endpoint L values, ink_opacity, grain, and the rose↔purple accent. Those are
+  // all still authored per mode. Only the neutral hue axis is now shared.
+  surface: [0.180,  0.0004, 0.0050],  // ≈ #13110f — deep warm, C 0.005 @ H 85
+  ink:     [0.840,  0.0002, 0.0020],  // C 0.002 @ H 85 — same chroma as before
   minor_t:  0.08,                     // proportions identical to light
   major_t:  0.14,
   border_t: 0.24,

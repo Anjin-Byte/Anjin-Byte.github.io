@@ -163,6 +163,20 @@ fn linear_to_oklab(c: vec3f) -> vec3f {
 // CPU. The two OKLab transforms above are the only color-space code left —
 // linear_to_oklab for the lit paper, oklab_to_linear for the final result.)
 
+// ── Relief amplitudes ─────────────────────────────────────────────────────────
+//
+// How hard the shared light (see step 8b) bites at ink edges and grid lines,
+// in OKLab L. Deliberately NOT uniforms: `RenderUniforms` / `PaperParams` are
+// size- and offset-guarded by `const _` asserts in renderer/types.rs, and
+// widening that contract to tune two numbers would cost more than it buys.
+// Promote them if they ever need to be theme- or runtime-driven.
+//
+// The gradient of an antialiased edge is ≈1 per pixel and `L.xy` has magnitude
+// ≈0.31, so the realised swing is about ±0.015 for ink and ±0.009 for the grid.
+// Enough to read as a lit edge, far too little to read as an outline.
+const INK_RELIEF: f32 = 0.05;
+const GRID_SCORE: f32 = 0.03;
+
 // ── Hash / noise ──────────────────────────────────────────────────────────────
 
 fn hash11(p: f32) -> f32 {
@@ -681,6 +695,42 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     let paper_grid_lab  = mix(after_minor_lab, theme.major_lab.xyz, major_cov * grid_mask);
     let result_lab      = mix(paper_grid_lab,  theme.ink_lab.xyz,   coverage * theme.ink_opacity);
 
+    // ── 8b. Relief: light the ink, score the grid ────────────────────────────
+    // Step 2 lights the paper fibre and is the ONLY lit layer; the grid and the
+    // ink then composite flat on top of it. These two terms hand both of them
+    // the same light `L`, so the whole canvas obeys one lighting model instead
+    // of one lit layer and two printed ones.
+    //
+    // First-order relief: for a height field h, the shading delta against a
+    // flat surface is -dot(grad(h), L.xy). Ink is RAISED (h = coverage), so it
+    // takes that sign and reads as a stamp with thickness, highlight on the
+    // light side and shadow opposite. The grid is IMPRESSED, so it takes the
+    // opposite sign and reads as scored INTO the stock rather than printed onto
+    // it. That is the same rule every DOM surface follows through `--cut`: the
+    // canvas grid was the one large surface not participating in the cut-paper
+    // material language.
+    //
+    // Only the EDGES carry a gradient, so this costs nothing in a cell's
+    // interior and nothing on bare paper. Amplitudes are held small on purpose:
+    // the visible swing is roughly ±0.02 in OKLab L, well inside the site's
+    // atmosphere budget, so it reads as material rather than as an outline.
+    //
+    // Applied to OKLab L like the grain term below, so one amplitude reads the
+    // same on light and dark palettes. Derivatives require uniform control
+    // flow, so this must sit AHEAD of the grain branch.
+    let ink_grad    = vec2f(dpdx(coverage), dpdy(coverage));
+    let grid_h      = (minor_cov + major_cov) * grid_mask;
+    let grid_grad   = vec2f(dpdx(grid_h), dpdy(grid_h));
+    let ink_relief  = -dot(ink_grad,  L.xy) * INK_RELIEF;
+    let grid_relief =  dot(grid_grad, L.xy) * GRID_SCORE;
+    // Clamped because light-mode paper sits at L 0.985, so a highlight there
+    // has almost no headroom before it would wrap.
+    let relit_lab   = vec3f(
+        clamp(result_lab.x + ink_relief + grid_relief, 0.0, 1.0),
+        result_lab.y,
+        result_lab.z,
+    );
+
     // ── 9. Material grain (uniform-gated) ────────────────────────────────────
     // Procedural value noise at a high spatial frequency gives fine-grained
     // variation (~1.5-2 px features on canvas, roughly 1 CSS-px on 2× DPI)
@@ -693,13 +743,13 @@ fn fs_main(@builtin(position) frag_pos: vec4f) -> @location(0) vec4f {
     // no derivative/textureSample calls occur past this point), so themes
     // with grain off — light mode ships 0.0 — skip the noise evaluation
     // entirely instead of computing a term that multiplies to zero.
-    var final_lab = result_lab;
+    var final_lab = relit_lab;
     if theme.grain_intensity != 0.0 {
         let grain_sample = value_noise(vec2f(px, world_y) * 0.6) - 0.5;
         final_lab = vec3f(
-            result_lab.x + grain_sample * theme.grain_intensity,
-            result_lab.y,
-            result_lab.z,
+            relit_lab.x + grain_sample * theme.grain_intensity,
+            relit_lab.y,
+            relit_lab.z,
         );
     }
 
