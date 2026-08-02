@@ -12102,9 +12102,6 @@ Expected #hex, #hexa, rgb(), rgba(), hsl(), hsla(), object or number`);
           class: "projects-container"
         }, {
           default: $n(() => [
-            a[0] || (a[0] = pe("div", {
-              class: "projects-head"
-            }, null, -1)),
             (Ze(true), ot(Lt, null, Vn(pt(t), (i) => (Ze(), ot("article", {
               key: i.title,
               class: rr([
@@ -12209,7 +12206,7 @@ Expected #hex, #hexa, rgb(), rgba(), hsl(), hsla(), object or number`);
   }), sD = $r(oD, [
     [
       "__scopeId",
-      "data-v-e9c18f5d"
+      "data-v-5e3fb25f"
     ]
   ]), lD = {
     id: "resume",
