@@ -45,15 +45,21 @@ const projectIndex: (Project & { visibleLinks: ResolvedProjectLink[] })[] = proj
 <template>
   <section id="projects" class="demos-section">
     <v-container class="projects-container">
+      <!-- A label, not a pitch. Every other section carries a kicker chip plus a
+           heading that says something about the section; this one deliberately
+           does not. A list of built things needs no thesis statement about
+           itself, and any sentence in that slot could only tell the reader how
+           to feel about work they are about to see for themselves. The chip and
+           the standfirst were both removed for that reason, which leaves the
+           heading doing the labelling the chip used to do. -->
+      <!--<div class="projects-head">
+        <h2 class="section-heading">Selected works</h2>
+      </div>-->
       <div class="projects-head">
-        <div class="projects-heading">
-          <span class="glass-chip section-kicker">Selected work</span>
-          <h2 class="section-heading projects-title">Small things, built carefully.</h2>
-        </div>
-        <p class="section-intro projects-intro">
-          Projects spanning graphics, emulation, mesh generation, and interface
-          engineering.
-        </p>
+        <!-- <div class="resume-heading"> -->
+          <!-- <span class="glass-chip section-kicker">Selected Projects</span> -->
+          <!-- <h2 class="section-heading resume-title">Cool stuff</h2> -->
+        <!-- </div> -->
       </div>
 
       <article
@@ -164,26 +170,18 @@ const projectIndex: (Project & { visibleLinks: ResolvedProjectLink[] })[] = proj
   max-width: var(--container-max);
 }
 
+/* One element now, so no grid. The two-column head existed to set the heading
+   against a standfirst on the right; with the standfirst gone the second track
+   would hold only empty space and `align-items: end` would have nothing to
+   align against. */
 .projects-head {
-  display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.85fr);
-  gap: 1.5rem 2rem;
-  align-items: end;
   margin-bottom: 2.25rem;
 }
 
-.projects-heading {
-  display: grid;
-  gap: 1rem;
-}
-
-.projects-title {
-  max-width: 13ch;
-}
-
-.projects-intro {
-  justify-self: end;
-}
+/* `.projects-title` is gone with its rule. The old 13ch cap was tuned to wrap a
+   six-word sentence into a stack; "Selected works" is two words, and a cap that
+   tight would split a two-word label across two lines for no reason. The
+   heading now needs nothing beyond `.section-heading`. */
 
 .project-feature {
   display: block;
@@ -527,14 +525,8 @@ const projectIndex: (Project & { visibleLinks: ResolvedProjectLink[] })[] = proj
 }
 
 @container island (max-width: 660px) {
-  .projects-head {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .projects-intro {
-    justify-self: start;
-  }
-
+  /* The head's narrow-width collapse went with the grid: a single heading needs
+     no column override, and there is no standfirst left to re-align. */
   .project-index {
     grid-template-columns: minmax(0, 1fr);
   }

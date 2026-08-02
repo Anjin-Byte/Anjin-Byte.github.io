@@ -11,12 +11,12 @@ const formatDate = (iso: string): string => dateFmt.format(new Date(`${iso}T12:0
   <section id="notebook" class="notebook-section">
     <v-container class="notebook-container">
       <div class="notebook-head">
-        <span class="glass-chip section-kicker">Notebook</span>
-        <h2 class="section-heading notebook-title">Field notes.</h2>
-        <p class="section-intro notebook-intro">
+        <!-- <span class="glass-chip section-kicker">Notebook</span> -->
+        <h2 class="section-heading notebook-title">Notebook</h2>
+        <!-- <p class="section-intro notebook-intro">
           Working notes on building this site: design, graphics, and the
           occasional dead end.
-        </p>
+        </p> -->
       </div>
 
       <ol class="note-index">

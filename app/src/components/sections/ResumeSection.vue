@@ -29,7 +29,7 @@ const printContacts = contactLinks.filter(
 
       <div class="resume-head">
         <div class="resume-heading">
-          <span class="glass-chip section-kicker">Resume</span>
+          <!-- <span class="glass-chip section-kicker">Resume</span> -->
           <h2 class="section-heading resume-title">Experience</h2>
         </div>
       </div>
